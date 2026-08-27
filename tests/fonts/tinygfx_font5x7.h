@@ -10,7 +10,7 @@
 #include <TinyGFX/Font.h>
 #include <stdint.h>
 
-static const uint8_t tinygfxFont5x7Bitmaps[160] = {
+static const uint8_t tinygfxFont5x7Bitmaps[160] TINYGFX_FONT_PROGMEM = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x21, 0x08, 0x42, 0x00, 0x80, 0x52, 0x80,
     0x00, 0x00, 0x00, 0x52, 0xBE, 0xAF, 0xA9, 0x40, 0x23, 0xE8, 0xE2, 0xF8,
     0x80, 0xCE, 0x44, 0x44, 0x4E, 0x60, 0x64, 0xA8, 0x8A, 0xC9, 0xA0, 0x21,
@@ -27,7 +27,7 @@ static const uint8_t tinygfxFont5x7Bitmaps[160] = {
     0x42, 0x22, 0x00, 0x80,
 };
 
-static const GFXglyph tinygfxFont5x7Glyphs[32] = {
+static const GFXglyph tinygfxFont5x7Glyphs[32] TINYGFX_FONT_PROGMEM = {
     {0, 5, 7, 6, 0, -7},  // 0x20 ' '
     {5, 5, 7, 6, 0, -7},  // 0x21 '!'
     {10, 5, 7, 6, 0, -7},  // 0x22 '"'
@@ -62,7 +62,7 @@ static const GFXglyph tinygfxFont5x7Glyphs[32] = {
     {155, 5, 7, 6, 0, -7},  // 0x3f '?'
 };
 
-static const GFXfont tinygfxFont5x7 = {
+static const GFXfont tinygfxFont5x7 TINYGFX_FONT_PROGMEM = {
     (uint8_t*)tinygfxFont5x7Bitmaps,
     (GFXglyph*)tinygfxFont5x7Glyphs,
     0x20, 0x3f, 8,

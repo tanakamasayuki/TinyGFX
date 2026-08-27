@@ -322,11 +322,13 @@ class TinyGFX {
   void setFont(const TinyGFXFont* font) {
     _font = font;
     _ascent = 0;
-    if (font == nullptr || font->glyph == nullptr) return;
+    if (font == nullptr) return;
+    const TinyGFXGlyph* g = (const TinyGFXGlyph*)tinygfx_rdptr(&font->glyph);
+    if (g == nullptr) return;
+    const uint16_t n = (uint16_t)(tinygfx_rd16(&font->last) - tinygfx_rd16(&font->first) + 1);
     int8_t minY = 0;
-    const uint16_t n = (uint16_t)(font->last - font->first + 1);
     for (uint16_t i = 0; i < n; ++i) {
-      const int8_t yo = font->glyph[i].yOffset;
+      const int8_t yo = (int8_t)tinygfx_rd8(&g[i].yOffset);
       if (yo < minY) minY = yo;
     }
     _ascent = (int8_t)(-minY);
@@ -342,15 +344,18 @@ class TinyGFX {
 
   int16_t fontHeight() const {
     if (_font == nullptr) return 0;
-    return (int16_t)((uint16_t)_font->yAdvance * _textSize);
+    return (int16_t)((uint16_t)tinygfx_rd8(&_font->yAdvance) * _textSize);
   }
   int16_t textWidth(const char* str) const {
     if (_font == nullptr || str == nullptr) return 0;
+    const TinyGFXGlyph* g = (const TinyGFXGlyph*)tinygfx_rdptr(&_font->glyph);
+    const uint16_t first = tinygfx_rd16(&_font->first);
+    const uint16_t last = tinygfx_rd16(&_font->last);
     int16_t total = 0;
     while (*str) {
       const uint8_t c = (uint8_t)*str++;
-      if (c < _font->first || c > _font->last) continue;
-      const uint16_t adv = (uint16_t)_font->glyph[c - _font->first].xAdvance * _textSize;
+      if (c < first || c > last) continue;
+      const uint16_t adv = (uint16_t)tinygfx_rd8(&g[c - first].xAdvance) * _textSize;
       total = (int16_t)(total + (int16_t)adv);
     }
     return total;
@@ -360,29 +365,34 @@ class TinyGFX {
   /// 戻り値は送り幅。
   int16_t drawChar(uint16_t ch, int16_t x, int16_t y) {
     const TinyGFXFont* f = _font;
-    if (f == nullptr || f->glyph == nullptr || f->bitmap == nullptr) return 0;
-    if (ch < f->first || ch > f->last) return 0;
-    const TinyGFXGlyph* g = &f->glyph[ch - f->first];
+    if (f == nullptr) return 0;
+    const uint16_t first = tinygfx_rd16(&f->first);
+    if (ch < first || ch > tinygfx_rd16(&f->last)) return 0;
+    const TinyGFXGlyph* gp = (const TinyGFXGlyph*)tinygfx_rdptr(&f->glyph);
+    const uint8_t* bm = (const uint8_t*)tinygfx_rdptr(&f->bitmap);
+    if (gp == nullptr || bm == nullptr) return 0;
+    const TinyGFXGlyph* g = &gp[ch - first];
+
     const uint8_t sz = _textSize;
-    const int16_t adv = (int16_t)((uint16_t)g->xAdvance * sz);
+    const int16_t adv = (int16_t)((uint16_t)tinygfx_rd8(&g->xAdvance) * sz);
 
     startWrite();
     if (_textHasBg) {  // セル全体を背景で塗ってから前景だけ描く
-      fillRect(x, y, adv, (int16_t)((uint16_t)f->yAdvance * sz), _textBg);
+      fillRect(x, y, adv, (int16_t)((uint16_t)tinygfx_rd8(&f->yAdvance) * sz), _textBg);
     }
-    const uint8_t gw = g->width;
-    const uint8_t gh = g->height;
+    const uint8_t gw = tinygfx_rd8(&g->width);
+    const uint8_t gh = tinygfx_rd8(&g->height);
     if (gw != 0 && gh != 0) {
-      const uint8_t* bm = f->bitmap + g->bitmapOffset;
-      const int16_t gx = (int16_t)(x + (int16_t)((int16_t)g->xOffset * sz));
-      int16_t py = (int16_t)(y + (int16_t)((int16_t)(_ascent + g->yOffset) * sz));
+      const uint8_t* src = bm + tinygfx_rd16(&g->bitmapOffset);
+      const int16_t gx = (int16_t)(x + (int16_t)((int8_t)tinygfx_rd8(&g->xOffset) * sz));
+      int16_t py = (int16_t)(y + (int16_t)((int16_t)(_ascent + (int8_t)tinygfx_rd8(&g->yOffset)) * sz));
       uint32_t bit = 0;
       for (uint8_t r = 0; r < gh; ++r) {
         int16_t px = gx;
         uint8_t runStart = 0;
         bool cur = false;
         for (uint8_t c = 0; c < gw; ++c) {
-          const bool on = ((bm[bit >> 3] >> (7 - (bit & 7))) & 1) != 0;
+          const bool on = ((tinygfx_rd8(&src[bit >> 3]) >> (7 - (bit & 7))) & 1) != 0;
           ++bit;
           if (c == 0) { cur = on; continue; }
           if (on != cur) {
