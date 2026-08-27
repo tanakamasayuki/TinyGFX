@@ -17,7 +17,7 @@
 | Panel | `PanelST7789` / `PanelMemory` **実装済み** |
 | 帯レンダリング `TileCanvas.h` | **実装済み**（D16） |
 | `Print.h`（拡張） | **実装済み** |
-| フォント | GFXfont 互換に決定（D17）。つなぎの 5x7 を `tests/fonts/` に生成 |
+| フォント | **独自の TinyFont に変更（D17 改訂）。** 索引とグリフ表を生成時に選ぶ。GFXfont より ASCII で 57% 小さく、CJK の疎な集合も表せる（[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md)） |
 | `tests/linkprune/` | **通っている（11 件）** |
 | `tests/footprint/` | **通っている（2 件）**。実測は [FOOTPRINT.ja.md](FOOTPRINT.ja.md) §5 |
 | Tier 1（描画の正しさ） | **完了。8 本すべて通っている**（`capture` `window` `primitive` `clip` `fill` `tile` `text` `image`） |

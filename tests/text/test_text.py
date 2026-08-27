@@ -6,6 +6,8 @@
 
 from pathlib import Path
 
+from PIL import ImageChops
+
 import tgfx_check as tc
 
 SKETCH = Path(__file__).parent
@@ -57,3 +59,13 @@ def test_text(dut):
     tr = tc.image(SKETCH, "transparent").load()
     assert tr[2, 3] == BLACK or tr[2 + 5, 3] == BLACK, (
         "透過なのにグリフの隙間が塗られている")
+
+    # --- TinyFont の変種は同じ絵になること ------------------------------------
+    # 索引（連続 / 疎）とグリフ表（無し / 有り）は生成時の選択でしかない。
+    # どれを選んでも描画結果は 1 画素も変わらないこと。
+    ref = tc.image(SKETCH, "var_fixed")
+    assert tc.lit(ref), "基準の変種が 1 画素も描けていない"
+    for name in ["var_records", "var_sparse"]:
+        img = tc.image(SKETCH, name)
+        box = ImageChops.difference(ref, img).getbbox()
+        assert box is None, f"{name} が固定ピッチ版と違う: bbox={box}"

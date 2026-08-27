@@ -58,10 +58,14 @@ jobs:
         working-directory: tests
         run: uv sync
 
-      - name: Check the generated font is current
+      - name: Check the generated fonts are current
         run: |
-          python3 tools/gen_font.py
-          git diff --exit-code tests/common_libs/tgfx_font/
+          F=tests/common_libs/tgfx_font/src
+          python3 tools/gen_font.py --mode fixed   --symbol tinygfxFont5x7       --out $F/tinygfx_font5x7.h
+          python3 tools/gen_font.py --mode records --symbol tinygfxFont5x7Rec    --out $F/tinygfx_font5x7_rec.h
+          python3 tools/gen_font.py --mode fixed --sparse --symbol tinygfxFont5x7Sparse --out $F/tinygfx_font5x7_sparse.h
+          python3 tools/gen_font.py --mode fixed   --symbol tinygfxFont5x7 --out examples/HelloWorld/tinygfx_font5x7.h
+          git diff --exit-code tests/common_libs/tgfx_font/ examples/HelloWorld/
 
       - name: Run pytest
         working-directory: tests

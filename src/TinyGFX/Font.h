@@ -1,38 +1,50 @@
-// TinyGFX - font description (Adafruit GFXfont compatible)
+// TinyGFX - TinyFont: 組込み向けの最小ビットマップフォント形式
 //
-// LGFXFontToolJs が出力する GFXfont 形式をそのまま食える形にしている。
-// 既存の Adafruit GFX 用フォントヘッダも同じ型でそのまま使える。
+// 設計の要点は「選択を実行時ではなく**生成時**に済ませ、結果をデータで表す」こと。
+//
+//   索引     連続（first からの通し）か、疎（昇順のコード表）か
+//   レコード 持つ（可変ピッチ）か、持たない（固定ピッチ）か
+//
+// どちらもポインタが nullptr かどうかで決まる。デコーダ側の分岐は
+// それぞれ 1 か所だけで、使わない側もリンクされるが数十バイトに収まる。
+// 詳しくは docs/FONT_FORMAT.ja.md。
 //
 // ビットマップは「行を連結した MSB first のビット列、グリフ間はバイト境界揃え」。
+// GFXfont（Adafruit）と同じ並びなので、既存資産はツール側で変換できる。
+//
 // TinyGFX 自身はフォントデータを 1 つも同梱しない（docs/DECISIONS.ja.md D17）。
 #pragma once
 #include <stdint.h>
 
-// Adafruit gfxfont.h と同じガード名。先に include されていればそちらを使う。
-#ifndef _GFXFONT_H_
-#define _GFXFONT_H_
+/// 可変ピッチのときのグリフ 1 件。**4 バイト固定。**
+/// 高さ・xOffset・yOffset はフォント全体で共通なので持たない。
+struct TinyGFXGlyph {
+  uint8_t offsetLo;   // bitmap 先頭からのバイトオフセット（16bit）
+  uint8_t offsetHi;
+  uint8_t width;      // グリフの幅（画素）
+  uint8_t xAdvance;   // 送り幅
+};
 
-typedef struct {
-  uint16_t bitmapOffset;  // bitmap 先頭からのバイトオフセット
-  uint8_t width;          // グリフの幅（画素）
-  uint8_t height;         // グリフの高さ（画素）
-  uint8_t xAdvance;       // 送り幅
-  int8_t xOffset;         // 描画開始位置（左）
-  int8_t yOffset;         // 描画開始位置（ベースラインから上が負）
-} GFXglyph;
+struct TinyGFXFont {
+  const uint8_t* bitmap;
 
-typedef struct {
-  uint8_t* bitmap;
-  GFXglyph* glyph;
-  uint16_t first;
-  uint16_t last;
-  uint8_t yAdvance;  // 行送り
-} GFXfont;
+  /// nullptr なら**固定ピッチ**（全グリフが width / xAdvance / bytesPerGlyph 共通）。
+  const TinyGFXGlyph* glyphs;
 
-#endif  // _GFXFONT_H_
+  /// nullptr なら**連続索引**（first から count 個）。
+  /// 非 nullptr なら**疎索引**（昇順に並んだコード表。count 個）。
+  const uint16_t* codes;
 
-typedef GFXglyph TinyGFXGlyph;
-typedef GFXfont TinyGFXFont;
+  uint16_t first;         // 連続索引のときの開始コード
+  uint16_t count;         // 収録グリフ数
+  uint8_t width;          // 固定ピッチのときのグリフ幅
+  uint8_t height;         // 全グリフ共通
+  uint8_t xAdvance;       // 固定ピッチのときの送り幅
+  uint8_t yAdvance;       // 行送り
+  int8_t xOffset;         // 全グリフ共通
+  int8_t yOffset;         // 全グリフ共通（ベースラインから上が負）
+  uint8_t bytesPerGlyph;  // 固定ピッチのとき。実行時に除算しないため持っておく
+};
 
 // ---------------------------------------------------------------------------
 // フォントデータの読み出し
@@ -42,7 +54,6 @@ typedef GFXfont TinyGFXFont;
 // 1 命令も増えない。
 //
 // **AVR ではフォントを PROGMEM に置くこと。** 置かないと化ける。
-// tools/gen_font.py と LGFXFontToolJs の出力はどちらも PROGMEM を付ける。
 // ---------------------------------------------------------------------------
 #if defined(__AVR__)
 #include <avr/pgmspace.h>

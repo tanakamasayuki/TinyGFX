@@ -11,6 +11,15 @@
 #include "Font.h"
 #include "Panel.h"
 
+// 使うフォント変種が決まっているなら、要らない側の分岐を落とせる。
+// 既定は両方あり（生成側が自由に選べる）。効果は docs/FONT_FORMAT.ja.md の実測表。
+#ifndef TINYGFX_FONT_SPARSE
+#define TINYGFX_FONT_SPARSE 1  // 0 にすると疎索引（コード表）を落とす
+#endif
+#ifndef TINYGFX_FONT_RECORDS
+#define TINYGFX_FONT_RECORDS 1  // 0 にすると可変ピッチ（グリフ表）を落とす
+#endif
+
 class TinyGFX {
  public:
   explicit TinyGFX(TinyGFXPanel& panel) : _panel(&panel) {}
@@ -317,21 +326,11 @@ class TinyGFX {
   }
 
   // ---- 文字 ------------------------------------------------------------
-  /// GFXfont（Adafruit / LGFXFontToolJs 出力）を設定する。
-  /// ascent はここで一度だけ求める。描画のたびに全グリフを走査しないため。
+  /// TinyFont を設定する。ascent はフォント全体で共通なのでここで済む
+  /// （グリフ表を走査しない）。
   void setFont(const TinyGFXFont* font) {
     _font = font;
-    _ascent = 0;
-    if (font == nullptr) return;
-    const TinyGFXGlyph* g = (const TinyGFXGlyph*)tinygfx_rdptr(&font->glyph);
-    if (g == nullptr) return;
-    const uint16_t n = (uint16_t)(tinygfx_rd16(&font->last) - tinygfx_rd16(&font->first) + 1);
-    int8_t minY = 0;
-    for (uint16_t i = 0; i < n; ++i) {
-      const int8_t yo = (int8_t)tinygfx_rd8(&g[i].yOffset);
-      if (yo < minY) minY = yo;
-    }
-    _ascent = (int8_t)(-minY);
+    _ascent = font ? (int8_t)(-(int8_t)tinygfx_rd8(&font->yOffset)) : 0;
   }
   const TinyGFXFont* getFont() const { return _font; }
   void setCursor(int16_t x, int16_t y) { _cursorX = x; _cursorY = y; }
@@ -348,44 +347,50 @@ class TinyGFX {
   }
   int16_t textWidth(const char* str) const {
     if (_font == nullptr || str == nullptr) return 0;
-    const TinyGFXGlyph* g = (const TinyGFXGlyph*)tinygfx_rdptr(&_font->glyph);
-    const uint16_t first = tinygfx_rd16(&_font->first);
-    const uint16_t last = tinygfx_rd16(&_font->last);
     int16_t total = 0;
     while (*str) {
-      const uint8_t c = (uint8_t)*str++;
-      if (c < first || c > last) continue;
-      const uint16_t adv = (uint16_t)tinygfx_rd8(&g[c - first].xAdvance) * _textSize;
-      total = (int16_t)(total + (int16_t)adv);
+      total = (int16_t)(total + (int16_t)((uint16_t)advanceOf((uint8_t)*str++) * _textSize));
     }
     return total;
   }
 
   /// 1 文字描く。y は行の上端（LovyanGFX 流。Adafruit のベースライン基準ではない）。
-  /// 戻り値は送り幅。
+  /// 戻り値は送り幅。収録外の文字は 0。
   int16_t drawChar(uint16_t ch, int16_t x, int16_t y) {
     const TinyGFXFont* f = _font;
     if (f == nullptr) return 0;
-    const uint16_t first = tinygfx_rd16(&f->first);
-    if (ch < first || ch > tinygfx_rd16(&f->last)) return 0;
-    const TinyGFXGlyph* gp = (const TinyGFXGlyph*)tinygfx_rdptr(&f->glyph);
-    const uint8_t* bm = (const uint8_t*)tinygfx_rdptr(&f->bitmap);
-    if (gp == nullptr || bm == nullptr) return 0;
-    const TinyGFXGlyph* g = &gp[ch - first];
+    const int32_t idx = glyphIndex(ch);
+    if (idx < 0) return 0;
 
     const uint8_t sz = _textSize;
-    const int16_t adv = (int16_t)((uint16_t)tinygfx_rd8(&g->xAdvance) * sz);
+    uint16_t bmOffset;
+    uint8_t gw, adv;
+#if TINYGFX_FONT_RECORDS
+    const TinyGFXGlyph* gp = (const TinyGFXGlyph*)tinygfx_rdptr(&f->glyphs);
+    if (gp != nullptr) {  // 可変ピッチ: グリフ表から引く
+      const TinyGFXGlyph* g = &gp[idx];
+      bmOffset = (uint16_t)(tinygfx_rd8(&g->offsetLo) | ((uint16_t)tinygfx_rd8(&g->offsetHi) << 8));
+      gw = tinygfx_rd8(&g->width);
+      adv = tinygfx_rd8(&g->xAdvance);
+    } else
+#endif
+    {  // 固定ピッチ: グリフ表を持たない
+      bmOffset = (uint16_t)((uint16_t)idx * tinygfx_rd8(&f->bytesPerGlyph));
+      gw = tinygfx_rd8(&f->width);
+      adv = tinygfx_rd8(&f->xAdvance);
+    }
 
+    const int16_t advOut = (int16_t)((uint16_t)adv * sz);
     startWrite();
     if (_textHasBg) {  // セル全体を背景で塗ってから前景だけ描く
-      fillRect(x, y, adv, (int16_t)((uint16_t)tinygfx_rd8(&f->yAdvance) * sz), _textBg);
+      fillRect(x, y, advOut, (int16_t)((uint16_t)tinygfx_rd8(&f->yAdvance) * sz), _textBg);
     }
-    const uint8_t gw = tinygfx_rd8(&g->width);
-    const uint8_t gh = tinygfx_rd8(&g->height);
-    if (gw != 0 && gh != 0) {
-      const uint8_t* src = bm + tinygfx_rd16(&g->bitmapOffset);
-      const int16_t gx = (int16_t)(x + (int16_t)((int8_t)tinygfx_rd8(&g->xOffset) * sz));
-      int16_t py = (int16_t)(y + (int16_t)((int16_t)(_ascent + (int8_t)tinygfx_rd8(&g->yOffset)) * sz));
+    const uint8_t gh = tinygfx_rd8(&f->height);
+    const uint8_t* bm = (const uint8_t*)tinygfx_rdptr(&f->bitmap);
+    if (gw != 0 && gh != 0 && bm != nullptr) {
+      const uint8_t* src = bm + bmOffset;
+      const int16_t gx = (int16_t)(x + (int16_t)((int8_t)tinygfx_rd8(&f->xOffset) * sz));
+      int16_t py = y;  // yOffset は ascent に畳んであるので上端がそのまま原点
       uint32_t bit = 0;
       for (uint8_t r = 0; r < gh; ++r) {
         int16_t px = gx;
@@ -410,7 +415,7 @@ class TinyGFX {
       }
     }
     endWrite();
-    return adv;
+    return advOut;
   }
 
   /// 文字列を描く。戻り値は描いた幅。改行は解釈しない。
@@ -426,6 +431,42 @@ class TinyGFX {
   }
 
  protected:
+  /// 文字コード -> グリフ番号。収録外は -1。
+  /// 連続索引なら引き算 1 回、疎索引なら二分探索。
+  int32_t glyphIndex(uint16_t ch) const {
+    const TinyGFXFont* f = _font;
+    const uint16_t n = tinygfx_rd16(&f->count);
+#if TINYGFX_FONT_SPARSE
+    const uint16_t* codes = (const uint16_t*)tinygfx_rdptr(&f->codes);
+    if (codes != nullptr) {  // 疎（昇順のコード表を二分探索）
+      uint16_t lo = 0, hi = n;
+      while (lo < hi) {
+        const uint16_t mid = (uint16_t)((lo + hi) >> 1);
+        const uint16_t v = tinygfx_rd16(&codes[mid]);
+        if (v == ch) return (int32_t)mid;
+        if (v < ch) lo = (uint16_t)(mid + 1);
+        else hi = mid;
+      }
+      return -1;
+    }
+#endif
+    const uint16_t first = tinygfx_rd16(&f->first);  // 連続
+    if (ch < first) return -1;
+    const uint16_t off = (uint16_t)(ch - first);
+    return (off < n) ? (int32_t)off : -1;
+  }
+
+  /// 送り幅（倍率をかける前）。収録外は 0。
+  uint8_t advanceOf(uint16_t ch) const {
+    const int32_t idx = glyphIndex(ch);
+    if (idx < 0) return 0;
+#if TINYGFX_FONT_RECORDS
+    const TinyGFXGlyph* gp = (const TinyGFXGlyph*)tinygfx_rdptr(&_font->glyphs);
+    if (gp != nullptr) return tinygfx_rd8(&gp[idx].xAdvance);
+#endif
+    return tinygfx_rd8(&_font->xAdvance);
+  }
+
   static void swap16(int16_t& a, int16_t& b) {
     const int16_t t = a; a = b; b = t;
   }
