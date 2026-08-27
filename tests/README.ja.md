@@ -5,7 +5,8 @@ TinyGFX のテスト一式。方針とケース一覧は [../docs/TEST_PLAN.ja.m
 - [pytest-embedded](https://docs.espressif.com/projects/pytest-embedded/en/latest/) + Arduino CLI バックエンド、`uv` で依存管理
 - **Tier 0（`footprint/` / `linkprune/`）はスケッチを実行しない。** ビルドしてサイズと
   シンボル表を見るだけなので `dut` を使わない。実機も要らない
-- Tier 1（これから）は `lang-ship:host` 上でホスト実行し、描いた結果を画素で検証する
+- **Tier 1（`capture/` ほか 8 本）は `lang-ship:host` 上でホスト実行**し、描いた結果を
+  画素で検証する。SDL2 も LovyanGFX も要らない
 
 ## 動かす
 
@@ -23,6 +24,12 @@ uv run pytest linkprune -v   # 1 つだけ
 arduino-cli core install ch32-riscv-arduino:ch32riscv
 ```
 
+開発中の新コアで測るときは環境変数で切り替える:
+
+```sh
+TINYGFX_FQBN='ch32-riscv-ug:ch32v:CH32V003:pnum=CH32V003F4P6' uv run pytest footprint -s
+```
+
 ## 構成
 
 ```text
@@ -30,9 +37,34 @@ tests/
   tinygfx_build.py    arduino-cli を叩いてサイズとシンボルを取る共通ヘルパ
   constructs/         測定用スケッチ。base / a..e / t / p1 / p2（docs/FOOTPRINT.ja.md §4）
   fonts/              つなぎのフォント（tools/gen_font.py が生成）。ライブラリには同梱しない
+  tgfx_check.py       output/ に残ったものを読む小道具（report / image / lit / 色変換）
+  common_libs/
+    tgfx_test/        PPM 出力と report.txt への値の記録
+    tgfx_font/        つなぎのフォント。ライブラリには同梱しない
   footprint/          サイズの回帰。base からの増分が予算内か
   linkprune/          未使用機能が最終バイナリに残っていないか
+  capture/            BusCapture が ST7789 のコマンド列から画を復元できるか（Tier 1 の土台）
+  window/             回転の MADCTL・幅高さ・原点オフセットの導出
+  primitive/          全プリミティブと縮退ケース
+  clip/               クリップ内はクリップ無しと同じ、外は無傷（不変条件）
+  fill/               転送画素数の過不足
+  tile/               帯の行数を変えても直接描画と同じ（不変条件）
+  text/               文字。戻り値・倍角・収録外・背景色つき・透過
+  image/              pushImage の配置・切り取り・透過
+  build_matrix/       examples が ch32v003 / uno / esp32 でビルドできるか（実行はしない）
 ```
+
+## 値の受け渡し
+
+スケッチは `output/report.txt` に `key=value` を書き、pytest は `tgfx_check.report()`
+でそれを読む。**シリアルには進行（`TEST start` / `SCENE <name>` / `TEST done`）だけ流す。**
+`dut.expect` で値まで拾うとテストが不安定になるため。
+
+## 期待画像は持たない
+
+`clip/` と `tile/` は**不変条件**で書いてある — 「クリップ内はクリップ無しと 1 画素も
+違わない」「帯の行数を変えても直接描画と同じ」。シーンを変えてもテストが壊れないので、
+期待画像のメンテが要らない。
 
 ## `linkprune/` が見ているもの
 

@@ -7,16 +7,22 @@ Tier 0（footprint / linkprune）はスケッチを**実行しない**。ビル�
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 CONSTRUCTS = REPO / "tests" / "constructs"
-FONTS = REPO / "tests" / "fonts"
+FONTS = REPO / "tests" / "common_libs" / "tgfx_font" / "src"
 
 # 基準機。docs/FOOTPRINT.ja.md §2
-CH32V003 = "ch32-riscv-arduino:ch32riscv:CH32V003_EVT"
+#
+# 環境変数 TINYGFX_FQBN で別のコアに向けられる。開発中の新コアで測るときに使う:
+#   TINYGFX_FQBN=ch32-riscv-ug:ch32v:CH32V003:pnum=CH32V003F4P6 uv run pytest footprint -s
+# CI は既定のまま（新コアはまだ Boards Manager から入らない環境がある）。
+DEFAULT_FQBN = "ch32-riscv-arduino:ch32riscv:CH32V003_EVT"
+CH32V003 = os.environ.get("TINYGFX_FQBN", DEFAULT_FQBN)
 
 # 構成の一覧。docs/FOOTPRINT.ja.md §4
 CONSTRUCT_ORDER = ["base", "a", "b", "c", "d", "e", "t", "p1", "p2"]
@@ -43,14 +49,36 @@ def compile_construct(name: str, fqbn: str = CH32V003) -> dict:
     sketch = CONSTRUCTS / name
     if not sketch.is_dir():
         raise BuildError(f"no such construct: {sketch}")
+    return compile_sketch(sketch, fqbn, extra_include=FONTS)
+
+
+def compile_profile(sketch, profile: str) -> dict:
+    """sketch.yaml のプロファイルでビルドする（examples 用）。
+
+    プロファイルがあるスケッチは --fqbn だと「そのプラットフォームは
+    プロファイルに宣言されていない」と怒られるので、こちらを使う。
+    """
+    sketch = Path(sketch)
+    return _run(["arduino-cli", "compile", "--profile", profile, "--json", str(sketch)],
+                sketch.name)
+
+
+def compile_sketch(sketch, fqbn: str, extra_include=None) -> dict:
+    """任意のスケッチをビルドする。ライブラリはこのリポジトリを使う。"""
+    sketch = Path(sketch)
+    name = sketch.name
     cmd = [
         "arduino-cli", "compile",
         "--fqbn", fqbn,
         "--library", str(REPO),
-        "--build-property", f"compiler.cpp.extra_flags=-I{FONTS}",
-        "--json",
-        str(sketch),
     ]
+    if extra_include is not None:
+        cmd += ["--build-property", f"compiler.cpp.extra_flags=-I{extra_include}"]
+    cmd += ["--json", str(sketch)]
+    return _run(cmd, name)
+
+
+def _run(cmd, name: str) -> dict:
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
     try:
         data = json.loads(proc.stdout)

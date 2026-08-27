@@ -59,6 +59,8 @@ class TinyGFXBusCapture : public TinyGFXBus {
   uint32_t endCalls() const { return _endCalls; }
   uint8_t txnDepth() const { return _txnDepth; }
   uint8_t lastCommand() const { return _lastCmd; }
+  /// 直近のコマンドに続く 1 バイト目。MADCTL など 1 引数のコマンドの確認に使う。
+  uint8_t lastCommandArg() const { return _lastArg0; }
   uint16_t windowXs() const { return _xs; }
   uint16_t windowYs() const { return _ys; }
   uint16_t windowXe() const { return _xe; }
@@ -71,6 +73,7 @@ class TinyGFXBusCapture : public TinyGFXBus {
       else { put((uint16_t)(((uint16_t)_hi << 8) | b)); _argLen = 0; _pixelCount++; }
       return;
     }
+    if (_argLen == 0) _lastArg0 = b;
     if (_argLen < 4) _args[_argLen] = b;
     _argLen++;
     if (_argLen == 4) {
@@ -96,6 +99,7 @@ class TinyGFXBusCapture : public TinyGFXBus {
   uint8_t _argLen = 0;
   uint8_t _hi = 0;
   uint8_t _lastCmd = 0;
+  uint8_t _lastArg0 = 0;
   uint8_t _txnDepth = 0;
   bool _inRamwr = false;
   uint32_t _cmdCount = 0, _pixelCount = 0, _beginCalls = 0, _endCalls = 0;

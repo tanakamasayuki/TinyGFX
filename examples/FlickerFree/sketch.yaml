@@ -1,0 +1,23 @@
+profiles:
+  ch32v003:
+    fqbn: ch32-riscv-arduino:ch32riscv:CH32V003_EVT
+    platforms:
+      - platform: ch32-riscv-arduino:ch32riscv (1.4.0)
+        platform_index_url: https://raw.githubusercontent.com/ch32-riscv-ug/arduino_core_ch32_riscv_arduino/main/package_ch32-riscv-arduino.json
+    libraries:
+      - dir: ../../
+  uno:
+    fqbn: arduino:avr:uno
+    platforms:
+      - platform: arduino:avr (1.8.8)
+    libraries:
+      - dir: ../../
+  esp32:
+    fqbn: esp32:esp32:esp32
+    platforms:
+      - platform: esp32:esp32 (3.3.11)
+        platform_index_url: https://espressif.github.io/arduino-esp32/package_esp32_index.json
+    libraries:
+      - dir: ../../
+
+default_profile: ch32v003

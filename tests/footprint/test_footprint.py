@@ -19,9 +19,10 @@ pytestmark = [
 ]
 
 # base からの増分の上限。docs/FOOTPRINT.ja.md §5
+# 予算は**どのコアでも**満たすこと（既定のコアと開発中の新コアの両方）。
 BUDGET = {
-    "a": (1800, 96),    # fillScreen まで
-    "b": (2100, 96),    # + 矩形・点・水平垂直線
+    "a": (1900, 96),    # fillScreen まで
+    "b": (2200, 96),    # + 矩形・点・水平垂直線
     "c": (5200, 96),    # + 全プリミティブ
     "d": (6400, 96),    # + 文字（フォントデータ 384 B を含む）
     "e": (7200, 96),    # + pushImage
@@ -47,7 +48,8 @@ def test_footprint(builds):
     base = builds["base"]
     assert not isinstance(base, tb.BuildError), f"base のビルドに失敗: {base}"
 
-    rows = [f"{'構成':<6}{'flash':>8}{'Δflash':>8}{'予算':>8}{'ram':>7}{'Δram':>7}{'予算':>7}"]
+    rows = [f"FQBN: {tb.CH32V003}",
+            f"{'構成':<6}{'flash':>8}{'Δflash':>8}{'予算':>8}{'ram':>7}{'Δram':>7}{'予算':>7}"]
     rows.append(f"{'base':<6}{base['flash']:>8}{'-':>8}{'-':>8}{base['ram']:>7}{'-':>7}{'-':>7}")
     failures = []
 

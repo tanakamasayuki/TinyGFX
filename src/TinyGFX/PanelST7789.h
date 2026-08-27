@@ -12,8 +12,15 @@ class TinyGFXPanelST7789 : public TinyGFXPanel {
     _height = h;
   }
 
-  /// パネルモジュールごとの GRAM 原点ずれ。回転 0 のときの値を渡す。
+  /// パネルモジュールごとの GRAM 原点ずれ。**回転 0 のときの値**を渡す。
+  /// 回転 1〜3 のぶんは setGramSize() と合わせて自動で導出する。
   void setOffset(int16_t x, int16_t y) { _offX0 = x; _offY0 = y; }
+
+  /// コントローラの GRAM の大きさ。既定はパネルと同じ。
+  /// オフセットのあるモジュールでは**これを設定しないと回転 2 / 3 がずれる**。
+  /// 例: 240x240 の ST7789 は setGramSize(240, 320)
+  ///     135x240 の ST7789 は setGramSize(240, 320) + setOffset(52, 40)
+  void setGramSize(int16_t w, int16_t h) { _gramW = w; _gramH = h; }
 
   bool init() override;
   void setRotation(uint8_t r) override;
@@ -46,6 +53,7 @@ class TinyGFXPanelST7789 : public TinyGFXPanel {
   TinyGFXBus* _bus;
   int16_t _natW, _natH;
   int16_t _offX0 = 0, _offY0 = 0;  // 回転 0 でのオフセット
+  int16_t _gramW = 0, _gramH = 0;  // 0 ならパネルと同じとみなす
   int16_t _offX = 0, _offY = 0;    // 現在の回転でのオフセット
   int8_t _rst;
 };
@@ -91,14 +99,22 @@ inline bool TinyGFXPanelST7789::init() {
 inline void TinyGFXPanelST7789::setRotation(uint8_t r) {
   r = (uint8_t)(r & 3);
   uint8_t madctl = MADCTL_RGB;
+  // 反対側から測ったオフセット。GRAM がパネルより大きいモジュールで効く。
+  const int16_t gw = (_gramW > 0) ? _gramW : _natW;
+  const int16_t gh = (_gramH > 0) ? _gramH : _natH;
+  int16_t cs2 = (int16_t)(gw - _natW - _offX0);
+  int16_t rs2 = (int16_t)(gh - _natH - _offY0);
+  if (cs2 < 0) cs2 = 0;
+  if (rs2 < 0) rs2 = 0;
   switch (r) {
-    case 0: madctl |= 0; _width = _natW; _height = _natH; _offX = _offX0; _offY = _offY0; break;
-    case 1: madctl |= (uint8_t)(MADCTL_MV | MADCTL_MX); _width = _natH; _height = _natW;
-            _offX = _offY0; _offY = _offX0; break;
-    case 2: madctl |= (uint8_t)(MADCTL_MX | MADCTL_MY); _width = _natW; _height = _natH;
+    case 0: madctl |= 0; _width = _natW; _height = _natH;
             _offX = _offX0; _offY = _offY0; break;
+    case 1: madctl |= (uint8_t)(MADCTL_MV | MADCTL_MX); _width = _natH; _height = _natW;
+            _offX = _offY0; _offY = cs2; break;
+    case 2: madctl |= (uint8_t)(MADCTL_MX | MADCTL_MY); _width = _natW; _height = _natH;
+            _offX = cs2; _offY = rs2; break;
     default: madctl |= (uint8_t)(MADCTL_MV | MADCTL_MY); _width = _natH; _height = _natW;
-             _offX = _offY0; _offY = _offX0; break;
+             _offX = rs2; _offY = _offX0; break;
   }
   _bus->beginTransaction();
   cmdData(0x36, &madctl, 1);

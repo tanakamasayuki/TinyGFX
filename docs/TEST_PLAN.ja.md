@@ -24,7 +24,9 @@
 
 ## 2. 描画をホストで検証する方法
 
-TinyGFX は LovyanGFX に描くのではなく**自分で SPI に喋る**ので、兄弟プロジェクトの「ホストの SDL2 で描いて PNG を撮る」手はそのまま使えない。ホストコア（`lang-ship:host`）は `SPI` 未実装、`digitalWrite` も no-op。
+TinyGFX は LovyanGFX に描くのではなく**自分で SPI に喋る**ので、兄弟プロジェクトの「ホストの SDL2 で描いて PNG を撮る」手はそのまま使えない。ホストコア（`lang-ship:host`）は `SPI` 未実装、`digitalWrite` も no-op、`digitalRead` は常に 0。
+**しかも既定バスはソフト SPI（ビットバン）で SPI クラスを経由しない**ので、
+SPI クラスを足してもらうだけでは足りない（[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E1）。
 
 そこで **Bus を差し替える**。
 
@@ -44,11 +46,22 @@ TinyGFX → Panel(ST7789) → TinyGFXBusCapture
 - 素の `lang-ship:host:host` で動く。SDL2 も LovyanGFX も不要
 - **`TinyGFXBusCapture` は `src/` に置く**（テスト専用ディレクトリに隠さない）。利用者が自分のパネルを検証するのにも使えるため。ただし**コアからは参照しない**（[CORE_DESIGN.ja.md](CORE_DESIGN.ja.md) §7.4 R3）
 
-### 2.1 ホストコアに SPI スタブを足す案（後回し）
+### 2.1 ホストコアに「バスの覗き口」を足す案
 
-ホストコア（`host-arduino-core`）も自分たちのリポジトリなので、**転送バイトを記録する `SPI` スタブ**を足せば `TinyGFXBusSPI` **そのもの**をホストで検証できる。CS / DC の叩き順まで見られるので価値は高い。
+ホストコア（`host-arduino-core`）も自分たちのリポジトリなので、
+**`digitalWrite` を観測できる口**と **`digitalRead` の値保持**を足せば、
+`TinyGFXBusSoftSPI`（本番と同じバス）**そのもの**をホストで検証できる。
+ビット順・DC を落とすタイミング・トランザクション中の CS まで見られる。
 
-**ただし Phase 0 では採らない。** ホストコア側のリリース待ちが TinyGFX の初期実装をブロックするため。`TinyGFXBusCapture` で先に進み、**Phase 4 以降に検討する**。それまで `TinyGFXBusSPI` はコンパイル通過（Tier 2）と実機（手動）で守る。
+**ポイントは「デバイスをコアに入れない」こと。** ST7789 の模型は TinyGFX 側が持つ
+（`TinyGFXBusCapture` のデコーダを SPI の下に付け替えるだけ）。コアが持つのは口だけ。
+
+依頼内容は [EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E1 に、優先度と検収条件まで
+書いてある。**P0（GPIO 観測 + `digitalRead` 値保持）だけで、既定バスの経路は全部通る。**
+
+**ただしこれを待たない。** ホストコア側のリリースが TinyGFX の実装をブロックしないよう、
+`TinyGFXBusCapture` で先に進める。それまで `TinyGFXBusSPI` / `TinyGFXBusSoftSPI` は
+コンパイル通過（Tier 2）と実機（手動）で守る。
 
 ## 3. Tier 0 — 土台。**実装済み・通っている**
 
@@ -82,44 +95,75 @@ R1〜R9 を破ると、まずここが落ちる。
 `test_float_does_not_fit_on_the_reference_board` は「float 版が基準機に載らないこと」を
 **記録するためのテスト**。載るようになったら skip して値を採り直せと言う。
 
-### `capture/` — Bus 差し替えのスパイク【未実装】
+### 基準機の切り替え
 
-`TinyGFXBusCapture` が ST7789 のコマンド列から画を復元できることを確認する。
-**Tier 1 を書く前提。次にやる。**
+既定は `ch32-riscv-arduino:ch32riscv:CH32V003_EVT`。開発中の新コアで測るときは:
 
-## 4. Tier 1 — 描画の正しさ
+```sh
+TINYGFX_FQBN='ch32-riscv-ug:ch32v:CH32V003:pnum=CH32V003F4P6' uv run pytest footprint -s
+```
 
-いずれも `TinyGFXBusCapture` の出力を Pillow で検証する。
+**予算表は 1 本で、どちらのコアでも通ること**を条件にしている
+（[FOOTPRINT.ja.md](FOOTPRINT.ja.md) §6.1）。
 
-| ディレクトリ | 見るもの |
-| --- | --- |
-| `primitive/` | 点・線・矩形・円・角丸・三角。**幅 0 / 高さ 0 / 負値 / 1px** の縮退ケースを必ず入れる |
-| `clip/` | クリップ矩形の内外。画面外へのはみ出しが 1 画素も出ないこと。クリップを変えても内側の絵が変わらないこと |
-| `rotation/` | 回転 0..3。**同じ図形を回転して描いた結果が、回転なしの結果を回したものと一致すること**（内部整合の不変条件。golden 画像を持たずに済む） |
-| `window/` | `setAddrWindow` が出す `CASET` / `RASET` の値。**パネル原点オフセット × 回転**の 4 通りが正しいこと |
-| `text/` | `drawChar` / `drawString` / `textWidth` / `setTextSize` の整数倍。戻り値が実際に描いた幅と一致すること。**AVR では PROGMEM 経由でも同じ絵になること**（D19） |
-| `image/` | `pushImage` の境界、部分クリップ、transparent 版 |
-| `fill/` | `writeColor` の転送画素数が**ちょうど** `w*h` であること。`TINYGFX_FILL_CHUNK` の有無で出力が 1 バイトも変わらないこと |
-| `tile/` | `TinyGFXTileCanvas`: **帯の行数を変えても出力が 1 画素も変わらないこと**（LGFXVirtualCanvas の `parity` と同じ不変条件）。端数帯、`setBackgroundColor`、`setAutoClear(false)` |
+## 4. Tier 1 — 描画の正しさ【**実装済み・通っている**】
 
-**不変条件を使えるところは golden 画像を持たない。** 「回転して描く = 描いて回す」「チャンクサイズを変えても同じ」のような形にすると、期待画像のメンテが要らなくなる（LGFXVirtualCanvas の `parity` と同じ発想）。
+`lang-ship:host:host` でホスト実行する。SDL2 も LovyanGFX も要らない。
+スケッチが `output/` に成果物を書き、pytest がそれを読む。
 
-## 5. Tier 2 — 移植性
+| ディレクトリ | 見ているもの | 状況 |
+| --- | --- | --- |
+| `capture/` | **土台。** `TinyGFXBusCapture` が ST7789 のコマンド列から画を復元できること。転送画素数がちょうど一致すること、ウィンドウの値、原点オフセット、`startWrite`/`endWrite` の釣り合い | 通過 |
+| `window/` | 回転 0..3 の MADCTL・幅高さの入れ替え・オフセットの導出（135x240 / GRAM 240x320 を模す）。オフセット無しなら全回転で 0 のままであること | 通過 |
+| `primitive/` | 全プリミティブ。端の 1 画素、枠と塗りの違い、**縮退ケース 10 通りが 1 画素も送らないこと** | 通過 |
+| `clip/` | **不変条件。** クリップ内はクリップ無しと 1 画素も違わず、外は 1 画素も触られないこと。画面より大きいクリップ、空のクリップ | 通過 |
+| `fill/` | 転送画素数の過不足を 11 ケースで固定。クリップ後・回転後も含む | 通過 |
+| `tile/` | **不変条件。** 帯の行数（1/2/3/5/7/8）を変えても直接描画と 1 画素も違わないこと。端数帯、バッファ不足、`setAutoClear(false)` | 通過 |
+| `text/` | `drawString` の戻り値が `textWidth` と一致すること、はみ出さないこと、倍角、収録外の文字、背景色つきのセル塗り、透過 | 通過 |
+| `image/` | `pushImage` の配置、四隅の切り取り、クリップとの重なり、transparent 版、画面外 | 通過 |
 
-| ディレクトリ | 見るもの |
-| --- | --- |
-| `build_matrix/` | 下表のとおり。**`TinyGFXBusSPI` / `TinyGFXBusSoftSPI` の実コードを守るのはここ** |
-| `noalloc/` | `linkprune/` に統合済み（base との差で判定） |
-| `examples_compile/` | `examples/` 全部がビルドできること |
+**期待画像は持たない。** 「クリップ内 == クリップ無し」「帯を変えても同じ」のような
+**不変条件**にしてあるので、絵を変えてもテストは壊れない
+（LGFXVirtualCanvas の `parity` と同じ考え方）。
 
-| FQBN | `BusSoftSPI` | `BusSPI` | 備考 |
-| --- | --- | --- | --- |
-| `ch32-riscv-arduino:ch32riscv:CH32V003_EVT` | ○（基準機） | ✕ | SPI ライブラリが無い（E2） |
-| `arduino:avr:uno` | ○ | ○（未確認） | フォントは PROGMEM 必須（D19） |
-| `esp32:esp32:*` | ○ | ○ | 未着手 |
-| `ch32-riscv-ug:ch32v:CH32V003`（新コア） | ○ | ○ | **CI に載せられない**（symlink + 外部ツールチェーンが要る）。E7 |
+### 検証の道具は 2 つ
 
-`build_matrix/` は**実行しない。コンパイルのみ。** ホストで動かせない `TinyGFXBusSPI` の型エラー・API 変更を捕まえるのが目的。
+- **`TinyGFXBusCapture`** — パネルが出すバイト列を解釈して仮想 GRAM に書き戻す。
+  「実際に何を送ったか」まで見える。転送画素数の検査はこれでしかできない
+- **`TinyGFXPanelMemory`** — RAM バッファへ直接書くパネル。`TileCanvas` の帯バッファと
+  同じもの。コマンド列の解釈を挟まないぶん単純
+
+### 共通部品
+
+- `tests/common_libs/tgfx_test/` — PPM 出力と `output/report.txt` への値の記録
+- `tests/common_libs/tgfx_font/` — つなぎのフォント。**ライブラリには同梱しない**（D17）
+- `tests/tgfx_check.py` — `report()` / `image()` / `lit()` / RGB565→RGB888 変換
+
+**値はシリアルではなくファイルで受け渡す。** `dut.expect` の取りこぼしでテストが
+不安定になるため。シリアルには `TEST start` / `TEST done` / `SCENE <name>` の進行だけ流す。
+
+## 5. Tier 2 — 移植性【**実装済み・通っている**】
+
+`build_matrix/` が `examples/` をそのままビルドする。**実行しない。コンパイルのみ。**
+ホストで動かせない `TinyGFXBusSPI` / `TinyGFXBusSoftSPI` の型エラーや API 変更を
+捕まえるのが目的。
+
+examples は `sketch.yaml` にプロファイル（`ch32v003` / `uno` / `esp32`）を持つので、
+`--fqbn` ではなく `--profile` でビルドする（プロファイルがあるスケッチに
+`--fqbn` を渡すと「そのプラットフォームは宣言されていない」と怒られる）。
+
+| プロファイル | 対象 | 実測 flash / RAM |
+| --- | --- | --- |
+| `ch32v003` | HelloWorld / Shapes / FlickerFree | 8,940 / 576、10,920 / 576、9,076 / 1,112 |
+| `uno` | 上記 + HardwareSPI | 4,732 / 107、5,926 / 111、4,814 / 646、3,512 / 108 |
+| `esp32` | HelloWorld のみ（重いわりに他で拾えない問題が少ない） | 260,516 / 22,172 |
+
+**`HardwareSPI` は CH32V003 では対象外。** そのコアに SPI ライブラリが無いため
+（[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E2）。
+`test_hardware_spi_still_fails_on_ch32` が「まだ通らない」ことを記録していて、
+通るようになったら気づけるようにしてある。
+
+`noalloc` は `linkprune/` に統合した（base との差で判定するほうが正確なため）。
 
 ## 6. 手動テスト（実機）
 

@@ -4,7 +4,7 @@
 
 ## 1. 現在地
 
-**フェーズ 0 完了。実装が動き、CH32V003 で予算内に収まっている。**
+**フェーズ 0〜4 の実装、Tier 0〜2 の検証、examples まで完了。残るのは実機と利用者向けドキュメント。**
 
 | 項目 | 状況 |
 | --- | --- |
@@ -20,12 +20,14 @@
 | フォント | GFXfont 互換に決定（D17）。つなぎの 5x7 を `tests/fonts/` に生成 |
 | `tests/linkprune/` | **通っている（11 件）** |
 | `tests/footprint/` | **通っている（2 件）**。実測は [FOOTPRINT.ja.md](FOOTPRINT.ja.md) §5 |
-| Tier 1（描画の正しさ） | **未着手。次にやる** |
+| Tier 1（描画の正しさ） | **完了。8 本すべて通っている**（`capture` `window` `primitive` `clip` `fill` `tile` `text` `image`） |
+| 回転オフセットの導出 | `setGramSize()` を追加。135x240 のような GRAM より小さいパネルで回転 2/3 がずれる問題を修正 |
+| Tier 2（移植性のコンパイル）| **完了。`build_matrix/` 9 件通過**（ch32v003 / uno / esp32 × examples） |
 | AVR（Uno R3）対応 | **実測で全構成が載る。** フォントを PROGMEM から読むようにした（D19） |
 | 開発中の新コアでの確認 | **ハードウェア SPI がリンクでき、base が 624 B**（[FOOTPRINT.ja.md](FOOTPRINT.ja.md) §6.1） |
 | ライブラリ名の確認 | **完了。3 レジストリとも競合なし**（E6） |
 | 実機確認 | **未。** まだ 1 度も実機に出していない |
-| examples | 未着手 |
+| examples | **完了。4 本**（HelloWorld / Shapes / FlickerFree / HardwareSPI）。日英 README つき |
 | 利用者向けドキュメント | 未着手。**API が固まってから** |
 
 ## 2. 実装順序
@@ -49,27 +51,31 @@
    ハードウェア SPI もリンク可。E2 / E3 は「直してもらう」より「リリースを待つ」が正解になった（E7）
 5. **Uno R3 でも全部載る。** 効くのは RAM だけで、フォントを PROGMEM に置けば実用になる（D19）
 
+> フェーズ 1〜4 の**実装と Tier 1 検証は済んでいる**。各フェーズに残っているのは
+> 実機確認だけ（M1 / M2）。
+
 ### フェーズ 1 — 出力の芯
 
 `TinyGFXBus` / `TinyGFXBusSPI` / `TinyGFXPanel` / `TinyGFXPanelST7789` / `setAddrWindow` / `writeColor` / `fillScreen` / `fillRect` / `drawPixel` / `drawFastHLine` / `drawFastVLine`。
 
-**コードは書けている。残っているのは検証。** テスト: `capture/` `window/` `fill/`。
-**完了条件に実機 M1 を含める。** 初期化列と SPI モードは実機でしか確かめられない。
+**実装済み。`capture/` `window/` `fill/` が通っている。**
+**残るのは実機 M1。** 初期化列と SPI モードは実機でしか確かめられない。
 
 ### フェーズ 2 — プリミティブとクリップと回転と帯レンダリング
 
 `drawLine` / `drawRect` / 円 / 角丸 / 三角 / `setClipRect` / `setRotation` / `TileCanvas`。
-**コードは書けている。残っているのは検証。**
+**実装済み。`primitive/` `clip/` `tile/` が通っている。**
 
-テスト: `primitive/` `clip/` `rotation/` `tile/`。**完了条件に実機 M2。**
+**残るのは実機 M2。** MADCTL の値とオフセットの導出が実機で正しいかは、
+ホストでは原理的に分からない（`window/` は「実装が表どおりか」しか見ていない）。
 
-### フェーズ 3 — 文字
+### フェーズ 3 — 文字（**実装済み。`text/` が通っている**）
 
 `TinyGFXFont` / 6x8 固定幅フォント / `drawChar` / `drawString` / `textWidth` / `setTextSize`。
 
 テスト: `text/` + 構成 D の `linkprune`（**文字を使わないスケッチにフォントが載らないこと**）。
 
-### フェーズ 4 — 画像と拡張ヘッダ
+### フェーズ 4 — 画像と拡張ヘッダ（**実装済み。`image/` が通っている**）
 
 `pushImage`（transparent 版含む）、`TinyGFX/Print.h`。
 
@@ -83,9 +89,14 @@ ST7735 / ILI9341。パネル初期化テーブルの整理。CH32V 向け Fast B
 テスト: `build_matrix/` 拡張、実機 M4。
 **Fast Backend の有無で `capture/` の出力が変わらないこと**を不変条件にする。
 
-### フェーズ 6 — 仕上げ
+### フェーズ 6 — 仕上げ（**examples のみ完了**）
 
-examples、README / GUIDE / API（日英）、API 安定化、ベンチ。
+- examples — **完了。4 本**
+- README / GUIDE / API（日英）— **未着手。次にやる**
+- API 安定化、ベンチ — 未
+
+**実機（M1 / M2）が終わるまで利用者向けドキュメントは書かない。**
+配線とオフセットの説明を、動いていないうちに書くと嘘になる。
 
 ## 3. リリース方針
 

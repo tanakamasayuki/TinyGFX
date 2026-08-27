@@ -214,7 +214,7 @@ class TinyGFX {
     const int16_t rmax = (int16_t)(((w < h ? w : h) - 1) >> 1);
     if (r > rmax) r = rmax;
     if (r <= 0) { fillRect(x, y, w, h, color); return; }
-    const int16_t x1 = (int16_t)(x + w - 1), y1 = (int16_t)(y + h - 1);
+    const int16_t x1 = (int16_t)(x + w - 1);
     startWrite();
     fillRect((int16_t)(x + r), y, (int16_t)(w - (r << 1)), h, color);
     int16_t cx = 0, cy = r, d = (int16_t)(1 - r);
