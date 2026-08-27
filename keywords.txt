@@ -1,0 +1,97 @@
+#######################################
+# Syntax Coloring Map For TinyGFX
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+TinyGFX	KEYWORD1
+TinyGFXBus	KEYWORD1
+TinyGFXBusSPI	KEYWORD1
+TinyGFXBusSoftSPI	KEYWORD1
+TinyGFXBusCapture	KEYWORD1
+TinyGFXPanel	KEYWORD1
+TinyGFXPanelST7789	KEYWORD1
+TinyGFXPanelMemory	KEYWORD1
+TinyGFXTileCanvas	KEYWORD1
+TinyGFXPrint	KEYWORD1
+TinyGFXFont	KEYWORD1
+TinyGFXGlyph	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin	KEYWORD2
+width	KEYWORD2
+height	KEYWORD2
+setRotation	KEYWORD2
+getRotation	KEYWORD2
+color565	KEYWORD2
+startWrite	KEYWORD2
+endWrite	KEYWORD2
+setClipRect	KEYWORD2
+resetClipRect	KEYWORD2
+clearClipRect	KEYWORD2
+setAddrWindow	KEYWORD2
+writeColor	KEYWORD2
+writePixels	KEYWORD2
+drawPixel	KEYWORD2
+fillRect	KEYWORD2
+fillScreen	KEYWORD2
+clear	KEYWORD2
+drawFastHLine	KEYWORD2
+drawFastVLine	KEYWORD2
+drawRect	KEYWORD2
+drawLine	KEYWORD2
+drawCircle	KEYWORD2
+fillCircle	KEYWORD2
+drawRoundRect	KEYWORD2
+fillRoundRect	KEYWORD2
+drawTriangle	KEYWORD2
+fillTriangle	KEYWORD2
+pushImage	KEYWORD2
+setFont	KEYWORD2
+getFont	KEYWORD2
+setCursor	KEYWORD2
+setTextColor	KEYWORD2
+setTextSize	KEYWORD2
+drawChar	KEYWORD2
+drawString	KEYWORD2
+textWidth	KEYWORD2
+fontHeight	KEYWORD2
+setOffset	KEYWORD2
+invertDisplay	KEYWORD2
+setSleep	KEYWORD2
+displayOn	KEYWORD2
+setBufferRegion	KEYWORD2
+fillBuffer	KEYWORD2
+readPixel	KEYWORD2
+setBackgroundColor	KEYWORD2
+setAutoClear	KEYWORD2
+tileRows	KEYWORD2
+render	KEYWORD2
+gfx	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+TFT_BLACK	LITERAL1
+TFT_WHITE	LITERAL1
+TFT_RED	LITERAL1
+TFT_GREEN	LITERAL1
+TFT_BLUE	LITERAL1
+TFT_CYAN	LITERAL1
+TFT_MAGENTA	LITERAL1
+TFT_YELLOW	LITERAL1
+TFT_ORANGE	LITERAL1
+TFT_PINK	LITERAL1
+TFT_NAVY	LITERAL1
+TFT_MAROON	LITERAL1
+TFT_PURPLE	LITERAL1
+TFT_OLIVE	LITERAL1
+TFT_DARKGREY	LITERAL1
+TFT_DARKGREEN	LITERAL1
+TINYGFX_FILL_CHUNK	LITERAL1
