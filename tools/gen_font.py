@@ -332,7 +332,7 @@ def render(code, rows):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="生成せずレンダリングだけする")
-    ap.add_argument("--out", default="tests/fonts/tinygfx_font5x7.h")
+    ap.add_argument("--out", default="tests/common_libs/tgfx_font/src/tinygfx_font5x7.h")
     args = ap.parse_args()
 
     glyphs = parse()

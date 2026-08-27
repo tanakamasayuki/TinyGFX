@@ -27,14 +27,24 @@ jobs:
           arduino-cli config add board_manager.additional_urls \
             https://raw.githubusercontent.com/ch32-riscv-ug/arduino_core_ch32_riscv_arduino/main/package_ch32-riscv-arduino.json
           arduino-cli config add board_manager.additional_urls \
-            https://espressif.github.io/arduino-esp32/package_esp32_index.json
+            https://tanakamasayuki.github.io/lang-ship-arduino-core/package_lang-ship_index.json
           arduino-cli core update-index
 
+      # ホスト実行。Tier 1（描画の正しさ）はこのコアが要る。
+      - name: Install host core
+        run: arduino-cli core install lang-ship:host
+
       # 基準機。Tier 0（footprint / linkprune）はこのコアが要る。
-      # 取得できない場合でもジョブは続ける（テスト側が skip する）。
+      # 取れなくてもジョブは続ける（テスト側が skip する）。
       - name: Install CH32 RISC-V core
         continue-on-error: true
         run: arduino-cli core install ch32-riscv-arduino:ch32riscv
+
+      # Tier 2（examples のビルド）用。esp32 は重いので CI では入れない
+      # （build_matrix の esp32 ケースは skip される）。
+      - name: Install AVR core
+        continue-on-error: true
+        run: arduino-cli core install arduino:avr
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -51,7 +61,7 @@ jobs:
       - name: Check the generated font is current
         run: |
           python3 tools/gen_font.py
-          git diff --exit-code tests/fonts/
+          git diff --exit-code tests/common_libs/tgfx_font/
 
       - name: Run pytest
         working-directory: tests
