@@ -342,27 +342,33 @@ void TinyGFXBusSPI::writeColor(uint16_t color, uint32_t count) {
 
 ## 9. 文字とフォント
 
-### 9.1 形式は GFXfont（Adafruit GFX 互換）
+### 9.1 形式は TinyFont
 
 ```cpp
-typedef struct {
-  uint16_t bitmapOffset;
-  uint8_t width, height, xAdvance;
-  int8_t xOffset, yOffset;
-} GFXglyph;
+struct TinyGFXGlyph {   // 可変ピッチのときだけ。4 バイト固定
+  uint8_t offsetLo, offsetHi, width, xAdvance;
+};
 
-typedef struct {
-  uint8_t* bitmap;
-  GFXglyph* glyph;
-  uint16_t first, last;
-  uint8_t yAdvance;
-} GFXfont;
+struct TinyGFXFont {
+  const uint8_t*      bitmap;
+  const TinyGFXGlyph* glyphs;  // nullptr = 固定ピッチ（表を持たない）
+  const uint16_t*     codes;   // nullptr = 連続索引。非 nullptr = 昇順のコード表
+  uint16_t first, count;
+  uint8_t  width, height, xAdvance, yAdvance;
+  int8_t   xOffset, yOffset;
+  uint8_t  bytesPerGlyph;
+};
 ```
 
-ビットマップは**行を連結した MSB first のビット列、グリフ間はバイト境界揃え**。
-`_GFXFONT_H_` ガードも Adafruit と同じにしてあるので、先にどちらかが定義されていれば衝突しない。
+**選択は実行時ではなく生成時。** 索引（連続 / 疎）とグリフ表（無し / 有り）は
+ポインタが `nullptr` かどうかで表す。4 通りを 1 つのデコーダが扱い、
+**両対応のコストは 76 バイト**。
 
-理由と、u8g2 形式を採らなかった経緯は [DECISIONS.ja.md](DECISIONS.ja.md) D17。
+ビットマップは「行を連結した MSB first のビット列、グリフ間はバイト境界揃え」で
+GFXfont と同じ並び。既存の Adafruit 資産はツール側で変換できる。
+
+形式の定義・実測・採らなかった案は [FONT_FORMAT.ja.md](FONT_FORMAT.ja.md)。
+決定の経緯は [DECISIONS.ja.md](DECISIONS.ja.md) D17。
 
 ### 9.2 フォントデータはライブラリに同梱しない
 
@@ -388,7 +394,7 @@ ascent を求め、以降はそれを足すだけにしている。描画のた�
 ウィンドウを張って全画素を流し込むほうが速いが、クリップとの相性が悪くコードも増える。
 **速度は二番手**なのでランで済ませている。
 
-実測値: 文字機能全体で Flash +1,088 B（うちフォントデータ 384 B）。
+実測値: 文字機能全体で Flash +844 B（うちフォントデータ 184 B、コード 660 B）。
 
 ### 9.5 Print / printf / float は拡張ヘッダで提供する
 
@@ -433,6 +439,8 @@ lcd.setTextSize(1.5f);        // float 版オーバーロードもこちら側
 | マクロ | 既定 | 効果 | 状況 |
 | --- | --- | --- | --- |
 | `TINYGFX_FILL_CHUNK` | 0 | `TinyGFXBusSPI` の塗りつぶしで使うスタック上の一時バッファ画素数 | 実装済み・**未測定** |
+| `TINYGFX_FONT_SPARSE` | 1 | 0 で疎索引（コード表）の分岐を落とす | **−56 B**（[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md) §4） |
+| `TINYGFX_FONT_RECORDS` | 1 | 0 で可変ピッチ（グリフ表）の分岐を落とす | **−24 B** |
 | `TINYGFX_STATIC_BUS` / `TINYGFX_STATIC_PANEL` | — | Bus / Panel を単一実装に固定して virtual を消す | **未実装。** 構成 E が予算内に収まったので保留（D2） |
 | `TINYGFX_NO_CLIP` | — | クリップ判定を省く | **未実装。** 効果を測ってから決める |
 

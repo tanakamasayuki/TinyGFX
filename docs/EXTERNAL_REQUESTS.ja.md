@@ -11,7 +11,7 @@
 | [E2](#e2) | ch32-riscv-ug/arduino_core_ch32_riscv_arduino | SPI ライブラリが無い。base が 5.9KB → **新コアで解消見込み** | 低 | しない |
 | [E3](#e3) | openwch / YuukiUmeta-UIAP コア | CH32V00x の `PinMap_SPI_*` が無い → **新コアで解消見込み** | 低 | しない |
 | [E7](#e7) | **ArduinoCore-CH32（開発中）** | **リリースを待つ。それまで測定は symlink 運用** | 高 | しない |
-| [E4](#e4) | LGFXFontToolJs | TinyGFX で使えるフォントヘッダの出力 | 中 | しない |
+| [E4](#e4) | LGFXFontToolJs | **TinyFont エンコーダ**（形式を変えたので依頼内容も変わった） | 中 | しない |
 | [E5](#e5) | arduino-library-release-toolkit | リリース資産の同期（既に取り込み済み） | 低 | しない |
 | [E6](#e6) | 外部レジストリ | ライブラリ名 `TinyGFX` の重複確認 → **確認済み・問題なし** | 済 | 解消 |
 
@@ -256,50 +256,83 @@ E2 と同じ。`TinyGFXBusSoftSPI` を使う。
 
 ---
 
-## E4. LGFXFontToolJs — TinyGFX で使えるフォントヘッダの出力 {#e4}
+## E4. LGFXFontToolJs — TinyFont エンコーダ {#e4}
 
-### 前提
+### 前提が変わった（2026-08-27）
 
-TinyGFX のフォント形式は **GFXfont（Adafruit GFX 互換）に合わせた**
-（[DECISIONS.ja.md](DECISIONS.ja.md) D17）。理由はデコーダが小さいこと、
-そして LGFXFontToolJs が既にこの形式をエンコードできること。
+当初は「GFXfont をそのまま食う」方針だったが、実測して **TinyFont という独自形式に変えた**
+（[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md)、[DECISIONS.ja.md](DECISIONS.ja.md) D17）。
 
-`src/format/gfxfont.js` の規約「行を連結した MSB first のビット列、グリフ間はバイト境界揃え」
-に合わせて `TinyGFX::drawChar` を実装済み。
+変えた理由は 2 つとも数字で出ている。
+
+1. **GFXfont のグリフ表が重い。** ASCII 95 字の 5x7 固定ピッチで、
+   ビットマップ 475 B に対しグリフ表 665 B。固定ピッチなら中身は全字同一で丸ごと冗長。
+   TinyFont は固定ピッチならグリフ表を持たないので **1,152 B → 499 B（−57%）**
+2. **GFXfont は疎な文字集合を表せない。** `first`〜`last` が連続でないといけないので、
+   U+4E00〜U+9FA5 に散った 500 字だと 20,902 件のグリフ表 = **146 KB**。
+   TinyFont は昇順のコード表を持てるので 1 KB
+
+**ビットマップの並びは GFXfont と同じ**（行を連結した MSB first、グリフ間はバイト境界揃え）
+なので、`src/format/gfxfont.js` の成果はそのまま使える。**変わるのはメタデータの組み方だけ。**
 
 ### 依頼内容
 
-1. **自己完結したヘッダを出せるようにしてほしい。**
-   いまの `encodeCSource({format:'gfx'})` は `GFXglyph` / `GFXfont` の型が
-   Adafruit_GFX か LovyanGFX 側にある前提。TinyGFX だけを使う人はどちらも入れない。
-   - 案 A: 型定義を出力ヘッダに含めるオプション（`#ifndef _GFXFONT_H_` ガード付き）
-   - 案 B: `#include <TinyGFX/Font.h>` を出す `target: 'tinygfx'` オプション
+#### 1. TinyFont のエンコーダ
 
-   TinyGFX 側は `_GFXFONT_H_` ガードで同じ型を提供しているので、**案 A なら TinyGFX 側の変更は不要**。
+構造は [FONT_FORMAT.ja.md](FONT_FORMAT.ja.md) §2。C ソースとして吐いてほしい。
 
-2. **確認したいこと**: `encodeCSource` の GFXfont 出力で `bitmapOffset` は
-   `uint16_t` か `uint32_t` か。Adafruit 互換なら 16bit だが、大きなフォントで溢れないか。
+```c
+static const uint8_t      myFontBitmaps[...] TINYGFX_FONT_PROGMEM = { ... };
+static const TinyGFXGlyph myFontGlyphs[...]  TINYGFX_FONT_PROGMEM = { ... };  // 可変ピッチのときだけ
+static const uint16_t     myFontCodes[...]   TINYGFX_FONT_PROGMEM = { ... };  // 疎索引のときだけ
+static const TinyGFXFont  myFont             TINYGFX_FONT_PROGMEM = { ... };
+```
 
-3. **PROGMEM 属性**。AVR で使うにはビットマップ・グリフ表・`GFXfont` の 3 つすべてに
-   PROGMEM が要る（[DECISIONS.ja.md](DECISIONS.ja.md) D19）。`csource.js` は
-   `LGFXFT_PROGMEM` を持っているので足りていそうだが、**3 つすべてに付くか**を確認したい。
+ヘッダの先頭に `#include <TinyGFX/Font.h>` を出せば自己完結する
+（型は TinyGFX が提供する。当初お願いしていた「Adafruit_GFX なしで通る出力」は不要になった）。
 
-### サブセット化は TinyGFX の対象外（2026-08-27 決定）
+#### 2. 索引とグリフ表を自動で選ぶ
 
-**「プロジェクトで使う文字だけを埋め込む」仕組みは、完全に外部のツールとして作る。**
-Python 製の独立ツールを想定していて、TinyGFX 側では一切考慮しない
-（[DECISIONS.ja.md](DECISIONS.ja.md) Q9 は取り下げ）。
+利用者に選ばせる必要はない。**入力を見て小さいほうを選べばよい。**
 
-TinyGFX が満たすべき条件は 1 つだけ: **フォントが素の GFXfont ヘッダであること。**
-これは既に満たしている。外部ツールがヘッダを上書きするだけで成立する。
+| 判定 | 結果 |
+| --- | --- |
+| 全グリフの `width` と `xAdvance` が同一 | グリフ表を省く（`glyphs = nullptr`） |
+| 収録コードが連続 | コード表を省く（`codes = nullptr`） |
+| 疎なら | 昇順のコード表を出す |
+
+**選んだ結果とデータ量をヘッダのコメントに書いてほしい。** 利用者が
+「このフォントは何バイトで、なぜその形式か」を読めるようにしたい。
+
+#### 3. PROGMEM 属性を 4 つすべてに
+
+AVR ではビットマップ・グリフ表・コード表・`TinyGFXFont` の**全部**に PROGMEM が要る。
+どれか 1 つでも抜けると化ける（[DECISIONS.ja.md](DECISIONS.ja.md) D19）。
+
+#### 4. 決定的な出力
+
+同じ入力から**バイト一致**のヘッダが出ること。CI で再生成して
+`git diff --exit-code` する運用にしたい（TinyGFX 側は既に `tools/gen_font.py` でそうしている）。
+
+### 確認したいこと
+
+- **オフセットは 16bit で足りるか。** TinyFont は `offsetLo` / `offsetHi` の 2 バイト
+  （64KB まで）。超えるフォントは V003 級には載らないが、大きな欧文フォントで
+  実際に何バイトになるか知りたい
+- **グリフごとの bbox を持つべきか。** GFXfont 方式（グリフごとに幅・高さ・オフセット）は
+  可変ピッチのビットマップを縮めるが、表が 4 → 7 バイトに増える。5x7 級では表の増加が
+  勝つが、**大きな欧文フォントでは逆転しうる。** そちら側で実データの数字を持っていたら教えてほしい
+
+### サブセット化は TinyGFX の対象外
+
+「プロジェクトで使う文字だけを埋め込む」仕組みは、**完全に外部のツール**（Python 想定）として
+作る。TinyGFX 側は一切考慮しない。満たすべき条件は「TinyFont のヘッダを上書きするだけで
+成立すること」で、これは既に満たしている。
 
 ### それまでどうするか
 
-`tools/gen_font.py` に ASCII アートで書いた 5x7 フォント（0x20-0x3F、32 文字）を
-つなぎとして使う。**測定用であって製品ではない。** 出力先も `tests/fonts/` で、
-ライブラリには同梱しない。
-
----
+`tools/gen_font.py` が 5x7（0x20-0x3F の 32 字）を 3 変種で吐く。**測定用であって製品ではない。**
+`tests/text/` が「変種を変えても描画結果が 1 画素も変わらない」ことを検査している。
 
 ## E5. arduino-library-release-toolkit — リリース資産の同期 {#e5}
 

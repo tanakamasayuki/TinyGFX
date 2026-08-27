@@ -4,6 +4,8 @@
 #include <TinyGFX/PanelST7789.h>
 #include <tgfx_test.h>
 #include <tinygfx_font5x7.h>
+#include <tinygfx_font5x7_rec.h>
+#include <tinygfx_font5x7_sparse.h>
 
 static const int W = 64, H = 32;
 static uint16_t gram[W * H];
@@ -55,6 +57,18 @@ void setup() {
   lcd.drawString("88888", 2, 3);
   tgfxReport("transparent_pixels", (long)bus.pixelCount());
   tgfxShot("transparent", gram, W, H);
+
+  // --- 変種の等価性 -------------------------------------------------------
+  // 同じ字を、固定ピッチ / グリフ表あり / 疎索引 で描いた結果は一致すること。
+  // 生成時にどれを選んでも絵が変わらない、が TinyFont の前提。
+  lcd.setTextColor(FG);
+  reset(); lcd.setFont(&tinygfxFont5x7);       lcd.drawString("0123456789", 1, 1);
+  tgfxShot("var_fixed", gram, W, H);
+  reset(); lcd.setFont(&tinygfxFont5x7Rec);    lcd.drawString("0123456789", 1, 1);
+  tgfxShot("var_records", gram, W, H);
+  reset(); lcd.setFont(&tinygfxFont5x7Sparse); lcd.drawString("0123456789", 1, 1);
+  tgfxShot("var_sparse", gram, W, H);
+  lcd.setFont(&tinygfxFont5x7);
 
   tgfxTestDone();
 }
