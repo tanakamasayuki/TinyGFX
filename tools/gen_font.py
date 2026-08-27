@@ -340,6 +340,8 @@ def main():
                     help="fixed=グリフ表を持たない（固定ピッチ） / records=4 バイト/字のグリフ表")
     ap.add_argument("--sparse", action="store_true", help="連続索引ではなく昇順のコード表を持つ")
     ap.add_argument("--symbol", default="tinygfxFont5x7")
+    ap.add_argument("--next", dest="next_font", default=None,
+                    help="この字を持たないとき次に探すフォントのシンボル名")
     ap.add_argument("--out", default="tests/common_libs/tgfx_font/src/tinygfx_font5x7.h")
     args = ap.parse_args()
 
@@ -406,8 +408,9 @@ def main():
         f"    {CELL_W},  // xAdvance",
         f"    {CELL_H},  // yAdvance",
         "    0,  // xOffset",
-        f"    {-GLYPH_H},  // yOffset",
+        "    0,  // yOffset（行の上端からのグリフ上端）",
         f"    {bytes_per_glyph},  // bytesPerGlyph",
+        (f"    &{args.next_font},  // next" if args.next_font else "    nullptr,  // next"),
         "};",
         "",
     ]

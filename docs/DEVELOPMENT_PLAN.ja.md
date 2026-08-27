@@ -20,7 +20,8 @@
 | フォント | **独自の TinyFont に変更（D17 改訂）。** 索引とグリフ表を生成時に選ぶ。GFXfont より ASCII で 57% 小さく、CJK の疎な集合も表せる（[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md)） |
 | `tests/linkprune/` | **通っている（11 件）** |
 | `tests/footprint/` | **通っている（2 件）**。実測は [FOOTPRINT.ja.md](FOOTPRINT.ja.md) §5 |
-| Tier 1（描画の正しさ） | **完了。8 本すべて通っている**（`capture` `window` `primitive` `clip` `fill` `tile` `text` `image`） |
+| Tier 1（描画の正しさ） | **完了。9 本すべて通っている**（`capture` `window` `primitive` `clip` `fill` `tile` `text` `image` `hostbus`） |
+| 本番の Bus 実装の検証 | **完了。** ホストコアのバス観測口（E1）で `BusSoftSPI` / `BusSPI` を通しで検証できるようになった |
 | 回転オフセットの導出 | `setGramSize()` を追加。135x240 のような GRAM より小さいパネルで回転 2/3 がずれる問題を修正 |
 | Tier 2（移植性のコンパイル）| **完了。`build_matrix/` 9 件通過**（ch32v003 / uno / esp32 × examples） |
 | AVR（Uno R3）対応 | **実測で全構成が載る。** フォントを PROGMEM から読むようにした（D19） |

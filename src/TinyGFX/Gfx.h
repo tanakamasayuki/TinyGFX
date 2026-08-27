@@ -326,12 +326,8 @@ class TinyGFX {
   }
 
   // ---- 文字 ------------------------------------------------------------
-  /// TinyFont を設定する。ascent はフォント全体で共通なのでここで済む
-  /// （グリフ表を走査しない）。
-  void setFont(const TinyGFXFont* font) {
-    _font = font;
-    _ascent = font ? (int8_t)(-(int8_t)tinygfx_rd8(&font->yOffset)) : 0;
-  }
+  /// TinyFont を設定する。連鎖（next）の先頭を渡す。
+  void setFont(const TinyGFXFont* font) { _font = font; }
   const TinyGFXFont* getFont() const { return _font; }
   void setCursor(int16_t x, int16_t y) { _cursorX = x; _cursorY = y; }
   int16_t getCursorX() const { return _cursorX; }
@@ -357,10 +353,10 @@ class TinyGFX {
   /// 1 文字描く。y は行の上端（LovyanGFX 流。Adafruit のベースライン基準ではない）。
   /// 戻り値は送り幅。収録外の文字は 0。
   int16_t drawChar(uint16_t ch, int16_t x, int16_t y) {
-    const TinyGFXFont* f = _font;
+    if (_font == nullptr) return 0;
+    uint16_t idx = 0;
+    const TinyGFXFont* f = resolveGlyph(ch, idx);
     if (f == nullptr) return 0;
-    const int32_t idx = glyphIndex(ch);
-    if (idx < 0) return 0;
 
     const uint8_t sz = _textSize;
     uint16_t bmOffset;
@@ -390,7 +386,8 @@ class TinyGFX {
     if (gw != 0 && gh != 0 && bm != nullptr) {
       const uint8_t* src = bm + bmOffset;
       const int16_t gx = (int16_t)(x + (int16_t)((int8_t)tinygfx_rd8(&f->xOffset) * sz));
-      int16_t py = y;  // yOffset は ascent に畳んであるので上端がそのまま原点
+      // yOffset は「行の上端からのグリフ上端」。連鎖したフォントの高さが違っても揃う
+      int16_t py = (int16_t)(y + (int16_t)((int8_t)tinygfx_rd8(&f->yOffset) * sz));
       uint32_t bit = 0;
       for (uint8_t r = 0; r < gh; ++r) {
         int16_t px = gx;
@@ -431,10 +428,24 @@ class TinyGFX {
   }
 
  protected:
-  /// 文字コード -> グリフ番号。収録外は -1。
-  /// 連続索引なら引き算 1 回、疎索引なら二分探索。
-  int32_t glyphIndex(uint16_t ch) const {
+  /// 連鎖をたどって、この字を持つフォントとそのグリフ番号を返す。
+  /// 見つからなければ nullptr。
+  const TinyGFXFont* resolveGlyph(uint16_t ch, uint16_t& outIndex) const {
     const TinyGFXFont* f = _font;
+    while (f != nullptr) {
+      const int32_t i = indexIn(f, ch);
+      if (i >= 0) {
+        outIndex = (uint16_t)i;
+        return f;
+      }
+      f = (const TinyGFXFont*)tinygfx_rdptr(&f->next);
+    }
+    return nullptr;
+  }
+
+  /// 1 つのフォントの中での文字コード -> グリフ番号。収録外は -1。
+  /// 連続索引なら引き算 1 回、疎索引なら二分探索。
+  static int32_t indexIn(const TinyGFXFont* f, uint16_t ch) {
     const uint16_t n = tinygfx_rd16(&f->count);
 #if TINYGFX_FONT_SPARSE
     const uint16_t* codes = (const uint16_t*)tinygfx_rdptr(&f->codes);
@@ -458,13 +469,14 @@ class TinyGFX {
 
   /// 送り幅（倍率をかける前）。収録外は 0。
   uint8_t advanceOf(uint16_t ch) const {
-    const int32_t idx = glyphIndex(ch);
-    if (idx < 0) return 0;
+    uint16_t idx = 0;
+    const TinyGFXFont* f = resolveGlyph(ch, idx);
+    if (f == nullptr) return 0;
 #if TINYGFX_FONT_RECORDS
-    const TinyGFXGlyph* gp = (const TinyGFXGlyph*)tinygfx_rdptr(&_font->glyphs);
+    const TinyGFXGlyph* gp = (const TinyGFXGlyph*)tinygfx_rdptr(&f->glyphs);
     if (gp != nullptr) return tinygfx_rd8(&gp[idx].xAdvance);
 #endif
-    return tinygfx_rd8(&_font->xAdvance);
+    return tinygfx_rd8(&f->xAdvance);
   }
 
   static void swap16(int16_t& a, int16_t& b) {
@@ -494,6 +506,5 @@ class TinyGFX {
   int16_t _cursorX = 0, _cursorY = 0;
   uint16_t _textFg = 0xFFFF, _textBg = 0x0000;
   uint8_t _rotation = 0, _txn = 0, _textSize = 1;
-  int8_t _ascent = 0;
   bool _textHasBg = false;
 };

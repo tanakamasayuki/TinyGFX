@@ -1,0 +1,13 @@
+profiles:
+  host:
+    # バージョンを書かない = <sketchbook>/hardware/lang-ship/host を使う。
+    # バス観測口（HostBus.h）はまだ未リリースなので、リリース版では skip される。
+    fqbn: lang-ship:host:host
+    port: socket://localhost
+    platforms:
+      - platform: lang-ship:host
+    libraries:
+      - dir: ../../
+      - dir: ../common_libs/tgfx_test
+
+default_profile: host
