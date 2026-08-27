@@ -8,11 +8,12 @@
 | # | 相手 | 内容 | 優先 | ブロックするか |
 | --- | --- | --- | --- | --- |
 | [E1](#e1) | host-arduino-core | ホストで SPI と GPIO の**順序付きログ**を取れるようにする | 中 | しない |
-| [E2](#e2) | ch32-riscv-ug/arduino_core_ch32_riscv_arduino | **SPI ライブラリが無い**。あと base が 5.9KB ある | 高 | しない |
-| [E3](#e3) | openwch / YuukiUmeta-UIAP コア | CH32V00x の `PinMap_SPI_*` が無くリンクできない | 中 | しない |
+| [E2](#e2) | ch32-riscv-ug/arduino_core_ch32_riscv_arduino | SPI ライブラリが無い。base が 5.9KB → **新コアで解消見込み** | 低 | しない |
+| [E3](#e3) | openwch / YuukiUmeta-UIAP コア | CH32V00x の `PinMap_SPI_*` が無い → **新コアで解消見込み** | 低 | しない |
+| [E7](#e7) | **ArduinoCore-CH32（開発中）** | **リリースを待つ。それまで測定は symlink 運用** | 高 | しない |
 | [E4](#e4) | LGFXFontToolJs | TinyGFX で使えるフォントヘッダの出力 | 中 | しない |
 | [E5](#e5) | arduino-library-release-toolkit | リリース資産の同期（既に取り込み済み） | 低 | しない |
-| [E6](#e6) | 外部レジストリ | ライブラリ名 `TinyGFX` の重複確認 | 高 | **公開をブロック** |
+| [E6](#e6) | 外部レジストリ | ライブラリ名 `TinyGFX` の重複確認 → **確認済み・問題なし** | 済 | 解消 |
 
 ---
 
@@ -104,6 +105,17 @@ ArduinoCoreAPI  EVT
 
 これが解決すると **TinyGFX が使える余地が 1.5〜2 倍**になる。TinyGFX 単体の工夫では届かない領域。
 
+### 2026-08-27 追記 — 開発中の新コアで両方とも解消する
+
+`ch32-riscv-ug/ArduinoCore-CH32`（プレリリース）で同じ測定をしたところ:
+
+- **`TinyGFXBusSPI`（ハードウェア SPI）がリンクできた**（E2-a 解消）
+- **base が 624 B**。5,892 B → 624 B で **5,268 B の改善**（E2-b 解消）
+
+つまり **E2 は「現行コアを直す」より「新コアのリリースを待つ」が正解**。
+優先度を下げ、代わりに [E7](#e7) を立てた。数字は
+[FOOTPRINT.ja.md](FOOTPRINT.ja.md) §6.1。
+
 ### それまでどうするか
 
 - SPI: `TinyGFXBusSoftSPI`（`pinMode` / `digitalWrite` だけのビットバン）を既定にする。
@@ -165,16 +177,21 @@ TinyGFX のフォント形式は **GFXfont（Adafruit GFX 互換）に合わせ�
 
    TinyGFX 側は `_GFXFONT_H_` ガードで同じ型を提供しているので、**案 A なら TinyGFX 側の変更は不要**。
 
-2. **プロジェクトで使う文字だけを埋め込むワークフロー。**
-   `subset()` は既にあるので、あとは「ソースを走査して使っている文字を集める」側。
-   - スケッチの文字列リテラルを拾ってサブセットを作る CLI があると、そのまま CI に載せられる
-   - TinyGFX 側でやるべき仕事なら、こちらで書く。**どちらが持つべきか相談したい**
-
-3. **CLI / npx で叩けるか。** CI でフォントを再生成して差分を検査したい
-   （`tests/gencheck` 相当。PaperCanvas でやっているのと同じ形）。
-
-4. **確認したいこと**: `encodeCSource` の GFXfont 出力で `bitmapOffset` は
+2. **確認したいこと**: `encodeCSource` の GFXfont 出力で `bitmapOffset` は
    `uint16_t` か `uint32_t` か。Adafruit 互換なら 16bit だが、大きなフォントで溢れないか。
+
+3. **PROGMEM 属性**。AVR で使うにはビットマップ・グリフ表・`GFXfont` の 3 つすべてに
+   PROGMEM が要る（[DECISIONS.ja.md](DECISIONS.ja.md) D19）。`csource.js` は
+   `LGFXFT_PROGMEM` を持っているので足りていそうだが、**3 つすべてに付くか**を確認したい。
+
+### サブセット化は TinyGFX の対象外（2026-08-27 決定）
+
+**「プロジェクトで使う文字だけを埋め込む」仕組みは、完全に外部のツールとして作る。**
+Python 製の独立ツールを想定していて、TinyGFX 側では一切考慮しない
+（[DECISIONS.ja.md](DECISIONS.ja.md) Q9 は取り下げ）。
+
+TinyGFX が満たすべき条件は 1 つだけ: **フォントが素の GFXfont ヘッダであること。**
+これは既に満たしている。外部ツールがヘッダを上書きするだけで成立する。
 
 ### それまでどうするか
 
@@ -198,14 +215,42 @@ TinyGFX のフォント形式は **GFXfont（Adafruit GFX 互換）に合わせ�
 
 ## E6. ライブラリ名 `TinyGFX` の重複確認 {#e6}
 
-**リポジトリを公開する前に必ずやる。** これだけは公開をブロックする。
+**2026-08-27 確認。問題なし。`TinyGFX` を採用してよい。**
 
-| 確認先 | 見るもの |
-| --- | --- |
-| GitHub | 同名の Arduino ライブラリ |
-| Arduino Library Registry | `name=TinyGFX` の登録済みライブラリ |
-| PlatformIO Registry | 同名パッケージ |
+| 確認先 | 方法 | 結果 |
+| --- | --- | --- |
+| Arduino Library Registry | `arduino-cli lib search tinygfx`（index 更新後） | **0 件** |
+| PlatformIO Registry | `api.registry.platformio.org/v3/search?query=tinygfx` | **0 件** |
+| GitHub | リポジトリ名検索 | 同名 3 件あるが**すべて無関係**（Rust の学習用、OpenGL/Vulkan のエンジン）。star はいずれも 0、**Arduino ライブラリは 1 つも無い** |
 
-`TinyGFX` / `tinygfx` は別分野で使われた例があるため、Arduino 界隈で強い競合が無ければ採用でよい。
-競合があれば `TinyGFXCore` / `TinyDisplayGFX` などに寄せる。**名前が変わると
-`src/tinygfx_version.h` のマクロ名と `library.properties` も変わる**ので、実装が進む前に決めたい。
+Arduino 界隈に競合が無いので、名前の衝突は実害なしと判断する。
+
+## E7. ArduinoCore-CH32（開発中）— リリース待ち {#e7}
+
+**窓口**: `~/dev_wch/ArduinoCore-CH32`（`ch32-riscv-ug`、`version=0.0.1` のプロトタイプ）
+
+### なぜ待つのか
+
+[FOOTPRINT.ja.md](FOOTPRINT.ja.md) §6.1 のとおり、このコアなら
+**base が 624 B**（現行 5,892 B）で、**ハードウェア SPI もリンクできる**。
+TinyGFX にとっては E2 と E3 が一度に解消する。
+
+### いま困っていること（依頼ではなく共有）
+
+プレリリースなので、測定に次の 2 つが要る:
+
+1. `<sketchbook>/hardware/ch32-riscv-ug/ch32v` への symlink
+2. `compiler.path` に xpack の `riscv-none-elf-gcc` を渡すビルドプロパティ
+
+このため **CI に載せられず、TinyGFX の自動テストの基準機は現行コアのまま**にしてある。
+ボードマネージャ URL で入るようになったら、次をやる:
+
+- `tests/tinygfx_build.py` の `CH32V003` を新 FQBN に差し替え
+- [FOOTPRINT.ja.md](FOOTPRINT.ja.md) §5 の予算表を測り直す（base が変わるので増分は同じでも総量が変わる）
+- `TinyGFXBusSPI` を Tier 2 の `build_matrix/` に追加（現行コアではビルドすらできない）
+- `TinyGFXBusSoftSPI` は残す。**AVR と、SPI が無い環境の保険**として要る
+
+### 聞いておきたいこと
+
+- CH32V003 の `SPI.begin()` はピン引数を取らない形か（`TinyGFXBusSPI` の前提）
+- `SPISettings` のクロック上限（ST7789 は 40MHz 級まで受けるので、どこまで出せるか）

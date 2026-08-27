@@ -80,10 +80,11 @@ TinyGFX が持つのは **「座標 → パネルへのバイト列」** まで�
 | 区分 | MCU | Flash / RAM | 位置づけ |
 | --- | --- | --- | --- |
 | **基準機** | **CH32V003** | **16KB / 2KB** | **ここに載らない設計は却下する。フットプリント判断の基準。** |
+| 将来の基準機 | CH32V003（新コア） | 16KB / 2KB | `ch32-riscv-ug/ArduinoCore-CH32`。**base が 624 B と圧倒的に軽く、ハードウェア SPI も動く。** リリースされたら基準機を移す（[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E7） |
 | 主ターゲット | CH32V20x | 64KB〜/ 20KB〜 | 実用ライン |
 | 移植性の参照機 | ESP32 | 潤沢 | Arduino SPI が安定。ホスト以外の動作確認先 |
 | 移植性の参照機 | RP2040 | 潤沢 | 同上（暫定・優先度低） |
-| 努力目標 | AVR (UNO) | 32KB / 2KB | ビルドが通れば良い。速度は問わない。**暫定** |
+| 対応 | **Arduino Uno R3 (AVR)** | 32KB / 2KB | **実測で全構成が載る。** フラッシュは余裕、効くのは RAM。フォントは PROGMEM 必須（[DECISIONS.ja.md](DECISIONS.ja.md) D19） |
 
 ## 7. 対象パネル
 

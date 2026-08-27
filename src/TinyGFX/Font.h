@@ -33,3 +33,26 @@ typedef struct {
 
 typedef GFXglyph TinyGFXGlyph;
 typedef GFXfont TinyGFXFont;
+
+// ---------------------------------------------------------------------------
+// フォントデータの読み出し
+//
+// AVR はフラッシュとデータのアドレス空間が別なので、PROGMEM に置いたデータは
+// pgm_read_* でしか読めない。それ以外のアーキテクチャでは素の参照に展開され、
+// 1 命令も増えない。
+//
+// **AVR ではフォントを PROGMEM に置くこと。** 置かないと化ける。
+// tools/gen_font.py と LGFXFontToolJs の出力はどちらも PROGMEM を付ける。
+// ---------------------------------------------------------------------------
+#if defined(__AVR__)
+#include <avr/pgmspace.h>
+#define TINYGFX_FONT_PROGMEM PROGMEM
+inline uint8_t tinygfx_rd8(const void* p) { return pgm_read_byte(p); }
+inline uint16_t tinygfx_rd16(const void* p) { return pgm_read_word(p); }
+inline const void* tinygfx_rdptr(const void* p) { return (const void*)pgm_read_ptr(p); }
+#else
+#define TINYGFX_FONT_PROGMEM
+inline uint8_t tinygfx_rd8(const void* p) { return *(const uint8_t*)p; }
+inline uint16_t tinygfx_rd16(const void* p) { return *(const uint16_t*)p; }
+inline const void* tinygfx_rdptr(const void* p) { return *(const void* const*)p; }
+#endif

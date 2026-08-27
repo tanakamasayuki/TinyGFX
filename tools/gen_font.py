@@ -368,13 +368,13 @@ def main():
         "#include <TinyGFX/Font.h>\n"
         "#include <stdint.h>\n"
         "\n"
-        f"static const uint8_t tinygfxFont5x7Bitmaps[{len(bitmap)}] = {{\n"
+        f"static const uint8_t tinygfxFont5x7Bitmaps[{len(bitmap)}] TINYGFX_FONT_PROGMEM = {{\n"
         + "\n".join(lines)
         + "\n};\n\n"
-        f"static const GFXglyph tinygfxFont5x7Glyphs[{len(table)}] = {{\n"
+        f"static const GFXglyph tinygfxFont5x7Glyphs[{len(table)}] TINYGFX_FONT_PROGMEM = {{\n"
         + "\n".join(tbl)
         + "\n};\n\n"
-        "static const GFXfont tinygfxFont5x7 = {\n"
+        "static const GFXfont tinygfxFont5x7 TINYGFX_FONT_PROGMEM = {\n"
         "    (uint8_t*)tinygfxFont5x7Bitmaps,\n"
         "    (GFXglyph*)tinygfxFont5x7Glyphs,\n"
         f"    {FIRST:#04x}, {last:#04x}, {CELL_H},\n"

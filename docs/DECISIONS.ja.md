@@ -215,6 +215,36 @@ TinyGFX のフォント構造体は **Adafruit GFXfont と同じレイアウト*
 **関連**: [EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E2 / E3。コア側が直れば
 `TinyGFXBusSPI` が使えるようになるが、**それを待たずに進める**。
 
+### D19. AVR ではフォントを PROGMEM から読む
+
+フォントのビットマップ・グリフ表・`GFXfont` 構造体を、AVR では `pgm_read_*` 経由で読む。
+それ以外のアーキテクチャでは素の参照に展開され、**1 命令も増えない**（実測でむしろ 12 B 減った）。
+
+**理由**: Arduino Uno R3（32KB / 2KB）で全構成のビルドが通ることを確認したが、
+**フォントが RAM に載ると使い物にならない**。実測:
+
+| 構成 | RAM（対応前） | RAM（対応後） |
+| --- | --- | --- |
+| D（文字あり、32 文字フォント） | 511 B | **119 B** |
+| E | 519 B | **127 B** |
+
+32 文字で 392 B。ASCII 全域（95 文字）なら 1.2KB で、**2KB の 60%** を持っていかれる。
+フラッシュは 32KB あって余裕（構成 E で 23%）なので、**AVR で効くのは RAM だけ**。
+ここを塞げば UNO は実用になる。
+
+**採らなかった案**:
+- *AVR を対象外にする* — フラッシュに余裕があるのに RAM だけで諦めるのはもったいない。
+  対応は `tinygfx_rd8` / `rd16` / `rdptr` の 3 つの inline 関数で済み、非 AVR は 0 コスト。
+- *PROGMEM 版の API を別に生やす*（`drawStringP` など）— API が 2 系統になる。
+  Adafruit も LovyanGFX も「フォントは常に PROGMEM」で統一しているのでそれに倣う。
+
+**制約**: **AVR ではフォントを PROGMEM に置くこと。** 置かないと化ける。
+`tools/gen_font.py` の出力には `TINYGFX_FONT_PROGMEM` が付く。
+LGFXFontToolJs 側も付くはず（[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E4-3 で確認中）。
+
+**まだやっていないこと**: `pushImage` の画像データは RAM 上のもののみ。AVR で PROGMEM の
+画像を渡す道は用意していない（Q6）。
+
 ## 2. 未決の論点（要相談）
 
 | # | 論点 | 選択肢 | 決める時期 |
@@ -224,11 +254,12 @@ TinyGFX のフォント構造体は **Adafruit GFXfont と同じレイアウト*
 | Q3 | フォント未設定時の挙動 | 何もしない（現状）/ 既定フォントを持つ | — **D17 で「同梱しない」としたので実質決着**。何もしない |
 | Q4 | `setSwapBytes` 相当を持つか | 持つ / Bus 実装ごとに固定（現状） | Phase 4 |
 | Q5 | CS 共有（他デバイスと SPI 共有）への対応 | v0.x では非対応 / Bus にフック | v1.0 前 |
-| Q6 | AVR / PROGMEM 対応 | 努力目標のまま / `pushImage` は AVR 非対応と明記 | Phase 4 |
+| Q6 | AVR で PROGMEM の**画像**を `pushImage` に渡せるようにするか | 対応する / RAM 上のみと明記する | Phase 4。**フォントは D19 で対応済み** |
 | ~~Q7~~ | ~~Panel の virtual メソッド数~~ | **決着。7 本にした**（`invertDisplay` / `setSleep` / `displayOn` は具象パネルの非仮想メソッド） | — |
-| Q8 | ライブラリ名 `TinyGFX` の重複確認 | [EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E6 | **公開前** |
-| Q9 | 使う文字だけを埋め込むサブセット化を、どちら側の仕事にするか | LGFXFontToolJs 側 / TinyGFX の tools 側 | Phase 3（E4 で相談） |
+| ~~Q8~~ | ~~ライブラリ名の重複確認~~ | **決着。3 レジストリとも競合なし**（[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E6） | — |
+| ~~Q9~~ | ~~サブセット化をどちらが持つか~~ | **取り下げ。完全に外部の Python ツールとして作る。TinyGFX 側は考慮しない**（素の GFXfont ヘッダを食えれば足りる） | — |
 | Q10 | `TinyGFXTileCanvas` の描画コールバックの形 | 関数ポインタ + `void*`（現状）/ テンプレートで任意の callable | Phase 2 |
+| Q11 | 自動テストの基準機を新コア（ArduinoCore-CH32）へ移す時期 | リリース後すぐ / v1.0 前 | [EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E7 |
 
 ## 3. memo から変えた点
 
@@ -247,3 +278,4 @@ TinyGFX のフォント構造体は **Adafruit GFXfont と同じレイアウト*
 | 既定の Bus | 「Arduino SPI を標準実装」 | **ソフト SPI を第一実装にする**（V003 で SPI が使えないため） | D18 |
 | ちらつき対策 | 記述なし | **帯レンダリング（TileCanvas）を最初から入れる** | D16 |
 | フォント | 「固定幅ビットマップフォント1種」 | **GFXfont 互換。データはライブラリに同梱しない** | D17 |
+| AVR | 記述なし | **Uno R3 で実用になるところまで対応**（フォントを PROGMEM から読む） | D19 |

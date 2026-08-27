@@ -97,7 +97,7 @@ R1〜R9 を破ると、まずここが落ちる。
 | `clip/` | クリップ矩形の内外。画面外へのはみ出しが 1 画素も出ないこと。クリップを変えても内側の絵が変わらないこと |
 | `rotation/` | 回転 0..3。**同じ図形を回転して描いた結果が、回転なしの結果を回したものと一致すること**（内部整合の不変条件。golden 画像を持たずに済む） |
 | `window/` | `setAddrWindow` が出す `CASET` / `RASET` の値。**パネル原点オフセット × 回転**の 4 通りが正しいこと |
-| `text/` | `drawChar` / `drawString` / `textWidth` / `setTextSize` の整数倍。戻り値が実際に描いた幅と一致すること |
+| `text/` | `drawChar` / `drawString` / `textWidth` / `setTextSize` の整数倍。戻り値が実際に描いた幅と一致すること。**AVR では PROGMEM 経由でも同じ絵になること**（D19） |
 | `image/` | `pushImage` の境界、部分クリップ、transparent 版 |
 | `fill/` | `writeColor` の転送画素数が**ちょうど** `w*h` であること。`TINYGFX_FILL_CHUNK` の有無で出力が 1 バイトも変わらないこと |
 | `tile/` | `TinyGFXTileCanvas`: **帯の行数を変えても出力が 1 画素も変わらないこと**（LGFXVirtualCanvas の `parity` と同じ不変条件）。端数帯、`setBackgroundColor`、`setAutoClear(false)` |
@@ -108,9 +108,16 @@ R1〜R9 を破ると、まずここが落ちる。
 
 | ディレクトリ | 見るもの |
 | --- | --- |
-| `build_matrix/` | `ch32-riscv-arduino:ch32riscv` / `esp32:esp32` / `arduino:avr:uno` でコンパイルが通ること。**`TinyGFXBusSPI` / `TinyGFXBusSoftSPI` の実コードを守るのはここ**。CH32V003 では SPI ライブラリが無いので `TinyGFXBusSPI` は対象外（[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E2） |
+| `build_matrix/` | 下表のとおり。**`TinyGFXBusSPI` / `TinyGFXBusSoftSPI` の実コードを守るのはここ** |
 | `noalloc/` | `linkprune/` に統合済み（base との差で判定） |
 | `examples_compile/` | `examples/` 全部がビルドできること |
+
+| FQBN | `BusSoftSPI` | `BusSPI` | 備考 |
+| --- | --- | --- | --- |
+| `ch32-riscv-arduino:ch32riscv:CH32V003_EVT` | ○（基準機） | ✕ | SPI ライブラリが無い（E2） |
+| `arduino:avr:uno` | ○ | ○（未確認） | フォントは PROGMEM 必須（D19） |
+| `esp32:esp32:*` | ○ | ○ | 未着手 |
+| `ch32-riscv-ug:ch32v:CH32V003`（新コア） | ○ | ○ | **CI に載せられない**（symlink + 外部ツールチェーンが要る）。E7 |
 
 `build_matrix/` は**実行しない。コンパイルのみ。** ホストで動かせない `TinyGFXBusSPI` の型エラー・API 変更を捕まえるのが目的。
 
