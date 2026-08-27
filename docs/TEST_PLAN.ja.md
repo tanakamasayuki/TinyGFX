@@ -46,22 +46,28 @@ TinyGFX → Panel(ST7789) → TinyGFXBusCapture
 - 素の `lang-ship:host:host` で動く。SDL2 も LovyanGFX も不要
 - **`TinyGFXBusCapture` は `src/` に置く**（テスト専用ディレクトリに隠さない）。利用者が自分のパネルを検証するのにも使えるため。ただし**コアからは参照しない**（[CORE_DESIGN.ja.md](CORE_DESIGN.ja.md) §7.4 R3）
 
-### 2.1 ホストコアに「バスの覗き口」を足す案
+### 2.1 本番のバス実装も検証する — `hostbus/`
 
-ホストコア（`host-arduino-core`）も自分たちのリポジトリなので、
-**`digitalWrite` を観測できる口**と **`digitalRead` の値保持**を足せば、
-`TinyGFXBusSoftSPI`（本番と同じバス）**そのもの**をホストで検証できる。
-ビット順・DC を落とすタイミング・トランザクション中の CS まで見られる。
+ホストコアに**バス観測口**が入った（`HostArduino::setPinWriteHook` /
+`SPI.setTransferHook`。[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E1）ので、
+`TinyGFXBusSoftSPI` / `TinyGFXBusSPI` **そのもの**をホストで検証できるようになった。
 
-**ポイントは「デバイスをコアに入れない」こと。** ST7789 の模型は TinyGFX 側が持つ
-（`TinyGFXBusCapture` のデコーダを SPI の下に付け替えるだけ）。コアが持つのは口だけ。
+```text
+TinyGFX → PanelST7789 → 本番の Bus → 線
+        → TgfxPinProbe / TgfxSpiProbe（TinyGFX 側の模型）→ 仮想 GRAM → PPM
+```
 
-依頼内容は [EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E1 に、優先度と検収条件まで
-書いてある。**P0（GPIO 観測 + `digitalRead` 値保持）だけで、既定バスの経路は全部通る。**
+模型は `tests/common_libs/tgfx_test/src/tgfx_host_probe.h`。SCK の立ち上がりで
+MOSI をシフトインし、DC を読んでコマンドとデータを分け、`TinyGFXBusCapture` へ流す。
+**コアは ST7789 を知らない。** 知っているのはこちら側だけ。
 
-**ただしこれを待たない。** ホストコア側のリリースが TinyGFX の実装をブロックしないよう、
-`TinyGFXBusCapture` で先に進める。それまで `TinyGFXBusSPI` / `TinyGFXBusSoftSPI` は
-コンパイル通過（Tier 2）と実機（手動）で守る。
+これで守れるようになったもの: ビット順、DC を落とすタイミング、
+トランザクション中の CS、`SPISettings`（クロック・モード）、
+**ソフト SPI とハードウェア SPI が同じ絵を出すこと**。
+
+**観測口はまだ未リリース。** `sketch.yaml` は platform をバージョン無しで宣言して
+sketchbook の作業コピーを見ており、観測口の無いコアでは skip する。
+リリースされたらバージョン付きに戻す。
 
 ## 3. Tier 0 — 土台。**実装済み・通っている**
 
@@ -121,6 +127,7 @@ TINYGFX_FQBN='ch32-riscv-ug:ch32v:CH32V003:pnum=CH32V003F4P6' uv run pytest foot
 | `tile/` | **不変条件。** 帯の行数（1/2/3/5/7/8）を変えても直接描画と 1 画素も違わないこと。端数帯、バッファ不足、`setAutoClear(false)` | 通過 |
 | `text/` | `drawString` の戻り値が `textWidth` と一致すること、はみ出さないこと、倍角、収録外の文字、背景色つきのセル塗り、透過 | 通過 |
 | `image/` | `pushImage` の配置、四隅の切り取り、クリップとの重なり、transparent 版、画面外 | 通過 |
+| `hostbus/` | **本番の Bus 実装**（§2.1）。ソフト SPI とハードウェア SPI が同じ絵を出すこと、ビット順・クロック・モード、アイドル時の CS / DC | 通過 |
 
 **期待画像は持たない。** 「クリップ内 == クリップ無し」「帯を変えても同じ」のような
 **不変条件**にしてあるので、絵を変えてもテストは壊れない

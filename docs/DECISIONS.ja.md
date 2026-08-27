@@ -275,6 +275,8 @@ LGFXFontToolJs 側も付くはず（[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.
 | ~~Q9~~ | ~~サブセット化をどちらが持つか~~ | **取り下げ。完全に外部の Python ツールとして作る。TinyGFX 側は考慮しない**（素の GFXfont ヘッダを食えれば足りる） | — |
 | Q10 | `TinyGFXTileCanvas` の描画コールバックの形 | 関数ポインタ + `void*`（現状）/ テンプレートで任意の callable | Phase 2 |
 | Q11 | 自動テストの基準機を新コア（ArduinoCore-CH32）へ移す時期 | リリース後すぐ / v1.0 前 | [EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E7 |
+| Q12 | `drawString` の UTF-8 対応 | コアに入れる（+153 B 実測）/ 拡張ヘッダに分ける | CJK を実際に出す段で。**形式に依らず必要**（[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md) §7） |
+| Q13 | u8g2 形式にも対応するか | TinyFont 一本 / 第 2 デコーダを opt-in で足す（試作は測定済み・693 B） | ツール側の議論待ち |
 
 ## 3. memo から変えた点
 

@@ -73,6 +73,7 @@ static const TinyGFXFont tinygfxFont5x7Rec TINYGFX_FONT_PROGMEM = {
     6,  // xAdvance
     8,  // yAdvance
     0,  // xOffset
-    -7,  // yOffset
+    0,  // yOffset（行の上端からのグリフ上端）
     5,  // bytesPerGlyph
+    nullptr,  // next
 };
