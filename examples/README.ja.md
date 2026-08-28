@@ -59,8 +59,9 @@ arduino-cli compile --profile m5stack -u -p /dev/ttyUSB0 examples/M5StackBasic
 生成されたヘッダは**純粋な CellFont** なので、`setFont()` に渡すには 1 行包む:
 
 ```cpp
-#include <TinyGFX/FontCell.h>
-#include "font.h"
+#include <TinyGFX.h>
+#include <TinyGFX/FontCell.h>   // デコーダ
+#include "font.h"               // CLI が出したもの
 
 static const TinyGFXFontRef myFont = {&Name, &tinygfxFontCellOps, nullptr};
 ```

@@ -1,7 +1,10 @@
 // TinyGFX - CellFont 形式のデコーダ
 //
 // 形式そのものは TinyGFX の外の仕様（LGFXFontToolJs docs/formats/cellfont.ja.md）。
-// ここにあるのは**その仕様の描画器側**だけ。構造体とアクセサは <CellFont.h>。
+// ここにあるのは**その仕様の描画器側**だけ。構造体とアクセサは TinyGFX/CellFont.h。
+//
+// **生成されたフォントヘッダより先にこれを include すること。** 生成ヘッダは
+// 描画器のヘッダを include せず、型が無ければ #error で止まる（仕様 §12.2）。
 //
 // **H≤16 のピクセルグリッドフォントで最良。** それより大きくても、収録字数が
 // 少なければ総量では勝つ（仕様 §13.4。TinyGFX のデコーダ追加コストは実測 693 B）。
@@ -17,8 +20,7 @@
 #pragma once
 #include <stdint.h>
 
-#include <CellFont.h>
-
+#include "CellFont.h"
 #include "Font.h"
 #include "Gfx.h"
 

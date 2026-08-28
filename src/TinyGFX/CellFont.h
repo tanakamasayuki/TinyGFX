@@ -4,12 +4,16 @@
 //   https://github.com/tanakamasayuki/LGFXFontToolJs  docs/formats/cellfont.ja.md
 //
 // このファイルは仕様 §12.1 が描画器に求めるものだけを置く。
-// **生成されたフォントヘッダはこれを `#include <CellFont.h>` で拾う**ので、
-// ライブラリのルート（src/）に、この名前で無ければならない。
+// **仕様が決めているのはマクロと型の名前だけで、ファイル名は自由。**
+// なので大域の include 名前空間を汚さないよう TinyGFX/ の下に置いてある。
+//
+// **生成されたフォントヘッダより先に include すること。** 生成ヘッダ側は
+// 描画器のヘッダを include せず、`CELLFONT_SPEC_VERSION` が未定義なら
+// `#error` で止まる（仕様 §12.2）。ふつうは `TinyGFX/FontCell.h` が連れてくる。
 //
 // TinyGFX には依存しない。構造体とアクセサだけで、コードを 1 バイトも生まない。
 //
-// 同じ仕様を実装した別のライブラリと同居したときのために、
+// 同じ仕様を実装した別のライブラリと同居しても壊れないよう、
 // **CELLFONT_SPEC_VERSION で全体を守っている。** 先に定義したほうが勝ち、
 // 生成ヘッダはどちらの定義でも同じように読める（仕様が同じなので構造体も同じ）。
 #ifndef CELLFONT_SPEC_VERSION

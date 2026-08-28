@@ -58,8 +58,9 @@ not use are not linked in.
 A generated header is **plain CellFont**, so wrap it in one line to hand it to `setFont()`:
 
 ```cpp
-#include <TinyGFX/FontCell.h>
-#include "font.h"
+#include <TinyGFX.h>
+#include <TinyGFX/FontCell.h>   // the decoder
+#include "font.h"               // whatever the CLI produced
 
 static const TinyGFXFontRef myFont = {&Name, &tinygfxFontCellOps, nullptr};
 ```
