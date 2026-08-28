@@ -32,11 +32,18 @@
 class TinyGFXPanelSSD1306 : public TinyGFXPanel {
  public:
   /// `buffer` is w * h / 8 bytes - 1,024 for 128x64.
-  TinyGFXPanelSSD1306(TinyGFXBus& bus, uint8_t* buffer, int16_t w = 128, int16_t h = 64)
+  /// `buffer` normally holds the whole screen: w * h / 8 bytes.
+  ///
+  /// Pass `bufferPages` to hand over less than that - `w * bufferPages` bytes -
+  /// and drive the panel a band at a time with setBandPage(). One page is 8
+  /// rows, so a 128x64 needs 128 bytes per page instead of 1,024 for the lot.
+  TinyGFXPanelSSD1306(TinyGFXBus& bus, uint8_t* buffer, int16_t w = 128, int16_t h = 64,
+                      int16_t bufferPages = 0)
       : _bus(&bus), _buf(buffer), _natW(w), _natH(h) {
     _width = w;
     _height = h;
     _pages = (int16_t)(h >> 3);
+    _bandPages = (bufferPages > 0 && bufferPages < _pages) ? bufferPages : 0;
   }
 
   bool init() override;
@@ -71,6 +78,33 @@ class TinyGFXPanelSSD1306 : public TinyGFXPanel {
   }
   void beginTransaction() override {}
   void endTransaction() override {}
+
+  /// Which page the band buffer currently stands for. Only meaningful when the
+  /// constructor was given a `bufferPages` smaller than the screen.
+  ///
+  /// This is how a monochrome panel is driven without a full framebuffer:
+  /// point the band at a page, clear it, draw the whole scene with the clip set
+  /// to that band, push it, move on.
+  ///
+  /// ```cpp
+  /// for (int16_t p = 0; p < 8; ++p) {
+  ///   panel.setBandPage(p);
+  ///   panel.clearBuffer();
+  ///   lcd.setClipRect(0, p * 8, 128, 8);
+  ///   drawScene(lcd);
+  ///   panel.display();
+  /// }
+  /// lcd.resetClipRect();
+  /// ```
+  ///
+  /// The trade is on the wire, not in RAM. Both ways push the same bytes for a
+  /// full redraw, but a whole-screen buffer can push just the pages that
+  /// changed, and a band cannot. docs/FOOTPRINT.ja.md has the numbers.
+  void setBandPage(int16_t first) {
+    _pageFirst = first;
+    _dirtyLo = 32767;
+    _dirtyHi = -1;
+  }
 
   /// Push only the pages that changed. Nothing reaches the screen until this
   /// is called.
@@ -118,15 +152,21 @@ class TinyGFXPanelSSD1306 : public TinyGFXPanel {
       if (hi > 7) hi = 7;
       uint8_t mask = 0;
       for (int16_t b = lo; b <= hi; ++b) mask = (uint8_t)(mask | (uint8_t)(1u << b));
-      uint8_t* row = &_buf[(int32_t)page * _natW];
+      int16_t slot = page;
+      if (_bandPages != 0) {
+        slot = (int16_t)(page - _pageFirst);
+        if (slot < 0 || slot >= _bandPages) { y = (int16_t)(pageTop + 8); continue; }
+      }
+      uint8_t* row = &_buf[(int32_t)slot * _natW];
       if (on) {
         for (int16_t x = ax; x <= bx; ++x) row[x] = (uint8_t)(row[x] | mask);
       } else {
         const uint8_t clear = (uint8_t)~mask;
         for (int16_t x = ax; x <= bx; ++x) row[x] = (uint8_t)(row[x] & clear);
       }
-      if (page < _dirtyLo) _dirtyLo = page;
-      if (page > _dirtyHi) _dirtyHi = page;
+      // Dirty is tracked in buffer space, so mark the slot, not the screen page.
+      if (slot < _dirtyLo) _dirtyLo = slot;
+      if (slot > _dirtyHi) _dirtyHi = slot;
       y = (int16_t)(pageTop + 8);
     }
   }
@@ -152,7 +192,11 @@ class TinyGFXPanelSSD1306 : public TinyGFXPanel {
 
     int16_t fx, fy;
     toBuffer(x, y, &fx, &fy);
-    const int16_t page = (int16_t)(fy >> 3);
+    int16_t page = (int16_t)(fy >> 3);
+    if (_bandPages != 0) {
+      page = (int16_t)(page - _pageFirst);
+      if (page < 0 || page >= _bandPages) return;  // outside the band
+    }
     uint8_t* slot = &_buf[(int32_t)page * _natW + fx];
     const uint8_t mask = (uint8_t)(1u << (fy & 7));
     if (on) *slot = (uint8_t)(*slot | mask);
@@ -164,6 +208,8 @@ class TinyGFXPanelSSD1306 : public TinyGFXPanel {
   TinyGFXBus* _bus;
   uint8_t* _buf;
   int16_t _natW, _natH, _pages;
+  int16_t _pageFirst = 0;
+  int16_t _bandPages = 0;  // 0 means the buffer covers the whole screen
   uint16_t _xs = 0, _ys = 0, _xe = 0, _ye = 0;
   uint16_t _cx = 0, _cy = 0;
   int16_t _dirtyLo = 32767, _dirtyHi = -1;
@@ -196,17 +242,22 @@ inline bool TinyGFXPanelSSD1306::init() {
 }
 
 inline void TinyGFXPanelSSD1306::clearBuffer(bool on) {
-  const int32_t n = (int32_t)_natW * _pages;
+  // However many pages the buffer actually holds - clearing the whole screen's
+  // worth would run off the end of a band buffer.
+  const int16_t pages = (_bandPages != 0) ? _bandPages : _pages;
+  const int32_t n = (int32_t)_natW * pages;
   const uint8_t v = on ? 0xFF : 0x00;
   for (int32_t i = 0; i < n; ++i) _buf[i] = v;
   _dirtyLo = 0;
-  _dirtyHi = (int16_t)(_pages - 1);
+  _dirtyHi = (int16_t)(pages - 1);
 }
 
 inline void TinyGFXPanelSSD1306::display() {
   if (_dirtyHi < _dirtyLo) return;  // nothing changed
-  cmd(0x21); cmd(0); cmd((uint8_t)(_natW - 1));                    // column range
-  cmd(0x22); cmd((uint8_t)_dirtyLo); cmd((uint8_t)_dirtyHi);       // page range
+  // Dirty pages are tracked in buffer space; the screen may be further down.
+  const int16_t base = (_bandPages != 0) ? _pageFirst : 0;
+  cmd(0x21); cmd(0); cmd((uint8_t)(_natW - 1));                              // column range
+  cmd(0x22); cmd((uint8_t)(base + _dirtyLo)); cmd((uint8_t)(base + _dirtyHi));  // page range
   _bus->writeData(&_buf[(int32_t)_dirtyLo * _natW],
                   (size_t)((int32_t)(_dirtyHi - _dirtyLo + 1) * _natW));
   _dirtyLo = 32767;
