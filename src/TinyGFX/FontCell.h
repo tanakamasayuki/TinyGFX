@@ -67,6 +67,41 @@
 #define TINYGFX_FONT_SCALE 1  // 0 drops the setTextSize() multiplier (fixes it at 1)
 #endif
 
+/// Walks a glyph's bit stream. Which way is smaller depends on the machine
+/// (both measured, same glyphs):
+///
+///   - AVR has no barrel shifter and no 32-bit registers, so indexing with a
+///     bit counter costs a shift by a variable amount on every pixel. Eating
+///     the stream a byte at a time is 162 bytes smaller there.
+///   - RISC-V shifts in one instruction and works in 32-bit registers, so the
+///     counter is free and the extra per-pixel branch would cost 16 bytes on
+///     the CH32V003 - the reference board.
+struct CellBits {
+  // A constructor rather than aggregate initialisation: the default member
+  // initialisers below make this a non-aggregate in C++11, which is the
+  // standard this library is held to (docs/REQUIREMENTS.ja.md 6.1).
+  explicit CellBits(const uint8_t* p) : src(p) {}
+
+  const uint8_t* src;
+#if defined(__AVR__)
+  uint8_t acc = 0, left = 0;
+  bool next() {
+    if (left == 0) { acc = CELLFONT_READ_U8(src++); left = 8; }
+    const bool b = (acc & 0x80) != 0;
+    acc = (uint8_t)(acc << 1);
+    --left;
+    return b;
+  }
+#else
+  uint32_t bit = 0;
+  bool next() {
+    const bool b = ((CELLFONT_READ_U8(&src[bit >> 3]) >> (7 - (bit & 7))) & 1) != 0;
+    ++bit;
+    return b;
+  }
+#endif
+};
+
 namespace tinygfx_cell {
 
 /// Look one font up. Returns true when found. Spec 7.1.
@@ -193,38 +228,16 @@ inline int16_t draw(TinyGFX& g, const void* font, uint16_t ch, int16_t x, int16_
     const int16_t gx = (int16_t)(x + (int16_t)((int8_t)CELLFONT_READ_U8(&f->xOffset) * sz));
     int16_t py = (int16_t)(y + (int16_t)((int8_t)CELLFONT_READ_U8(&f->yOffset) * sz));
     // Rows are concatenated into one MSB-first bit stream and do not realign
-    // to byte boundaries. There are two ways to walk it, and which one is
-    // smaller depends on the machine (both measured, same glyphs):
-    //
-    //   - AVR has no barrel shifter and no 32-bit registers, so indexing with
-    //     a bit counter costs a shift by a variable amount on every pixel.
-    //     Eating the stream a byte at a time instead is 162 bytes smaller.
-    //   - RISC-V shifts in one instruction and works in 32-bit registers, so
-    //     the counter is free there and the extra per-pixel branch would cost
-    //     16 bytes on the CH32V003 - the reference board.
-#if defined(__AVR__)
-    uint8_t acc = 0, left = 0;
-#else
-    uint32_t bit = 0;
-#endif
+    // to byte boundaries, so one reader walks the whole glyph.
+    CellBits bits(src);
     for (uint8_t r = 0; r < gh; ++r) {
       int16_t px = gx;
       uint8_t runStart = 0;
-      bool cur = false;
-      for (uint8_t c = 0; c < gw; ++c) {
-#if defined(__AVR__)
-        if (left == 0) { acc = CELLFONT_READ_U8(src++); left = 8; }
-        const bool on = (acc & 0x80) != 0;
-        acc = (uint8_t)(acc << 1);
-        --left;
-#else
-        const bool on = ((CELLFONT_READ_U8(&src[bit >> 3]) >> (7 - (bit & 7))) & 1) != 0;
-        ++bit;
-#endif
-        if (c == 0) {
-          cur = on;
-          continue;
-        }
+      // The first pixel of the row opens the run, so it is read out here
+      // rather than costing a "is this the first column" test on every pixel.
+      bool cur = bits.next();
+      for (uint8_t c = 1; c < gw; ++c) {
+        const bool on = bits.next();
         if (on != cur) {
           const int16_t runW = (int16_t)((uint16_t)(c - runStart) * sz);
           if (cur) g.fillRect(px, py, runW, sz, fg);
