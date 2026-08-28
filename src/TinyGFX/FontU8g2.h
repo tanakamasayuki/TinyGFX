@@ -1,20 +1,21 @@
-// TinyGFX - u8g2 形式のフォント
+// TinyGFX - u8g2 format fonts
 //
-// **高さ 16 画素を超えて、かつ収録字数が多いフォントはこちらのほうが小さい。**
-// RLE とグリフごとの bbox が効き始めるため（docs/FONT_FORMAT.ja.md §0）。
-// H≤16 なら、字数が少なければ H>16 でも CellFont（FontCell.h）のほうが小さい。
+// Smaller than CellFont once a font is both taller than 16 pixels and carries
+// many glyphs - that is where RLE and per-glyph bounding boxes start to pay
+// (docs/FONT_FORMAT.ja.md 0). At or below 16 pixels, and above it whenever the
+// glyph count is small, CellFont (FontCell.h) wins.
 //
-// デコーダのコード量は CellFont とほぼ同じ（693 B vs 684 B、実測）。
-// **include しなければ 1 バイトもリンクされない。**
+// The two decoders are almost exactly the same size: 693 bytes against 684,
+// measured. Not including this header links not one byte of it.
 //
-// 正しさは LGFXFontToolJs が描いた絵との一致で確認している（tests/u8g2/）。
+// Correctness is pinned by matching what LGFXFontToolJs renders (tests/u8g2/).
 #pragma once
 #include <stdint.h>
 
 #include "Font.h"
 #include "Gfx.h"
 
-/// u8g2 のビット列リーダ。LSB 詰め、1 回の読み出しは高々 2 バイトにまたがる。
+/// The u8g2 bit reader. LSB-packed; one read spans at most two bytes.
 struct TinyGFXU8g2Bits {
   const uint8_t* ptr;
   uint8_t bitPos;
@@ -37,7 +38,7 @@ struct TinyGFXU8g2Bits {
   }
 };
 
-/// u8g2 フォントのヘッダ（23 バイト）のうち、描画に要るものだけ。
+/// The parts of the 23-byte u8g2 font header that drawing actually needs.
 struct TinyGFXFontU8g2 {
   const uint8_t* data;
 
@@ -58,7 +59,7 @@ struct TinyGFXFontU8g2 {
     return (uint16_t)(((uint16_t)tinygfx_rd8(data + off) << 8) | tinygfx_rd8(data + off + 1));
   }
 
-  /// グリフのビット列の先頭。無ければ nullptr。
+  /// Start of a glyph's bit stream, or nullptr when it is not present.
   const uint8_t* glyphData(uint16_t enc) const {
     const uint8_t* p = data + 23;
     if (enc <= 255) {
@@ -71,7 +72,8 @@ struct TinyGFXFontU8g2 {
         p += step;
       }
     }
-    // Unicode 区画: 4 バイトの飛び先表（次ブロックまでのバイト数 / そのブロックの最終コード）
+    // Unicode section: a 4-byte jump table of (bytes to the next block,
+    // last code in that block)
     const uint8_t* table = data + 23 + startUnicode();
     p = table;
     uint16_t lastInBlock;
@@ -93,19 +95,19 @@ struct TinyGFXFontU8g2 {
 
 namespace tinygfx_u8g2 {
 
-/// 行送り。u8g2 の ascent_para - descent_para。
+/// Line advance: u8g2's ascent_para minus descent_para.
 inline uint8_t lineHeight(const void* font) {
   const TinyGFXFontU8g2 f = {(const uint8_t*)font};
   return (uint8_t)(f.ascentPara() - f.descentPara());
 }
 
-/// ベースラインから行の箱の上端まで。u8g2 の ascent_para。
+/// Baseline to the top of the line box: u8g2's ascent_para.
 inline int16_t ascent(const void* font) {
   const TinyGFXFontU8g2 f = {(const uint8_t*)font};
   return (int16_t)f.ascentPara();
 }
 
-/// 描かずに送り幅だけ返す。収録外は -1。
+/// The advance only, without drawing. -1 when not covered.
 inline int16_t advance(const void* font, uint16_t ch) {
   const TinyGFXFontU8g2 f = {(const uint8_t*)font};
   const uint8_t* gd = f.glyphData(ch);
@@ -118,8 +120,8 @@ inline int16_t advance(const void* font, uint16_t ch) {
   return (int16_t)bits.getSigned(f.bitsD());
 }
 
-/// 1 文字描く。**y はベースライン**（u8g2 本来の基準と同じ）。
-/// 戻り値は送り幅（倍率をかける前）。収録外は -1。
+/// Draw one glyph. `y` is the baseline, which is u8g2's own convention.
+/// Returns the advance before the text size multiplier, or -1 when not covered.
 inline int16_t draw(TinyGFX& g, const void* font, uint16_t ch, int16_t x, int16_t y) {
   const TinyGFXFontU8g2 f = {(const uint8_t*)font};
   const uint8_t* gd = f.glyphData(ch);
@@ -134,7 +136,8 @@ inline int16_t draw(TinyGFX& g, const void* font, uint16_t ch, int16_t x, int16_
 
   const uint8_t sz = g.getTextSize();
   if (g.hasTextBg()) {
-    // 行の箱は**連鎖先頭のメトリクス**で決める（フォントごとに変えると段がずれる）
+    // The line box comes from the chain head's metrics; varying it per font
+    // would make the rows drift apart
     const int16_t cellTop = (int16_t)(y - (int16_t)(g.getTextAscent() * sz));
     g.fillRect(x, cellTop, (int16_t)((int16_t)adv * sz),
                (int16_t)((uint16_t)g.getTextLineHeight() * sz), g.getTextBgColor());
@@ -153,7 +156,7 @@ inline int16_t draw(TinyGFX& g, const void* font, uint16_t ch, int16_t x, int16_
     const uint8_t zeros = bits.get(b0);
     const uint8_t ones = bits.get(b1);
     do {
-      uint8_t cnt = zeros;  // 0 のラン: 進めるだけ
+      uint8_t cnt = zeros;  // a run of zeros: just advance
       while (cnt > 0) {
         const uint8_t rem = (uint8_t)(gw - cx);
         const uint8_t run = rem < cnt ? rem : cnt;
@@ -161,7 +164,7 @@ inline int16_t draw(TinyGFX& g, const void* font, uint16_t ch, int16_t x, int16_
         if (cx >= gw) { cx = 0; ++cy; }
         cnt = (uint8_t)(cnt - run);
       }
-      cnt = ones;  // 1 のラン: 行ごとに矩形で描く
+      cnt = ones;  // a run of ones: draw it row by row as rectangles
       while (cnt > 0) {
         const uint8_t rem = (uint8_t)(gw - cx);
         const uint8_t run = rem < cnt ? rem : cnt;
@@ -179,7 +182,8 @@ inline int16_t draw(TinyGFX& g, const void* font, uint16_t ch, int16_t x, int16_
 
 }  // namespace tinygfx_u8g2
 
-/// この形式の入口。生成したフォントヘッダが TinyGFXFontRef からここを指す。
+/// This format's entry point. A TinyGFXFontRef built around a generated font
+/// header points here.
 static const TinyGFXFontOps tinygfxFontU8g2Ops = {
     &tinygfx_u8g2::draw,
     &tinygfx_u8g2::advance,

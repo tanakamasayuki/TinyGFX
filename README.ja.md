@@ -164,8 +164,40 @@ canvas.render(scene);
 
 **ライブラリはフォントデータを 1 バイトも同梱していません。** フォントはスケッチ側に置きます。
 
-生成は [LGFXFontToolJs](https://www.npmjs.com/package/lgfx-font-tool) を使う想定です。
-形式は 2 つあり、**使わないほうのデコーダはリンクされません。**
+### 作りかた
+
+[LGFXFontToolJs](https://www.npmjs.com/package/lgfx-font-tool) の CLI が
+**プロジェクトで使う文字だけ**を焼き込める形で出します。
+
+```sh
+npx -p lgfx-font-tool lgfx-font build --google "Noto Sans JP" --em 12 \
+    --chars "温度設定完了 23.5℃" --format cellfont --out font.h
+```
+
+> パッケージ名は `lgfx-font-tool`、コマンド名は `lgfx-font` と違うので `-p` が要ります。
+
+上の 12 文字なら **245 バイト**。使う文字を増やした分だけ増えます。
+
+出力は**純粋な CellFont** で、TinyGFX の名前を 1 つも含みません。
+`setFont()` に渡すには 1 行包みます。
+
+```cpp
+#include <TinyGFX.h>
+#include <TinyGFX/FontCell.h>   // デコーダ。使う形式だけ
+#include "font.h"               // CLI が出したもの。手を入れない
+
+static const TinyGFXFontRef myFont = {&font, &tinygfxFontCellOps, nullptr};
+
+lcd.setFont(&myFont);
+lcd.drawString("23.5", 8, 8);
+```
+
+`TinyGFX.h` が CellFont の型を連れてくるので、**include の順序は気にしなくて構いません**
+（型だけなので 0 バイトです）。
+
+### 形式は 2 つ
+
+**使わないほうのデコーダはリンクされません。**
 
 | 形式 | 向き |
 | --- | --- |

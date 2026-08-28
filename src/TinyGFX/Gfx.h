@@ -1,9 +1,10 @@
 // TinyGFX - drawing core
 //
-// このクラスには virtual を 1 つも置かない（docs/DECISIONS.ja.md D1）。
-// すべてヘッダ内 inline なので、呼ばれないメソッドはそもそも生成されない。
-// コアは <Arduino.h> も Serial も参照しない（docs/CORE_DESIGN.ja.md §7.4 R4）。
-// 除算・剰余を使わない（CH32V003 は rv32ec で除算命令を持たない）。
+// Not one virtual method in this class (docs/DECISIONS.ja.md D1). Everything
+// is inline in the header, so a method nobody calls is never emitted at all.
+// The core references neither <Arduino.h> nor Serial (docs/CORE_DESIGN.ja.md
+// 7.4, rule R4), and never divides or takes a remainder - the CH32V003 is
+// rv32ec and has no divide instruction.
 #pragma once
 #include <stdint.h>
 
@@ -12,16 +13,16 @@
 #include "Panel.h"
 
 
-/// 収録外の字に使う退避先（REPLACEMENT CHARACTER）。
-/// 豆腐を出すかどうかは**フォントに U+FFFD を入れるかどうか**で決まる。
-/// コアは独自の既定の箱を持たない（CellFont 仕様 §7.2）。
+/// Where an uncovered code falls back to (REPLACEMENT CHARACTER).
+/// Whether a notdef box appears is decided by whether the font includes
+/// U+FFFD; the core has no built-in box of its own (CellFont spec 7.2).
 #define TINYGFX_NOTDEF 0xFFFDu
 
 class TinyGFX {
  public:
   explicit TinyGFX(TinyGFXPanel& panel) : _panel(&panel) {}
 
-  // ---- 基本 ------------------------------------------------------------
+  // ---- basics ----------------------------------------------------------
   bool begin() {
     const bool ok = _panel->init();
     resetClipRect();
@@ -39,7 +40,7 @@ class TinyGFX {
     return tinygfx_color565(r, g, b);
   }
 
-  // ---- 転送制御 --------------------------------------------------------
+  // ---- transfer control ------------------------------------------------
   void startWrite() {
     if (_txn++ == 0) _panel->beginTransaction();
   }
@@ -47,7 +48,7 @@ class TinyGFX {
     if (_txn != 0 && --_txn == 0) _panel->endTransaction();
   }
 
-  // ---- クリップ --------------------------------------------------------
+  // ---- clipping --------------------------------------------------------
   void setClipRect(int16_t x, int16_t y, int16_t w, int16_t h) {
     int16_t x1 = (int16_t)(x + w - 1);
     int16_t y1 = (int16_t)(y + h - 1);
@@ -66,14 +67,14 @@ class TinyGFX {
   }
   void clearClipRect() { resetClipRect(); }
 
-  // ---- 低レベル転送 ----------------------------------------------------
+  // ---- low-level transfer ----------------------------------------------
   void setAddrWindow(int16_t x, int16_t y, int16_t w, int16_t h) {
     _panel->setWindow((uint16_t)x, (uint16_t)y, (uint16_t)(x + w - 1), (uint16_t)(y + h - 1));
   }
   void writeColor(uint16_t color, uint32_t count) { _panel->writeColor(color, count); }
   void writePixels(const uint16_t* data, uint32_t count) { _panel->writePixels(data, count); }
 
-  // ---- プリミティブ ----------------------------------------------------
+  // ---- primitives ------------------------------------------------------
   void drawPixel(int16_t x, int16_t y, uint16_t color) {
     if (x < _clipX0 || x > _clipX1 || y < _clipY0 || y > _clipY1) return;
     startWrite();
@@ -245,14 +246,15 @@ class TinyGFX {
     endWrite();
   }
 
-  /// 除算なしの三角形塗り。辺を Bresenham で走らせて走査線ごとに水平線を引く。
+  /// Filled triangle without a divide: the edges are stepped with Bresenham
+  /// and each scanline becomes a horizontal line.
   void fillTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2,
                     uint16_t color) {
-    // y で昇順に並べ替え
+    // sort by y, ascending
     if (y0 > y1) { swap16(x0, x1); swap16(y0, y1); }
     if (y1 > y2) { swap16(x1, x2); swap16(y1, y2); }
     if (y0 > y1) { swap16(x0, x1); swap16(y0, y1); }
-    if (y0 == y2) {  // 退化: 水平線
+    if (y0 == y2) {  // degenerate: a horizontal line
       int16_t lo = x0, hi = x0;
       if (x1 < lo) lo = x1; else if (x1 > hi) hi = x1;
       if (x2 < lo) lo = x2; else if (x2 > hi) hi = x2;
@@ -274,7 +276,7 @@ class TinyGFX {
     endWrite();
   }
 
-  // ---- 画像 ------------------------------------------------------------
+  // ---- images ----------------------------------------------------------
   void pushImage(int16_t x, int16_t y, int16_t w, int16_t h, const uint16_t* data) {
     if (w <= 0 || h <= 0 || data == nullptr) return;
     int16_t sx = 0, sy = 0;
@@ -287,7 +289,7 @@ class TinyGFX {
     const int16_t cw = (int16_t)(x1 - x + 1);
     const int16_t ch = (int16_t)(y1 - y + 1);
     startWrite();
-    if (cw == w && sx == 0) {  // 行が丸ごと入る: 1 回のウィンドウで流し込む
+    if (cw == w && sx == 0) {  // whole rows survive: push them in one window
       const uint16_t* src = data + (uint32_t)(uint16_t)sy * (uint32_t)(uint16_t)w;
       _panel->setWindow((uint16_t)x, (uint16_t)y, (uint16_t)x1, (uint16_t)y1);
       _panel->writePixels(src, (uint32_t)(uint16_t)cw * (uint32_t)(uint16_t)ch);
@@ -302,7 +304,8 @@ class TinyGFX {
     endWrite();
   }
 
-  /// transparent と一致する画素を飛ばす版。連続するランだけ転送する。
+  /// The version that skips pixels matching `transparent`, pushing only the
+  /// runs in between.
   void pushImage(int16_t x, int16_t y, int16_t w, int16_t h, const uint16_t* data,
                  uint16_t transparent) {
     if (w <= 0 || h <= 0 || data == nullptr) return;
@@ -322,12 +325,13 @@ class TinyGFX {
     endWrite();
   }
 
-  // ---- 文字 ------------------------------------------------------------
+  // ---- text ------------------------------------------------------------
   //
-  // **コアはフォント形式を知らない。** 描き方はフォント側（TinyGFXFontOps）が持つ。
-  // 使っていない形式のデコーダはどこからも参照されないのでリンクされない。
+  // The core knows nothing about font formats; the font carries the code that
+  // draws it (TinyGFXFontOps). A decoder for a format you do not use is
+  // referenced by nothing and so is never linked.
 
-  /// フォントを設定する。連鎖（next）の先頭を渡す。
+  /// Set the font. Pass the head of the chain.
   void setFont(const TinyGFXFontRef* font) { _font = font; }
   const TinyGFXFontRef* getFont() const { return _font; }
   void setCursor(int16_t x, int16_t y) { _cursorX = x; _cursorY = y; }
@@ -337,7 +341,7 @@ class TinyGFX {
   void setTextColor(uint16_t fg, uint16_t bg) { _textFg = fg; _textBg = bg; _textHasBg = true; }
   void setTextSize(uint8_t size) { _textSize = size ? size : 1; }
 
-  // デコーダが読む描画状態
+  // drawing state the decoders read
   uint8_t getTextSize() const { return _textSize; }
   uint16_t getTextColor() const { return _textFg; }
   uint16_t getTextBgColor() const { return _textBg; }
@@ -347,9 +351,10 @@ class TinyGFX {
     return (int16_t)((uint16_t)getTextLineHeight() * _textSize);
   }
 
-  // デコーダが読む行のメトリクス。**連鎖の先頭のものだけを使う。**
-  // 連鎖する各フォントは高さも yOffset も別々でよいが、ベースラインは共通なので、
-  // ここを各フォントの値にすると段組みと背景セルがずれる。
+  // Line metrics the decoders read. Always the chain head's, never each
+  // font's own: fonts in a chain may differ in height and yOffset, but they
+  // share a baseline, so using per-font values would misalign both the line
+  // spacing and the background cell.
   uint8_t getTextLineHeight() const {
     return (_font == nullptr) ? 0 : _font->ops->lineHeight(_font->data);
   }
@@ -367,12 +372,14 @@ class TinyGFX {
     return total;
   }
 
-  /// 1 文字描く。**y は行の上端。** 戻り値は送り幅（倍率込み）。
+  /// Draw one glyph. `y` is the top of the line. Returns the advance,
+  /// multiplier included.
   ///
-  /// 収録外なら U+FFFD（豆腐）へ退避する。**退避は連鎖を全部引き終えてから**
-  /// 1 度だけ行う（CellFont 仕様 §7.2 / §15.2）。フォントごとに退避すると、
-  /// 1 本目の豆腐が 2 本目に載っている字を潰す。
-  /// 豆腐も無ければ 0 を返す（何も描かず、ペンを進めない）。
+  /// An uncovered code falls back to U+FFFD, and that fallback happens once,
+  /// only after the whole chain has been searched (CellFont spec 7.2 and
+  /// 15.2). Falling back per font would let the first font's notdef hide a
+  /// glyph the second font actually has.
+  /// With no notdef either, this returns 0: nothing drawn, pen not advanced.
   int16_t drawChar(uint16_t ch, int16_t x, int16_t y) {
     if (_font == nullptr) return 0;
     const int16_t base = (int16_t)(y + (int16_t)(getTextAscent() * _textSize));
@@ -381,7 +388,7 @@ class TinyGFX {
     return (a < 0) ? 0 : (int16_t)(a * _textSize);
   }
 
-  /// 文字列を描く。戻り値は描いた幅。改行は解釈しない。
+  /// Draw a string and return the width drawn. Newlines are not interpreted.
   int16_t drawString(const char* str, int16_t x, int16_t y) {
     if (str == nullptr) return 0;
     const int16_t x0 = x;
@@ -394,7 +401,7 @@ class TinyGFX {
   }
 
  protected:
-  /// 連鎖を引いて 1 文字描く。**退避はしない。** 収録外は -1。
+  /// Walk the chain and draw one glyph. No fallback here; -1 when uncovered.
   int16_t drawIn(uint16_t ch, int16_t x, int16_t base) {
     for (const TinyGFXFontRef* f = _font; f != nullptr; f = f->next) {
       const int16_t a = f->ops->draw(*this, f->data, ch, x, base);
@@ -403,8 +410,9 @@ class TinyGFX {
     return -1;
   }
 
-  /// 送り幅（倍率込み）。収録外は U+FFFD へ退避し、それも無ければ -1。
-  /// **drawChar と同じ退避をする**（textWidth と描いた幅がずれないように）。
+  /// The advance, multiplier included. Falls back to U+FFFD, then -1.
+  /// It falls back exactly as drawChar does, so textWidth and the width
+  /// actually drawn cannot disagree.
   int16_t advanceOf(uint16_t ch) const {
     int16_t a = advanceIn(ch);
     if (a < 0 && ch != TINYGFX_NOTDEF) a = advanceIn(TINYGFX_NOTDEF);
@@ -423,7 +431,7 @@ class TinyGFX {
     const int16_t t = a; a = b; b = t;
   }
 
-  /// 走査線ごとに x を進める辺。除算を使わない。
+  /// An edge that steps x once per scanline, without dividing.
   struct Edge {
     int16_t x = 0, dx = 0, dy = 1, sx = 1, err = 0;
     void init(int16_t x0, int16_t y0, int16_t x1, int16_t y1) {

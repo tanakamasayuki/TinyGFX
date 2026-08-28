@@ -1,21 +1,24 @@
-// TinyGFX - ILI9342C panel (M5Stack Core / BASIC など)
+// TinyGFX - ILI9342C panel (M5Stack Core / BASIC and friends)
 //
-// ILI9341 の兄弟だが、**GRAM が最初から横長（320x240）**。
-// オフセットのあるモジュールが無いので setOffset / setGramSize は持たない。
+// A sibling of the ILI9341, except its GRAM is landscape from the start
+// (320x240). There are no modules with an origin offset, so there is no
+// setOffset or setGramSize here.
 //
-// ST7789 との実質的な差は次の 3 点だけ。どれも実機でしか合っているか
-// 分からないので、**1 行で直せる**ようにしてある。
-//   1. 色順が BGR（既定）           -> setRgbOrder(false) で RGB
-//   2. 反転が要る（既定 INVON）      -> invertDisplay(false)（**begin() の後で**）
-//   3. ガラスの貼り付き向き          -> setMirror(mx, my)
+// In practice only three things differ from the ST7789, and none of them can
+// be confirmed anywhere but on real glass - so each is a one-line fix.
+//   1. Colour order is BGR by default  -> setRgbOrder(false) for RGB
+//   2. Inversion is on by default      -> invertDisplay(false), after begin()
+//   3. How the glass is mounted        -> setMirror(mx, my)
 //
-// ガンマ・電源の長い初期化列は**わざと入れていない**。ILI934x は電源投入時の
-// 既定値でちゃんと出る。色味を追い込みたくなったら足す。
+// The long gamma and power init sequences are left out on purpose. An ILI934x
+// comes up fine on its power-on defaults; add them when you want to chase the
+// colour rendition.
 #pragma once
 #include <stdint.h>
 
-// 1 度の読み出しで扱う画素数。**大きいほど速い**（線の張り替えが減る）。
-// スタックを 3 バイト/画素 使う。既定 64 で 192 バイト。
+// Pixels handled by one read. Larger is faster, because the data line is
+// handed back and forth less often. Costs 3 stack bytes per pixel, so the
+// default of 64 uses 192 bytes.
 #ifndef TINYGFX_READ_CHUNK
 #define TINYGFX_READ_CHUNK 64
 #endif
@@ -31,12 +34,12 @@ class TinyGFXPanelILI9342 : public TinyGFXPanel {
     _height = h;
   }
 
-  /// 色順。ILI9342C のモジュールはたいてい BGR なので既定は true。
-  /// 赤と青が入れ替わって見えたら false にする。
+  /// Colour order. ILI9342C modules are usually BGR, hence the default of
+  /// true. Set false if red and blue come out swapped.
   void setRgbOrder(bool bgr) { _bgr = bgr; }
 
-  /// ガラスの貼り付き向き。全回転の MADCTL に XOR される。
-  /// 絵が上下・左右にひっくり返って出たらここで直す。
+  /// How the glass is mounted. XORed into the MADCTL of every rotation.
+  /// Fix a picture that comes out flipped horizontally or vertically here.
   void setMirror(bool mirrorX, bool mirrorY) {
     _flip = (uint8_t)((mirrorX ? MADCTL_MX : 0) | (mirrorY ? MADCTL_MY : 0));
   }
@@ -49,44 +52,48 @@ class TinyGFXPanelILI9342 : public TinyGFXPanel {
   void beginTransaction() override { _bus->beginTransaction(); }
   void endTransaction() override { _bus->endTransaction(); }
 
-  // 仮想にしない（全員が払うほどではない。docs/DECISIONS.ja.md Q7）
+  // Deliberately not virtual - not worth charging everyone for
+  // (docs/DECISIONS.ja.md Q7).
   //
-  // **どれも init()（= lcd.begin()）の後に呼ぶこと。** 前に呼ぶとバスがまだ
-  // 初期化されておらず、通っても init() の初期化列に上書きされる。
+  // Call all of these after init() (that is, after lcd.begin()). Earlier and
+  // the bus is not up yet, and even if the bytes got out, init()'s own
+  // sequence would overwrite them.
   void invertDisplay(bool invert) { cmd(invert ? 0x21 : 0x20); }
   void setSleep(bool sleep) { cmd(sleep ? 0x10 : 0x11); }
   void displayOn(bool on) { cmd(on ? 0x29 : 0x28); }
 
-  // ---- 読み戻し ---------------------------------------------------------
+  // ---- read-back --------------------------------------------------------
   //
-  // **呼ばなければ 1 バイトも載らない。** inline なメンバ関数は、どこからも
-  // 呼ばれなければコードが生成されない（リンカが落とすのではなく、そもそも出ない）。
-  // バス側の `readData` を足す代金だけは全員が払うが、実測 +8 バイト。
+  // Not calling these costs nothing at all: an inline member function that is
+  // never called is never emitted in the first place - the linker does not
+  // even get a chance to drop it. The one thing everyone pays for is the bus's
+  // readSequence, measured at 8 bytes.
   //
-  // 読めるのは `TinyGFXBusSPI` だけ。ソフト SPI は MISO の線を持たないので
-  // 何もせず返る（バッファは 0 のまま）。
+  // Only TinyGFXBusSPI can read. Software SPI has no MISO wire, so it returns
+  // without touching the buffer, leaving it zeroed.
 
-  /// コントローラの ID を読む。`out` に 4 バイト（先頭 1 バイトはダミー）。
-  /// ILI9341 系なら `00 00 93 41` のような並びが返る。
-  /// **全部 00 か全部 FF なら MISO が繋がっていない。**
+  /// Read the controller ID into `out` (3 bytes; the dummy byte is skipped).
+  /// An ILI9341-family part answers with something like `00 93 41`.
+  /// All-00 or all-FF means the data line never reaches you.
   void readId(uint8_t* out3) { readRegister(0x04, out3, 3); }
 
-  /// 任意のレジスタを読む。ダミー 1 バイトは読み飛ばす。
+  /// Read any register, skipping the leading dummy byte.
   void readRegister(uint8_t reg, uint8_t* out, uint8_t n) {
     const uint8_t script[2] = {reg, 0};
     _bus->readSequence(script, 2, 1, out, n);
   }
 
-  /// `0xD3` RDID4。ILI9341 は `00 93 41`。
+  /// RDID4 (0xD3). An ILI9341 answers `00 93 41`.
   void readId4(uint8_t* out4) { readRegister(0xD3, out4, 4); }
 
-  /// GRAM を読み戻す。戻り値は読んだ画素数。
+  /// Read the GRAM back. Returns the number of pixels read.
   ///
-  /// **16bpp で書いても読み出しは 1 画素 3 バイト**（RGB666 が各バイトの上位に入る）。
-  /// 先頭にダミーが 1 バイト入るのも ILI934x の作法。ここで両方吸収する。
+  /// Even though pixels are written at 16bpp, they read back 3 bytes each
+  /// (RGB666, in the high bits of each byte), and a dummy byte comes first.
+  /// Both are ILI934x conventions, absorbed here.
   ///
-  /// 反転（INVON / INVOFF）は表示側の処理なので **GRAM の中身には出ない。**
-  /// 読み戻しで反転の有無は判定できない。
+  /// Inversion (INVON / INVOFF) happens on the display side and never shows up
+  /// in the GRAM, so read-back cannot tell you whether it is on.
   uint32_t readPixels(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t* out);
 
 
@@ -141,7 +148,7 @@ inline bool TinyGFXPanelILI9342::init() {
   _bus->beginTransaction();
   const uint8_t colmod = 0x55;  // 16bit/pixel
   cmdData(0x3A, &colmod, 1);
-  cmdData(0x21, nullptr, 0);  // INVON（M5Stack の ILI9342C は反転が要る）
+  cmdData(0x21, nullptr, 0);  // INVON (the ILI9342C on an M5Stack needs it)
   cmdData(0x13, nullptr, 0);  // NORON
   _bus->endTransaction();
   setRotation(0);
@@ -153,8 +160,9 @@ inline bool TinyGFXPanelILI9342::init() {
 
 inline void TinyGFXPanelILI9342::setRotation(uint8_t r) {
   r = (uint8_t)(r & 3);
-  // 表そのものは ST7789 と同じ（GRAM が横長なので回転 0 が 320x240 になる）。
-  // ガラスの向きの差は _flip で吸収する。
+  // The table itself is the same as the ST7789's; because the GRAM is
+  // landscape, rotation 0 comes out 320x240. Differences in how the glass is
+  // mounted are absorbed by _flip.
   uint8_t madctl;
   switch (r) {
     case 0: madctl = 0; _width = _natW; _height = _natH; break;
@@ -173,8 +181,9 @@ inline uint32_t TinyGFXPanelILI9342::readPixels(uint16_t x, uint16_t y, uint16_t
                                                 uint16_t* out) {
   if (w == 0 || h == 0 || out == nullptr) return 0;
   const uint16_t xe = (uint16_t)(x + w - 1), ye = (uint16_t)(y + h - 1);
-  // {CASET,4,args, RASET,4,args, RAMRD,0} を 1 本の手順として渡す。
-  // **途中で周辺機と手叩きを切り替えないため**（切り替えるとビットがずれる）。
+  // Hand {CASET,4,args, RASET,4,args, RAMRD,0} over as a single script, so
+  // that nothing switches between the SPI peripheral and bit-banging half way
+  // through - that shifts the bits.
   const uint8_t script[16] = {
       0x2A, 4, (uint8_t)(x >> 8), (uint8_t)x, (uint8_t)(xe >> 8), (uint8_t)xe,
       0x2B, 4, (uint8_t)(y >> 8), (uint8_t)y, (uint8_t)(ye >> 8), (uint8_t)ye,
@@ -183,7 +192,7 @@ inline uint32_t TinyGFXPanelILI9342::readPixels(uint16_t x, uint16_t y, uint16_t
   uint8_t buf[3 * TINYGFX_READ_CHUNK];
   uint32_t left = (uint32_t)w * (uint32_t)h;
   const uint32_t total = left;
-  // 1 度に読み切る。分けると切り替えが増えて不安定になる
+  // Read it in one go; splitting means more hand-overs and less stability
   const uint16_t k = (left > TINYGFX_READ_CHUNK) ? TINYGFX_READ_CHUNK : (uint16_t)left;
   _bus->readSequence(script, 14, 1, buf, (size_t)k * 3);
   uint32_t i = 0;
@@ -191,7 +200,8 @@ inline uint32_t TinyGFXPanelILI9342::readPixels(uint16_t x, uint16_t y, uint16_t
     out[i++] = tinygfx_color565(buf[j * 3], buf[j * 3 + 1], buf[j * 3 + 2]);
   }
   left -= k;
-  // 残りは窓をずらして読み直す（連続読み出しの途中で線を戻すと続きが取れない）
+  // Read the rest by moving the window: handing the line back mid-stream
+  // loses the continuation
   while (left != 0) {
     const uint32_t doneRows = i / w;
     const uint16_t ry = (uint16_t)(y + doneRows);

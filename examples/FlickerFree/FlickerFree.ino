@@ -1,10 +1,11 @@
 // TinyGFX - FlickerFree
 //
-// フレームバッファを持たないので、消してから描くとちらつく。
-// TinyGFXTileCanvas は画面を横帯に分け、小さな RAM バッファへ 1 帯ずつ描いてから
-// 転送する。必要な RAM は「幅 × 帯の行数 × 2 バイト」だけ。
+// With no framebuffer, clearing and then drawing flickers. TinyGFXTileCanvas
+// splits the screen into horizontal bands, draws one band at a time into a
+// small RAM buffer and pushes it. All it needs is width * band rows * 2 bytes.
 //
-// 描画関数は帯の数だけ呼ばれるが、座標は常に画面全体のものでよい。
+// The drawing function runs once per band, but its coordinates are always
+// whole-screen.
 #include <TinyGFX.h>
 #include <TinyGFX/BusSoftSPI.h>
 #include <TinyGFX/PanelST7789.h>
@@ -17,14 +18,14 @@ static const int16_t HEIGHT = 240;
 TinyGFXBusSoftSPI bus(/*sck*/5, /*mosi*/6, /*dc*/3, /*cs*/4);
 TinyGFXPanelST7789 panel(bus, WIDTH, HEIGHT, /*rst*/2);
 
-// 帯バッファ。必要な RAM は「幅 × 行数 × 2 バイト」だけ。
+// The band buffer. All it costs is width * rows * 2 bytes.
 //
-//   1 行  =   480 B  ← CH32V003（RAM 2KB）はここ
-//   4 行  = 1,920 B  ← Uno R3 でも厳しい
-//  16 行  = 7,680 B  ← ESP32 なら余裕。転送回数が減るぶん速い
+//    1 row  =   480 B  <- where a CH32V003 (2 KB of RAM) has to sit
+//    4 rows = 1,920 B  <- already tight on an Uno R3
+//   16 rows = 7,680 B  <- comfortable on an ESP32, and faster: fewer transfers
 //
-// **行数を変えても絵は 1 画素も変わらない**（tests/tile/ がそれを検査している）。
-// 速さと RAM のトレードオフだけ。
+// Changing the row count does not change the image by a single pixel
+// (tests/tile/ checks exactly that). It trades speed against RAM, nothing more.
 #if defined(__AVR__) || defined(__riscv)
 static const int16_t BAND_ROWS = 1;
 #else
@@ -38,7 +39,7 @@ struct Ball {
 };
 static Ball ball = {40, 40, 3, 2};
 
-// 帯ごとに呼ばれる。ここに重い処理を書くと帯の数だけ走るので注意。
+// Runs once per band. Anything expensive in here runs that many times.
 static void drawScene(TinyGFX& g, void* ctx) {
   const Ball* b = (const Ball*)ctx;
   g.drawRect(0, 0, WIDTH, HEIGHT, TFT_DARKGREY);

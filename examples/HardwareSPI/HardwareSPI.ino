@@ -1,14 +1,15 @@
 // TinyGFX - HardwareSPI
 //
-// ハードウェア SPI を使う版。バスの宣言が変わるだけで、描画側は何も変わらない。
+// The hardware SPI version. Only the bus declaration changes; the drawing
+// code is identical.
 //
-// 注意: SCK / MOSI は指定しない。Arduino Core の SPI に任せる
-// （ピンを取らない SPI.begin() のコアがあるため）。
-// ピンを指定したい環境では、lcd.begin() より前に自分で SPI.begin(...) を呼び、
-// コンストラクタの initSpi に false を渡すこと。
+// Note that SCK and MOSI are not given here - they are left to the core's SPI
+// library, because some cores have an SPI.begin() that takes no pins. To
+// choose them yourself, call SPI.begin(...) before lcd.begin() and pass false
+// for the constructor's initSpi.
 //
-// CH32V003 では現状ハードウェア SPI が使えないコアがある。その場合は
-// BusSoftSPI（HelloWorld の例）を使う。
+// Some CH32V003 cores cannot use hardware SPI at all today; use BusSoftSPI
+// there instead, as in the HelloWorld example.
 #include <TinyGFX.h>
 #include <TinyGFX/BusSPI.h>
 #include <TinyGFX/PanelST7789.h>
@@ -21,7 +22,7 @@ void setup() {
   lcd.begin();
   lcd.fillScreen(TFT_BLACK);
 
-  // 連続して描くときは startWrite / endWrite で囲むと CS のトグルが減る
+  // Wrapping a run of drawing in startWrite / endWrite cuts the CS toggling
   lcd.startWrite();
   for (int16_t i = 0; i < 120; i += 8) {
     lcd.drawRect(i, i, 240 - i * 2, 240 - i * 2, lcd.color565(i, 255 - i, 128));

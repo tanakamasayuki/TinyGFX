@@ -1,9 +1,9 @@
 // TinyGFX - panel that renders into a caller-supplied RAM buffer
 //
-// 二役ある:
-//   1) ホストテストの検証先（描いた結果を画素で直接見る）
-//   2) TileCanvas の帯バッファ（docs/DECISIONS.ja.md D16）
-// バッファは利用者が用意する。このクラスは動的確保をしない。
+// This wears two hats:
+//   1) the target for host tests, where the result is inspected pixel by pixel
+//   2) the band buffer behind TileCanvas (docs/DECISIONS.ja.md D16)
+// The buffer is supplied by the caller. Nothing here allocates.
 #pragma once
 #include <stdint.h>
 
@@ -11,7 +11,7 @@
 
 class TinyGFXPanelMemory : public TinyGFXPanel {
  public:
-  /// buffer は「現在の幅 × rows」画素ぶん必要。rows の既定は h（全画面）。
+  /// `buffer` needs current-width * rows pixels. `rows` defaults to h (full screen).
   TinyGFXPanelMemory(uint16_t* buffer, int16_t w, int16_t h)
       : _buf(buffer), _natW(w), _natH(h), _bufY0(0), _bufRows(h) {
     _width = w;
@@ -27,7 +27,7 @@ class TinyGFXPanelMemory : public TinyGFXPanel {
     _bufRows = _height;
   }
 
-  /// バッファが受け持つ行範囲を指定する（帯レンダリング用）。
+  /// Set which rows the buffer currently stands for (used by tiled rendering).
   void setBufferRegion(int16_t y0, int16_t rows) {
     _bufY0 = y0;
     _bufRows = rows;
@@ -37,13 +37,13 @@ class TinyGFXPanelMemory : public TinyGFXPanel {
   const uint16_t* buffer() const { return _buf; }
   uint16_t* buffer() { return _buf; }
 
-  /// バッファ全体を単色で埋める。
+  /// Fill the whole buffer with one colour.
   void fillBuffer(uint16_t color) {
     const uint32_t n = (uint32_t)(uint16_t)_width * (uint32_t)(uint16_t)_bufRows;
     for (uint32_t i = 0; i < n; ++i) _buf[i] = color;
   }
 
-  /// 論理座標の 1 画素を読む。範囲外・バッファ外は 0。
+  /// Read one pixel in logical coordinates. Off-screen or off-buffer reads as 0.
   uint16_t readPixel(int16_t x, int16_t y) const {
     if (x < 0 || y < 0 || x >= _width || y >= _height) return 0;
     const int16_t by = (int16_t)(y - _bufY0);

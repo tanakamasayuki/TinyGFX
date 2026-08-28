@@ -12,14 +12,15 @@ class TinyGFXPanelST7789 : public TinyGFXPanel {
     _height = h;
   }
 
-  /// パネルモジュールごとの GRAM 原点ずれ。**回転 0 のときの値**を渡す。
-  /// 回転 1〜3 のぶんは setGramSize() と合わせて自動で導出する。
+  /// The module's GRAM origin offset. Give the value for rotation 0; the
+  /// offsets for rotations 1-3 are derived from this and setGramSize().
   void setOffset(int16_t x, int16_t y) { _offX0 = x; _offY0 = y; }
 
-  /// コントローラの GRAM の大きさ。既定はパネルと同じ。
-  /// オフセットのあるモジュールでは**これを設定しないと回転 2 / 3 がずれる**。
-  /// 例: 240x240 の ST7789 は setGramSize(240, 320)
-  ///     135x240 の ST7789 は setGramSize(240, 320) + setOffset(52, 40)
+  /// The controller's GRAM size; defaults to the panel size.
+  /// On a module with an offset, rotations 2 and 3 land in the wrong place
+  /// unless this is set.
+  /// For example: a 240x240 ST7789 wants setGramSize(240, 320), and a
+  /// 135x240 one wants setGramSize(240, 320) plus setOffset(52, 40).
   void setGramSize(int16_t w, int16_t h) { _gramW = w; _gramH = h; }
 
   bool init() override;
@@ -30,10 +31,12 @@ class TinyGFXPanelST7789 : public TinyGFXPanel {
   void beginTransaction() override { _bus->beginTransaction(); }
   void endTransaction() override { _bus->endTransaction(); }
 
-  // 仮想にしない（全員が払うほどではない。docs/DECISIONS.ja.md Q7）
+  // Deliberately not virtual - not worth charging everyone for
+  // (docs/DECISIONS.ja.md Q7).
   //
-  // **どれも init()（= lcd.begin()）の後に呼ぶこと。** 前に呼ぶとバスがまだ
-  // 初期化されておらず、通っても init() の初期化列に上書きされる。
+  // Call all of these after init() (that is, after lcd.begin()). Earlier and
+  // the bus is not up yet, and even if the bytes got out, init()'s own
+  // sequence would overwrite them.
   void invertDisplay(bool invert) { cmd(invert ? 0x21 : 0x20); }
   void setSleep(bool sleep) { cmd(sleep ? 0x10 : 0x11); }
   void displayOn(bool on) { cmd(on ? 0x29 : 0x28); }
@@ -55,9 +58,9 @@ class TinyGFXPanelST7789 : public TinyGFXPanel {
 
   TinyGFXBus* _bus;
   int16_t _natW, _natH;
-  int16_t _offX0 = 0, _offY0 = 0;  // 回転 0 でのオフセット
-  int16_t _gramW = 0, _gramH = 0;  // 0 ならパネルと同じとみなす
-  int16_t _offX = 0, _offY = 0;    // 現在の回転でのオフセット
+  int16_t _offX0 = 0, _offY0 = 0;  // offset at rotation 0
+  int16_t _gramW = 0, _gramH = 0;  // 0 means "same as the panel"
+  int16_t _offX = 0, _offY = 0;    // offset at the current rotation
   int8_t _rst;
 };
 
@@ -89,7 +92,7 @@ inline bool TinyGFXPanelST7789::init() {
   _bus->beginTransaction();
   const uint8_t colmod = 0x55;  // 16bit/pixel
   cmdData(0x3A, &colmod, 1);
-  cmdData(0x21, nullptr, 0);  // INVON (ST7789 は通常反転)
+  cmdData(0x21, nullptr, 0);  // INVON (ST7789 panels are normally inverted)
   cmdData(0x13, nullptr, 0);  // NORON
   _bus->endTransaction();
   setRotation(0);
@@ -102,7 +105,8 @@ inline bool TinyGFXPanelST7789::init() {
 inline void TinyGFXPanelST7789::setRotation(uint8_t r) {
   r = (uint8_t)(r & 3);
   uint8_t madctl = MADCTL_RGB;
-  // 反対側から測ったオフセット。GRAM がパネルより大きいモジュールで効く。
+  // The offset measured from the far side. This matters on modules whose
+  // GRAM is larger than the panel.
   const int16_t gw = (_gramW > 0) ? _gramW : _natW;
   const int16_t gh = (_gramH > 0) ? _gramH : _natH;
   int16_t cs2 = (int16_t)(gw - _natW - _offX0);

@@ -1,10 +1,10 @@
 // TinyGFX - Shapes
 //
-// 使えるプリミティブを一通り。
+// One of each primitive.
 //
-// 使わない図形はフラッシュに載らないので、必要なものだけ呼べばよい。
-// この例のように全部呼ぶと、CH32V003 でフラッシュが約 4.9KB 増える
-// （docs/FOOTPRINT.ja.md の構成 C）。
+// Shapes you never call are not in the flash image, so call only what you
+// need. Calling every one of them, as this example does, adds about 4.9 KB on
+// a CH32V003 (construct C in docs/FOOTPRINT.ja.md).
 #include <TinyGFX.h>
 #include <TinyGFX/BusSoftSPI.h>
 #include <TinyGFX/PanelST7789.h>
@@ -27,7 +27,7 @@ void setup() {
   lcd.drawTriangle(10, 180, 60, 120, 110, 180, TFT_WHITE);
   lcd.fillTriangle(130, 180, 180, 120, 230, 180, TFT_ORANGE);
 
-  // クリップ矩形の外へは 1 画素も出ない
+  // Not one pixel escapes the clip rectangle
   lcd.setClipRect(10, 200, 100, 30);
   lcd.fillCircle(60, 215, 60, TFT_BLUE);
   lcd.clearClipRect();
