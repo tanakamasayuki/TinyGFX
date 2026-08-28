@@ -337,7 +337,7 @@ E2 と同じ。`TinyGFXBusSoftSPI` を使う。
 決定的な出力（§10.4）。**依頼としては閉じてよい。**
 
 TinyGFX 側は **2026-08-28 に CellFont v1 の描画器を実装済み**
-（`src/CellFont.h` + `src/TinyGFX/FontCell.h`）。
+（`src/TinyGFX/CellFont.h` + `src/TinyGFX/FontCell.h`）。
 
 ### 仕様に取り込まれた指摘（TinyGFX 側から出したもの）
 
@@ -346,6 +346,7 @@ TinyGFX 側は **2026-08-28 に CellFont v1 の描画器を実装済み**
 | 1 | 「`headCount` はアライメントの余りに収まる」は 16bit ABI では成り立たない（AVR で 19 → 20 バイト。実測） | §3 に ABI 別の表として反映 |
 | 2 | 頭ブロックの閾値は 2 でなく **1** でよい（`first` / `headCount` は元からあるので追加コスト 0、`codes` が 2 バイト減る） | §10.3 / §15.1 が `headCount >= 1` に |
 | 3 | **連鎖が入れ子になる描画器**では、U+FFFD 退避をデコーダの中に置いてはならない | §15.2 に注意書きとして追加 |
+| 4 | 生成ヘッダの `#include <CellFont.h>` が**大域の include 名前空間を占める** | §12.1 / §12.2 改訂。**ファイル名を仕様から外し、生成ヘッダは include しない**形に |
 
 ### 逆に仕様から学んだこと（TinyGFX 側の不具合 3 件）
 

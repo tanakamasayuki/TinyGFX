@@ -21,15 +21,22 @@ TinyGFX が使うビットマップフォント形式は **CellFont**。仕様�
 
 | ファイル | 役割 |
 | --- | --- |
-| `src/CellFont.h` | **仕様 §12.1 が描画器に求めるもの。** 構造体・`CELLFONT_PROGMEM`・アクセサ・版番号。**TinyGFX に依存しない** |
+| `src/TinyGFX/CellFont.h` | **仕様 §12.1 が描画器に求めるもの。** 構造体・`CELLFONT_PROGMEM`・アクセサ・版番号。**TinyGFX に依存しない**。`TinyGFX.h` が既定で連れてくる（実測 0 バイト） |
 | `src/TinyGFX/FontCell.h` | CellFont のデコーダと `tinygfxFontCellOps` |
 | `src/TinyGFX/FontU8g2.h` | u8g2 のデコーダと `tinygfxFontU8g2Ops` |
 | `src/TinyGFX/Font.h` | 形式に依らない受け口（`TinyGFXFontOps` / `TinyGFXFontRef`） |
 
-`<CellFont.h>` がライブラリのルートに居るのは仕様の要求で、**生成されたフォント
-ヘッダがこの名前で拾う**ため。同じ仕様を実装した別ライブラリと同居しても壊れないよう、
-`CELLFONT_SPEC_VERSION` で全体を守ってある（先に定義したほうが勝つ。仕様が同じなので
-構造体も同じ）。
+**仕様が決めているのはマクロと型の名前だけで、ファイル名は自由**（§12.1、2026-08-28 改訂）。
+なので大域の include 名前空間を汚さないよう `TinyGFX/` の下に置いてある。
+
+**生成されたフォントヘッダは描画器のヘッダを include しない。** 型が無ければ
+`#error` で止まる（§12.2）。つまり「描画器のヘッダを先に」という順序が要るのだが、
+**`TinyGFX.h` が `CellFont.h` を既定で連れてくる**ので、利用者が順序を気にすることはない。
+構造体とマクロだけなので**コードもデータも 1 バイトも増えない**（構成 base〜T の全部で
+実測値が変わらないことを確認）。
+
+同じ仕様を実装した別ライブラリと同居しても壊れないよう、`CELLFONT_SPEC_VERSION` で
+ファイル全体を守ってある（先に定義したほうが勝つ。仕様が同じなので構造体も同じ）。
 
 ### 連鎖が 2 段ある
 
@@ -172,8 +179,9 @@ npx lgfx-font build --google "Noto Sans JP" --px 16 --charset chars.txt --out sr
 `setFont()` に渡すには TinyGFX 側で 1 行包む:
 
 ```cpp
-#include <TinyGFX/FontCell.h>
-#include "font.h"
+#include <TinyGFX.h>
+#include <TinyGFX/FontCell.h>   // デコーダ。使う形式だけ
+#include "font.h"               // CLI が出したもの。手を入れない
 
 static const TinyGFXFontRef myFont = {&Name, &tinygfxFontCellOps, nullptr};
 ```

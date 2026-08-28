@@ -7,12 +7,17 @@
 // テスト用のつなぎ。**実運用のフォントは LGFXFontToolJs の CLI で作る。**
 // TinyGFX 本体はフォントデータを同梱しない。スケッチ側に置くこと。
 //
+// 使い方: **TinyGFX/FontCell.h を先に include してから**、
 // setFont() に渡すには TinyGFXFontRef で包む（形式の入口を指すため）:
 //   static const TinyGFXFontRef myFont = {&tinygfxFont5x7Sparse, &tinygfxFontCellOps, nullptr};
 #pragma once
-#include <CellFont.h>
+#include <stdint.h>
 
-#if !defined(CELLFONT_SPEC_VERSION) || CELLFONT_SPEC_VERSION != 1
+// 描画器のヘッダ（CellFont / CellGlyph の型を持つもの）を先に include すること
+
+#if !defined(CELLFONT_SPEC_VERSION)
+#error "Include your renderer CellFont header before this font header"
+#elif CELLFONT_SPEC_VERSION != 1
 #error "This font header requires CellFont spec version 1"
 #endif
 

@@ -397,10 +397,18 @@ lcd.drawString("12:34", 4, 4);
 生成されたヘッダは**形式の仕様どおり**で、TinyGFX の名前を 1 つも含まない:
 
 ```cpp
-#include <CellFont.h>
+#pragma once
+#include <stdint.h>
+#if !defined(CELLFONT_SPEC_VERSION)
+#error "Include your renderer CellFont header before this font header"
+#endif
 static const uint8_t  MyFontBitmaps[] CELLFONT_PROGMEM = { ... };
 static const CellFont MyFont          CELLFONT_PROGMEM = { ... };
 ```
+
+**生成ヘッダは描画器のヘッダを include しない**（仕様 §12.2）。型は
+`TinyGFX/CellFont.h` が持っていて、`TinyGFX.h` が既定で連れてくるので、
+利用者が include の順序を気にすることはない。
 
 ### 9.3 いま用意している形式
 
@@ -461,7 +469,7 @@ lcd.println(3.14f);           // ここまで来ると浮動小数点書式化�
 
 | ヘッダ | 内容 | 状況 |
 | --- | --- | --- |
-| `CellFont.h`（ルート） | CellFont の構造体とアクセサ（仕様 §12.1） | 実装済み |
+| `TinyGFX/CellFont.h` | CellFont の構造体とアクセサ（仕様 §12.1）。`TinyGFX.h` が既定で include | 実装済み |
 | `TinyGFX/FontCell.h` | CellFont のデコーダ | 実装済み |
 | `TinyGFX/FontU8g2.h` | u8g2 のデコーダ | 実装済み |
 | `TinyGFX/Print.h` | `Print` 継承、`printf`、float | 実装済み |
