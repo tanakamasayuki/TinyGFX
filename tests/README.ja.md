@@ -62,6 +62,7 @@ tests/
   u8g2/               u8g2 形式フォントのデコード
   i2c/                I2C + SSD1306（モノクロ・ページ転送・dirty ページ）
   build_matrix/       examples が ch32v003 / uno / esp32 / m5stack でビルドできるか（実行はしない）
+  manual/m5stack/     **実機検証スケッチ。** pytest では走らない（ビルドだけ検査する）
 ```
 
 ## 値の受け渡し

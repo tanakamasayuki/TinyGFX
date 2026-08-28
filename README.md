@@ -10,7 +10,7 @@ Anything you do not call costs nothing at all.
 > ### Only one setup has run on real hardware
 >
 > **On 2026-08-28 this drove a physical display for the first time**: an M5Stack BASIC
-> (ILI9342C). 41 host tests also pass. But that is **the only configuration confirmed on
+> (ILI9342C). 42 host tests also pass. But that is **the only configuration confirmed on
 > real glass.**
 >
 > | | |
@@ -214,7 +214,7 @@ cd tests && uv sync && uv run pytest -v -s
 No hardware needed: everything either runs on the host core or just builds and inspects
 size and symbols. Details in [tests/README.md](tests/README.md).
 
-Of the 41, the characteristic ones:
+Of the 42, the characteristic ones:
 
 - **`linkprune/`** — `nm` proves that unused features and unused font formats are absent from the final binary
 - **`footprint/`** — per-configuration increments stay within budget, and **the numbers are always printed**

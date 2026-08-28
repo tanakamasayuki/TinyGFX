@@ -51,6 +51,19 @@ def test_example_builds(profile, example):
     print(f"  {profile:<10} {example:<12} flash={build['flash']:>7} ram={build['ram']}")
 
 
+def test_manual_sketch_builds():
+    """実機検証スケッチ（`tests/manual/m5stack/`）が腐っていないこと。
+
+    自動では走らせない（実機でしか意味がない）。**ビルドだけ通す。**
+    docs/MANUAL_TEST.ja.md M0b。
+    """
+    if not tb.have_core(PROFILE_CORE["m5stack"]):
+        pytest.skip("esp32 のコアが入っていない")
+    build = tb.compile_profile(tb.REPO / "tests" / "manual" / "m5stack", "m5stack")
+    assert build["flash"] is not None
+    print(f"  manual     m5stack      flash={build['flash']:>7} ram={build['ram']}")
+
+
 def test_hardware_spi_still_fails_on_ch32():
     """CH32V003 のコアで HardwareSPI が通らないことを**記録として**残す。
 
