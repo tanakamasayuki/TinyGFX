@@ -170,11 +170,12 @@ canvas.render(scene);
 **プロジェクトで使う文字だけ**を焼き込める形で出します。
 
 ```sh
-npx -p lgfx-font-tool lgfx-font build --google "Noto Sans JP" --em 12 \
+npx lgfx-font build --google "Noto Sans JP" --em 12 \
     --chars "温度設定完了 23.5℃" --format cellfont --out font.h
 ```
 
-> パッケージ名は `lgfx-font-tool`、コマンド名は `lgfx-font` と違うので `-p` が要ります。
+> `node_modules` のあるディレクトリで実行すると npx が 404 を返します。
+> そのときは `npx -p lgfx-font-tool lgfx-font ...` と書いてください。
 
 上の 12 文字なら **245 バイト**。使う文字を増やした分だけ増えます。
 
