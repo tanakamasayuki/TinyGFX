@@ -11,6 +11,9 @@
 #include "u8g2_ascii.h"
 #include "u8g2_cjk.h"
 
+static const TinyGFXFontRef u8g2AsciiFont = {u8g2Ascii_data, &tinygfxFontU8g2Ops, nullptr};
+static const TinyGFXFontRef u8g2CjkFont = {u8g2Cjk_data, &tinygfxFontU8g2Ops, nullptr};
+
 static const int W = 80, H = 24;
 static uint16_t gram[W * H];
 TinyGFXBusCapture bus(gram, W, H);
@@ -23,7 +26,7 @@ void setup() {
   lcd.begin();
   lcd.setTextColor(TFT_WHITE);
 
-  lcd.setFont(&u8g2_ascii);
+  lcd.setFont(&u8g2AsciiFont);
   tgfxReport("line_height", (long)lcd.fontHeight());
   bus.fill(0);
   bus.resetCounters();
@@ -31,14 +34,14 @@ void setup() {
   tgfxReport("ascii_measured", (long)lcd.textWidth("0123456789ABCabc"));
   tgfxShot("ascii", gram, W, H);
 
-  lcd.setFont(&u8g2_cjk);
+  lcd.setFont(&u8g2CjkFont);
   bus.fill(0);
   bus.resetCounters();
   tgfxReport("cjk_width", (long)tgfxDrawUtf8(lcd, "日本語表示", 2, 4));
   tgfxShot("cjk", gram, W, H);
 
   // 収録外の文字は何も描かず 0
-  lcd.setFont(&u8g2_ascii);
+  lcd.setFont(&u8g2AsciiFont);
   bus.fill(0);
   bus.resetCounters();
   tgfxReport("missing_adv", (long)lcd.drawChar('Z', 2, 4));

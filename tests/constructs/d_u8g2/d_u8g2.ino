@@ -4,6 +4,8 @@
 #include <TinyGFX/FontU8g2.h>
 #include <u8g2_ascii.h>
 
+static const TinyGFXFontRef u8g2AsciiFont = {u8g2Ascii_data, &tinygfxFontU8g2Ops, nullptr};
+
 TinyGFXBusSoftSPI bus(/*sck*/5, /*mosi*/6, /*dc*/3, /*cs*/4);
 TinyGFXPanelST7789 panel(bus, 240, 240, /*rst*/2);
 TinyGFX lcd(panel);
@@ -23,7 +25,7 @@ void setup() {
   lcd.fillRoundRect(50, 40, 30, 20, 4, TFT_YELLOW);
   lcd.drawTriangle(0, 60, 20, 90, 40, 60, TFT_WHITE);
   lcd.fillTriangle(50, 60, 70, 90, 90, 60, TFT_WHITE);
-  lcd.setFont(&u8g2_ascii);
+  lcd.setFont(&u8g2AsciiFont);
   lcd.setTextColor(TFT_WHITE);
   lcd.drawString("0123456789", 0, 100);
 }

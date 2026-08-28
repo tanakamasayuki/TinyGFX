@@ -21,10 +21,10 @@ pytestmark = [
 # 構成ごとに「出てはいけない」名前（マングル名への部分一致）
 FORBIDDEN = {
     "a": ["drawLine", "drawCircle", "fillRoundRect", "fillTriangle", "drawChar",
-          "tinygfxFont5x7", "pushImage", "TileCanvas", "TinyGFXPrint"],
+          "tgfxDigits", "pushImage", "TileCanvas", "TinyGFXPrint"],
     "b": ["drawLine", "drawCircle", "fillRoundRect", "fillTriangle", "drawChar",
-          "tinygfxFont5x7", "pushImage", "TileCanvas", "TinyGFXPrint"],
-    "c": ["drawChar", "tinygfxFont5x7", "pushImage", "TileCanvas", "TinyGFXPrint"],
+          "tgfxDigits", "pushImage", "TileCanvas", "TinyGFXPrint"],
+    "c": ["drawChar", "tgfxDigits", "pushImage", "TileCanvas", "TinyGFXPrint"],
     "d": ["pushImage", "TileCanvas", "TinyGFXPrint"],
     "e": ["TileCanvas", "TinyGFXPrint"],
 }

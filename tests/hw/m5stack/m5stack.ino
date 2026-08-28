@@ -24,7 +24,7 @@
 #include <TinyGFX/FontCell.h>
 #include <TinyGFX/PanelILI9342.h>
 #include <tgfx_scene.h>
-#include <tinygfx_font5x7.h>
+#include <tgfx_digits.h>
 
 static const int8_t PIN_DC = 27, PIN_CS = 14, PIN_RST = 33, PIN_BL = 32, PIN_SD_CS = 4;
 
@@ -32,7 +32,7 @@ TinyGFXBusSPI bus(SPI, PIN_DC, PIN_CS, /*freq*/ 24000000UL);
 TinyGFXPanelILI9342 panel(bus, 320, 240, PIN_RST);
 TinyGFX lcd(panel);
 
-static const TinyGFXFontRef font5x7 = {&tinygfxFont5x7, &tinygfxFontCellOps, nullptr};
+static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps, nullptr};
 // **読み戻すのは上 2 行だけ。** 読み出しは 1 回ごとに線を張り替えるので、
 // 何十回も回すとボードが固まる（実測）。デバッグ用途なので小さく取る。
 static const int16_t TGFX_READBACK_H = 2;
@@ -99,7 +99,7 @@ TEST_CASE(test_capture_scene) {
   TinyGFX g(capPanel);
   g.begin();
   cap.fill(0);
-  g.setFont(&font5x7);
+  g.setFont(&digitsFont);
   g.setTextColor(TFT_WHITE);
   tgfxGoldenScene(g);
 
@@ -109,14 +109,14 @@ TEST_CASE(test_capture_scene) {
                         (const uint8_t*)capBuf, sizeof(capBuf));
 
   // ついでに実物にも出しておく（目で見たいときのため）
-  lcd.setFont(&font5x7);
+  lcd.setFont(&digitsFont);
   lcd.setTextColor(TFT_WHITE);
   tgfxGoldenScene(lcd);
 }
 
 /// 読み戻しで同じシーンを取る。読めるパネルでだけ意味がある。
 TEST_CASE(test_readback_scene) {
-  lcd.setFont(&font5x7);
+  lcd.setFont(&digitsFont);
   lcd.setTextColor(TFT_WHITE);
   tgfxGoldenScene(lcd);
   // 全面だと線の張り替えが 48 回入って protocol の待ち時間を超える。

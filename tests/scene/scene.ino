@@ -8,9 +8,9 @@
 #include <TinyGFX/PanelST7789.h>
 #include <tgfx_test.h>
 #include <tgfx_scene.h>
-#include <tinygfx_font5x7.h>
+#include <tgfx_digits.h>
 
-static const TinyGFXFontRef font5x7 = {&tinygfxFont5x7, &tinygfxFontCellOps, nullptr};
+static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps, nullptr};
 
 static uint16_t gram[TGFX_SCENE_W * TGFX_SCENE_H];
 TinyGFXBusCapture bus(gram, TGFX_SCENE_W, TGFX_SCENE_H);
@@ -22,7 +22,7 @@ void setup() {
   tgfxTestBegin("scene");
   lcd.begin();
   bus.fill(0);
-  lcd.setFont(&font5x7);
+  lcd.setFont(&digitsFont);
   lcd.setTextColor(TFT_WHITE);
   tgfxGoldenScene(lcd);
   tgfxShot("scene", gram, TGFX_SCENE_W, TGFX_SCENE_H);

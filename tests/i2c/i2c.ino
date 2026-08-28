@@ -12,9 +12,9 @@
 #include <TinyGFX/PanelSSD1306.h>
 #include <tgfx_test.h>
 #include <TinyGFX/FontCell.h>
-#include <tinygfx_font5x7.h>
+#include <tgfx_digits.h>
 
-static const TinyGFXFontRef font5x7 = {&tinygfxFont5x7, &tinygfxFontCellOps, nullptr};
+static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps, nullptr};
 #include <Wire.h>
 
 static const int W = 128, H = 64;
@@ -110,9 +110,9 @@ void setup() {
   lcd.drawRect(0, 0, W, H, TFT_WHITE);
   lcd.drawLine(0, 0, W - 1, H - 1, TFT_WHITE);
   lcd.fillCircle(96, 32, 12, TFT_WHITE);
-  lcd.setFont(&font5x7);
+  lcd.setFont(&digitsFont);
   lcd.setTextColor(TFT_WHITE);
-  lcd.drawString("12:34", 8, 24);
+  lcd.drawString("12345", 8, 24);
   panel.display();
   tgfxReport("bytes_scene", (long)dataBytes);
   tgfxReport("transactions_scene", (long)txCount);

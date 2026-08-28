@@ -68,7 +68,7 @@ TinyGFX が使うビットマップフォント形式は **CellFont**。仕様�
 
 ## 2. 実測 — CellFont への移行でいくら増えたか
 
-CH32V003 / `-Os` / `tests/constructs/d`（構成 C + 文字、5x7 の 32 字）。
+CH32V003 / `-Os` / `tests/constructs/d`（構成 C + 文字）。
 
 | | flash | 文字機能ぶん | データ | **コード** |
 | --- | --- | --- | --- | --- |
@@ -189,22 +189,32 @@ static const TinyGFXFontRef myFont = {&Name, &tinygfxFontCellOps, nullptr};
 
 **TinyGFX 本体はフォントデータを 1 バイトも同梱しない。**
 
-### つなぎ — `tools/gen_font.py`
+### テストと examples のフォント
 
-CLI が揃うまでの間、`tests/` と `examples/` が外部ツールなしで走るためのもの。
-5x7（0x20-0x3F の 32 字）を 3 変種で吐く。**出力は仕様 §12.2 の形そのまま**なので、
-CLI が揃ったらファイルを差し替えるだけで済む。
+**すべて CLI が出したものをそのまま置いてある**（2026-08-28 に切り替えた）。
+手書きのつなぎ生成器 `tools/gen_font.py` は役目を終えたので削除した。
 
-```sh
-python3 tools/gen_font.py                    # 固定ピッチ・連続
-python3 tools/gen_font.py --mode records ...  # 可変ピッチ（グリフ表）
-python3 tools/gen_font.py --sparse ...        # 疎索引（頭ブロック + コード表）
-```
+| 置き場所 | 生成 | 何を踏むか |
+| --- | --- | --- |
+| `tests/common_libs/tgfx_font/src/tgfx_digits.h` | `--sets digits` | 固定ピッチ・連続索引 |
+| 〃 `tgfx_digits_chain.h` | `--sets digits --chars "℃"` | **形式内の連鎖**（セル幅クラスで 2 本に割れる） |
+| 〃 `tgfx_digits_sparse.h` | 同上 `--max-chain 1` | **可変ピッチ + 疎索引 + 頭ブロック** |
+| 〃 `tgfx_ascii.h` | `--sets ascii` | ASCII 95 字 |
+| `examples/*/tgfx_clock.h` | `--sets digits --chars ":. "` | 疎索引。**しっぽに `first` より小さいコード**（0x20 / 0x2E） |
+| `tests/clifont/cli_font.h` | `--google "Noto Sans JP" --em 12 --chars ...` | 可変ピッチ + 頭ブロック + 全角 |
 
-`--sparse` は**わざと正準でない**並びを吐く。頭ブロックを真ん中の並び（`0x30..0x3f`）に
-取るので、しっぽに `first` より小さいコードが残る。仕様 §7.1 が
-「`c < first` で打ち切ってよいのは連続索引のときだけ」と警告している道を、
-デコーダに実際に通させるための治具。
+いずれも書体は `lgfxJapanGothic_8`（`--google` のものを除く）。
+
+**上の 3 つは同じ 10 字を 3 通りに符号化したもの**で、`tests/text/` が
+「どれで描いても絵が一致すること」を検査している。どの符号化を選ぶかは
+生成器の裁量であって、**スケッチから見えてはいけない。**
+
+### u8g2 だけ CLI から取れない
+
+`--format u8g2` の C 出力は `lgfx::U8g2font` を宣言するので、LovyanGFX が無いと
+コンパイルできない。**バイト列は CLI と完全に一致している**ことを確認したうえで、
+`tools/gen_u8g2_ref.mjs` が同じ形（`<name>_data` のバイト列だけ）を出している。
+[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E8 が通ったら CLI に寄せる。
 
 ## 7. 経緯
 

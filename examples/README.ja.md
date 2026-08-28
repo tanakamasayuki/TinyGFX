@@ -50,9 +50,14 @@ arduino-cli compile --profile m5stack -u -p /dev/ttyUSB0 examples/M5StackBasic
 ## フォントはスケッチ側に置く
 
 **TinyGFX はフォントデータを 1 バイトも同梱していない。**
-`HelloWorld` には `tinygfx_font5x7.h` を同梱してあるが、これはつなぎの
-5x7（0x20-0x3F の 32 文字）で、実運用のフォントは
-[LGFXFontToolJs](https://www.npmjs.com/package/lgfx-font-tool) で作る。
+各例が同梱している `tgfx_clock.h` は
+[LGFXFontToolJs](https://www.npmjs.com/package/lgfx-font-tool) の CLI が出したもの。
+`lgfxJapanGothic_8` から数字と `:` `.` 空白だけを取り出した 13 字で、**1,743 バイト**。
+
+```sh
+npx lgfx-font build --font lgfxJapanGothic_8 --sets digits --chars ":. " \
+    --format cellfont --name tgfxClock --out tgfx_clock.h
+```
 
 形式は **CellFont**（外部仕様 v1）と **u8g2**。使わなかった形式のデコーダはリンクされない。
 

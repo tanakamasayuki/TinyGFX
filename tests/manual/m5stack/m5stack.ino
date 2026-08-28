@@ -20,7 +20,7 @@
 #include <TinyGFX/PanelILI9342.h>
 #include <TinyGFX/TileCanvas.h>
 
-#include "tinygfx_font5x7.h"
+#include "tgfx_clock.h"
 
 // 内蔵 LCD
 static const int8_t PIN_DC = 27, PIN_CS = 14, PIN_RST = 33, PIN_BL = 32, PIN_SD_CS = 4;
@@ -31,7 +31,7 @@ TinyGFXBusSPI bus(SPI, PIN_DC, PIN_CS, /*freq*/ 24000000UL);
 TinyGFXPanelILI9342 panel(bus, 320, 240, PIN_RST);
 TinyGFX lcd(panel);
 
-static const TinyGFXFontRef font5x7 = {&tinygfxFont5x7, &tinygfxFontCellOps, nullptr};
+static const TinyGFXFontRef clockFont = {&tgfxClock, &tinygfxFontCellOps, nullptr};
 
 // --- 連鎖の相手。**高さが違う**（3 画素、ascent 3）。'A'..'C' が塗り潰しの帯 ---
 // 正しければ数字の**下端に揃う**。デコーダが自分の ascent で換算すると上端に出る。
@@ -45,7 +45,7 @@ static const CellFont fontBar CELLFONT_PROGMEM = {
     2, 0,
 };
 static const TinyGFXFontRef refBar = {&fontBar, &tinygfxFontCellOps, nullptr};
-static const TinyGFXFontRef refChain = {&tinygfxFont5x7, &tinygfxFontCellOps, &refBar};
+static const TinyGFXFontRef refChain = {&tgfxClock, &tinygfxFontCellOps, &refBar};
 
 // 帯レンダリング用。ESP32 なので広めに取る（320 x 20 x 2 = 12,800 B）
 static const int16_t BAND_ROWS = 20;
@@ -61,7 +61,7 @@ static uint32_t shownAt = 0;
 static void header(uint8_t n) {
   lcd.fillScreen(TFT_BLACK);
   lcd.drawRect(0, 0, lcd.width(), lcd.height(), TFT_WHITE);
-  lcd.setFont(&font5x7);
+  lcd.setFont(&clockFont);
   lcd.setTextColor(TFT_YELLOW);
   lcd.setTextSize(2);
   char s[4];
@@ -95,7 +95,7 @@ static void pageRotation(uint8_t r) {
 static void pageText() {
   lcd.setRotation(0);
   header(4);
-  lcd.setFont(&font5x7);
+  lcd.setFont(&clockFont);
   int16_t y = 40;
   for (uint8_t sz = 1; sz <= 4; ++sz) {          // 倍角
     lcd.setTextSize(sz);
@@ -109,7 +109,7 @@ static void pageText() {
   lcd.setTextColor(TFT_WHITE);
   lcd.drawString("45", 130, y);                  // 背景なし（透過）に戻らないこと
   lcd.setTextColor(TFT_RED, TFT_BLACK);
-  lcd.drawString("<=>?", 190, y);
+  lcd.drawString("12:34", 190, y);
   lcd.setTextSize(1);
   // 収録外（英字はこのフォントに無い）。**豆腐も無いので何も出ず、詰まって見える**
   lcd.setTextColor(TFT_DARKGREY);
@@ -132,7 +132,7 @@ static void pageChain() {
   lcd.setTextSize(1);
   // 目安線: 1 倍のときのベースライン
   lcd.drawFastHLine(4, 47, 312, TFT_DARKGREY);
-  lcd.setFont(&font5x7);
+  lcd.setFont(&clockFont);
 }
 
 /// クリップ。外に 1 画素も漏れないこと。
@@ -216,7 +216,7 @@ static void pageBench() {
   for (int i = 0; i < 200; ++i) lcd.fillCircle(160, 120, 100, (uint16_t)(i * 37));
   r[3] = {"fillCircle r100 x200", millis() - t0};
 
-  lcd.setFont(&font5x7);
+  lcd.setFont(&clockFont);
   lcd.setTextColor(TFT_WHITE);
   lcd.setTextSize(2);
   t0 = millis();
