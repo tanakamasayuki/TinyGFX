@@ -22,9 +22,16 @@ static const uint8_t ADDR = 0x3C;
 
 static uint8_t fb[W * H / 8];
 static uint8_t fast[W * H / 8];
+static uint8_t whole[W * H / 8];
+static uint8_t bandBuf[W];  // one page
 TinyGFXBusI2C bus(Wire, ADDR);
 TinyGFXPanelSSD1306 panel(bus, fb, W, H);
 TinyGFX lcd(panel);
+
+// The same panel again, but told its buffer is a single page. Same bus, so the
+// model on the other end sees both.
+TinyGFXPanelSSD1306 bandPanel(bus, bandBuf, W, H, 1);
+TinyGFX bandLcd(bandPanel);
 
 // ---- 受け側の模型（TinyGFX 側が持つ。コアは SSD1306 を知らない） ----------
 static uint8_t model[W * H / 8];
@@ -65,6 +72,18 @@ static uint8_t onWire(uint8_t addr, const uint8_t* d, size_t len, bool stop, voi
     for (size_t i = 1; i < len; ++i) { putByte(d[i]); ++dataBytes; }
   }
   return 0;
+}
+
+/// The scene both the whole-buffer and the banded runs draw.
+static void monoScene(TinyGFX& g) {
+  g.drawRect(0, 0, W, H, TFT_WHITE);
+  g.fillRect(8, 8, 40, 16, TFT_WHITE);
+  g.drawCircle(96, 32, 20, TFT_WHITE);
+  g.fillTriangle(20, 60, 40, 34, 60, 60, TFT_WHITE);
+  g.drawLine(0, 0, W - 1, H - 1, TFT_WHITE);
+  g.setFont(&digitsFont);
+  g.setTextColor(TFT_WHITE);
+  g.drawString("12345", 70, 4);
 }
 
 static uint16_t image[W * H];
@@ -168,6 +187,40 @@ void setup() {
     lcd.setRotation(0);
     panel.clearBuffer();
     tgfxReport("fillrect_fastpath_diff", diff);
+  }
+
+  // --- 帯で描いても、全面バッファと同じ絵になること ------------------------
+  //
+  // フレームバッファを持たない構成（1 ページぶん 128 バイトだけ）。
+  // シーンをページごとに描き直してその都度流す。**RAM が 1/8 で済むが、
+  // 毎回全ページ流すことになる。** 絵は 1 画素も変わってはいけない。
+  {
+    lcd.setRotation(0);
+    panel.clearBuffer();
+    for (int i = 0; i < W * H / 8; ++i) model[i] = 0;
+    dataBytes = 0;
+    monoScene(lcd);
+    panel.display();
+    tgfxReport("bytes_whole_buffer", (long)dataBytes);
+    for (int i = 0; i < W * H / 8; ++i) whole[i] = model[i];
+
+    for (int i = 0; i < W * H / 8; ++i) model[i] = 0;
+    dataBytes = 0;
+    for (int16_t page = 0; page < H / 8; ++page) {
+      bandPanel.setBandPage(page);
+      bandPanel.clearBuffer();
+      bandLcd.setClipRect(0, (int16_t)(page * 8), W, 8);
+      monoScene(bandLcd);
+      bandPanel.display();
+    }
+    bandLcd.resetClipRect();
+    tgfxReport("bytes_banded", (long)dataBytes);
+
+    long diff = 0;
+    for (int i = 0; i < W * H / 8; ++i) {
+      if (whole[i] != model[i]) ++diff;
+    }
+    tgfxReport("banded_diff", diff);
   }
 
   tgfxTestDone();
