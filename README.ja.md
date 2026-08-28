@@ -9,9 +9,12 @@ CH32V003（フラッシュ 16KB / RAM 2KB）で、**全機能を使っても +6.
 
 > ### まだ実機で動かしていません
 >
-> ホスト上のテストは 38 本通っていますが、**一度も実物のディスプレイに出していません。**
-> 初期化列の待ち時間・SPI モード・パネルの原点オフセットは実機でしか確かめられないので、
-> **配線して試す段階の人は [docs/MANUAL_TEST.ja.md](docs/MANUAL_TEST.ja.md) を見てください。**
+> ホスト上のテストは 40 本通っていますが、**一度も実物のディスプレイに出していません。**
+> 初期化列の待ち時間・SPI モード・パネルの原点オフセットは実機でしか確かめられません。
+>
+> 試すなら **配線の要らない [examples/M5StackBasic](examples/M5StackBasic)（M5Stack Core / BASIC）**
+> が一番確実です。枠・色順・文字の向き・図形を 1 画面に出し、違っていたときの直し方も
+> 画面とシリアルに書いてあります。手順は [docs/MANUAL_TEST.ja.md](docs/MANUAL_TEST.ja.md) の M0。
 > API もまだ動く可能性があります。
 
 ## なにが違うのか
@@ -86,6 +89,7 @@ void loop() {}
 | | I2C（Wire） | `TinyGFX/BusI2C.h` |
 | | コマンド列の記録（検証用） | `TinyGFX/BusCapture.h` |
 | パネル | ST7789（カラー TFT） | `TinyGFX/PanelST7789.h` |
+| | ILI9342C（M5Stack Core / BASIC） | `TinyGFX/PanelILI9342.h` |
 | | SSD1306（モノクロ OLED） | `TinyGFX/PanelSSD1306.h` |
 | | RAM バッファ（テスト・帯用） | `TinyGFX/PanelMemory.h` |
 | フォント | TinyFont（H≤16 向けの独自形式） | `TinyGFX/FontTiny.h` |
@@ -198,13 +202,14 @@ cd tests && uv sync && uv run pytest -v -s
 実機は要りません。ホスト実行と、ビルドしてサイズ・シンボルを見るだけのテストです。
 詳細は [tests/README.ja.md](tests/README.ja.md)。
 
-38 本のうち特徴的なもの:
+40 本のうち特徴的なもの:
 
 - **`linkprune/`** — 使っていない機能・フォント形式が最終バイナリに残っていないことを `nm` で検査
 - **`footprint/`** — 構成ごとの増分が予算内か。**数字は常に出します**
 - **`tile/`** — 帯の行数を変えても直接描画と 1 画素も違わないこと
 - **`hostbus/`** — 本番の SPI バスが実際に流したバイトを拾って画に戻す
 - **`i2c/`** — 同じことを I2C + SSD1306 で
+- **`ili9342/`** — MADCTL・色順・ミラーの組み立て（**表が実機で正しいかは M0 で確かめます**）
 
 ## ライセンス
 

@@ -9,9 +9,21 @@
 | [FlickerFree](FlickerFree) | 帯レンダリングでちらつきを消す | 約 7.6 KB / RAM 約 2.0 KB |
 | [HardwareSPI](HardwareSPI) | ハードウェア SPI を使う版 | Shapes とほぼ同じ |
 | [OledI2C](OledI2C) | **I2C のモノクロ OLED**（SSD1306） | 約 5.6 KB / **RAM 約 1.1 KB** |
+| [M5StackBasic](M5StackBasic) | **実機の立ち上げ用**。M5Stack Core / BASIC 専用 | —（ESP32 なので測っていない） |
 
 増分の根拠は [../docs/FOOTPRINT.ja.md](../docs/FOOTPRINT.ja.md)。
 **使わない機能はフラッシュに載らない**ので、必要なものだけ呼べばよい。
+
+## 実機で最初に試すなら M5StackBasic
+
+[M5StackBasic](M5StackBasic) だけは**配線が要らない**。ピンが決まっていて電源も
+安定しているので、「ライブラリが動くのか、配線が悪いのか」で悩まずに済む。
+枠・色順・文字の向き・図形を 1 画面に出し、違っていたときの直し方も画面と
+シリアルに書いてある。手順は [../docs/MANUAL_TEST.ja.md](../docs/MANUAL_TEST.ja.md) の M0。
+
+```
+arduino-cli compile --profile m5stack -u -p /dev/ttyUSB0 examples/M5StackBasic
+```
 
 ## モノクロ OLED は勝手が違う
 
@@ -42,8 +54,10 @@
 5x7（0x20-0x3F の 32 文字）で、実運用のフォントは
 [LGFXFontToolJs](https://www.npmjs.com/package/lgfx-font-tool) で作る。
 
-形式は GFXfont（Adafruit GFX 互換）なので、既存の Adafruit 用フォントヘッダも
-そのまま `setFont()` に渡せる。
+形式は独自の **TinyFont** と **u8g2**（[../docs/FONT_FORMAT.ja.md](../docs/FONT_FORMAT.ja.md)）。
+ビットマップの並びは GFXfont と同じなので、既存の Adafruit 用フォントは
+**ツール側で変換すれば**使える（構造体はそのままでは渡せない）。
+使わなかった形式のデコーダはリンクされない。
 
 **AVR では PROGMEM に置くこと。** 置かないと RAM を食い、絵も化ける。
 

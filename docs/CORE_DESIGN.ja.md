@@ -229,7 +229,9 @@ Panel が持つ状態:
 
 **回転はコントローラの MADCTL でやる。** ソフトで座標変換しない（フラッシュも時間も食うため）。
 
-実装は `TinyGFXPanelST7789`（実機）、`TinyGFXPanelMemory`（RAM バッファ。テストと帯レンダリング）。
+実装は `TinyGFXPanelST7789` / `TinyGFXPanelILI9342`（カラー・実機）、
+`TinyGFXPanelSSD1306`（モノクロ・実機。D21）、
+`TinyGFXPanelMemory`（RAM バッファ。テストと帯レンダリング）。
 
 ## 6. Bus インターフェース
 

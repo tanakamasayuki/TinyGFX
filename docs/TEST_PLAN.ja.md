@@ -121,6 +121,7 @@ TINYGFX_FQBN='ch32-riscv-ug:ch32v:CH32V003:pnum=CH32V003F4P6' uv run pytest foot
 | --- | --- | --- |
 | `capture/` | **土台。** `TinyGFXBusCapture` が ST7789 のコマンド列から画を復元できること。転送画素数がちょうど一致すること、ウィンドウの値、原点オフセット、`startWrite`/`endWrite` の釣り合い | 通過 |
 | `window/` | 回転 0..3 の MADCTL・幅高さの入れ替え・オフセットの導出（135x240 / GRAM 240x320 を模す）。オフセット無しなら全回転で 0 のままであること | 通過 |
+| `ili9342/` | ILI9342C の MADCTL・色順（BGR ビット）・`setMirror` の XOR。両軸ミラーが回転 2 と一致すること。オフセットが素通しであること。**表が実機で正しいかは M0 で確かめる**（D22） | 通過 |
 | `primitive/` | 全プリミティブ。端の 1 画素、枠と塗りの違い、**縮退ケース 10 通りが 1 画素も送らないこと** | 通過 |
 | `clip/` | **不変条件。** クリップ内はクリップ無しと 1 画素も違わず、外は 1 画素も触られないこと。画面より大きいクリップ、空のクリップ | 通過 |
 | `fill/` | 転送画素数の過不足を 11 ケースで固定。クリップ後・回転後も含む | 通過 |
@@ -157,7 +158,7 @@ TINYGFX_FQBN='ch32-riscv-ug:ch32v:CH32V003:pnum=CH32V003F4P6' uv run pytest foot
 ホストで動かせない `TinyGFXBusSPI` / `TinyGFXBusSoftSPI` の型エラーや API 変更を
 捕まえるのが目的。
 
-examples は `sketch.yaml` にプロファイル（`ch32v003` / `uno` / `esp32`）を持つので、
+examples は `sketch.yaml` にプロファイル（`ch32v003` / `uno` / `esp32` / `m5stack`）を持つので、
 `--fqbn` ではなく `--profile` でビルドする（プロファイルがあるスケッチに
 `--fqbn` を渡すと「そのプラットフォームは宣言されていない」と怒られる）。
 

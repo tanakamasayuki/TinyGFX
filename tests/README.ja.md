@@ -5,7 +5,7 @@ TinyGFX のテスト一式。方針とケース一覧は [../docs/TEST_PLAN.ja.m
 - [pytest-embedded](https://docs.espressif.com/projects/pytest-embedded/en/latest/) + Arduino CLI バックエンド、`uv` で依存管理
 - **Tier 0（`footprint/` / `linkprune/`）はスケッチを実行しない。** ビルドしてサイズと
   シンボル表を見るだけなので `dut` を使わない。実機も要らない
-- **Tier 1（`capture/` ほか 8 本）は `lang-ship:host` 上でホスト実行**し、描いた結果を
+- **Tier 1（`capture/` ほか 11 本）は `lang-ship:host` 上でホスト実行**し、描いた結果を
   画素で検証する。SDL2 も LovyanGFX も要らない
 
 ## 動かす
@@ -36,7 +36,6 @@ TINYGFX_FQBN='ch32-riscv-ug:ch32v:CH32V003:pnum=CH32V003F4P6' uv run pytest foot
 tests/
   tinygfx_build.py    arduino-cli を叩いてサイズとシンボルを取る共通ヘルパ
   constructs/         測定用スケッチ。base / a..e / t / p1 / p2（docs/FOOTPRINT.ja.md §4）
-  fonts/              つなぎのフォント（tools/gen_font.py が生成）。ライブラリには同梱しない
   tgfx_check.py       output/ に残ったものを読む小道具（report / image / lit / 色変換）
   common_libs/
     tgfx_test/        PPM 出力と report.txt への値の記録
@@ -44,14 +43,18 @@ tests/
   footprint/          サイズの回帰。base からの増分が予算内か
   linkprune/          未使用機能が最終バイナリに残っていないか
   capture/            BusCapture が ST7789 のコマンド列から画を復元できるか（Tier 1 の土台）
-  window/             回転の MADCTL・幅高さ・原点オフセットの導出
+  window/             ST7789 の回転 MADCTL・幅高さ・原点オフセットの導出
+  ili9342/            ILI9342C の MADCTL・色順（BGR）・ミラー
   primitive/          全プリミティブと縮退ケース
   clip/               クリップ内はクリップ無しと同じ、外は無傷（不変条件）
   fill/               転送画素数の過不足
   tile/               帯の行数を変えても直接描画と同じ（不変条件）
   text/               文字。戻り値・倍角・収録外・背景色つき・透過
   image/              pushImage の配置・切り取り・透過
-  build_matrix/       examples が ch32v003 / uno / esp32 でビルドできるか（実行はしない）
+  hostbus/            本番の SPI バスが実際に流したバイトを拾って画に戻す
+  u8g2/               u8g2 形式フォントのデコード
+  i2c/                I2C + SSD1306（モノクロ・ページ転送・dirty ページ）
+  build_matrix/       examples が ch32v003 / uno / esp32 / m5stack でビルドできるか（実行はしない）
 ```
 
 ## 値の受け渡し

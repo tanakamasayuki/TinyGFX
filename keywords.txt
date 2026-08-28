@@ -14,6 +14,7 @@ TinyGFXBusCapture	KEYWORD1
 TinyGFXBusI2C	KEYWORD1
 TinyGFXPanel	KEYWORD1
 TinyGFXPanelST7789	KEYWORD1
+TinyGFXPanelILI9342	KEYWORD1
 TinyGFXPanelMemory	KEYWORD1
 TinyGFXPanelSSD1306	KEYWORD1
 TinyGFXTileCanvas	KEYWORD1
@@ -82,6 +83,8 @@ clearBuffer	KEYWORD2
 setContrast	KEYWORD2
 setControlBytes	KEYWORD2
 setGramSize	KEYWORD2
+setRgbOrder	KEYWORD2
+setMirror	KEYWORD2
 gfx	KEYWORD2
 
 #######################################
