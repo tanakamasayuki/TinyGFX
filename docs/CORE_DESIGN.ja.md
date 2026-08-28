@@ -384,39 +384,53 @@ int16_t drawChar(uint16_t ch, int16_t x, int16_t y) {
 ### 9.2 使い方
 
 ```cpp
-#include <TinyGFX/FontTiny.h>   // 使う形式だけ include する
-#include "myfont.h"             // 生成されたフォント（中で FontRef を定義している）
+#include <TinyGFX/FontCell.h>   // 使う形式だけ include する
+#include "myfont.h"             // 生成されたフォント（純粋な CellFont）
+
+// 形式の入口を指す 1 行。生成ヘッダ側には書かない（形式は描画器を知らない）
+static const TinyGFXFontRef myFont = {&MyFont, &tinygfxFontCellOps, nullptr};
 
 lcd.setFont(&myFont);
 lcd.drawString("12:34", 4, 4);
 ```
 
-生成されたヘッダはこうなっている:
+生成されたヘッダは**形式の仕様どおり**で、TinyGFX の名前を 1 つも含まない:
 
 ```cpp
-static const TinyGFXFontTiny myFontData = { ... };
-static const TinyGFXFontRef  myFont = { &myFontData, &tinygfxFontTinyOps, nullptr };
+#include <CellFont.h>
+static const uint8_t  MyFontBitmaps[] CELLFONT_PROGMEM = { ... };
+static const CellFont MyFont          CELLFONT_PROGMEM = { ... };
 ```
 
 ### 9.3 いま用意している形式
 
 | ヘッダ | 形式 | 向き |
 | --- | --- | --- |
-| `TinyGFX/FontTiny.h` | **TinyFont** | **高さ 16 画素以下**のピクセルグリッドフォント |
-| `TinyGFX/FontU8g2.h` | u8g2 | 16 画素超。RLE と bbox が効き始める帯 |
+| `TinyGFX/FontCell.h` | **CellFont**（[外部仕様 v1](https://github.com/tanakamasayuki/LGFXFontToolJs)） | **高さ 16 画素以下**、または字数が少ないもの |
+| `TinyGFX/FontU8g2.h` | u8g2 | 16 画素超**かつ字数が多い**帯。RLE と bbox が効く |
 
-境界が H≈16 なのは実測上の変曲点だから（[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md) §0）。
-**デコーダの大きさはほぼ同じ**（TinyFont 828 B / u8g2 1,105 B）なので、
-選択はデータ量だけで決まる。
+境界が H≈16 なのは実測上の変曲点だから。**デコーダの大きさはほぼ同じ**
+（CellFont 684 B / u8g2 693 B）なので、H≤16 では選択がデータ量だけで決まる。
+H>16 でも**字数が少なければ CellFont のほうが総量で安い**（デコーダをもう 1 つ積む
+ぶんをデータの差が超えないため。[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md) §3）。
 
 ### 9.4 連鎖は形式をまたげる
 
-`next` で繋いだ先は別形式でよい。半角を TinyFont、全角を u8g2、も書ける。
+`TinyGFXFontRef::next` で繋いだ先は別形式でよい。半角を CellFont、全角を u8g2、も書ける。
+
+**連鎖は 2 段ある。** CellFont は形式の中にも連鎖（`CellFont::next`）を持ち、
+そちらはセル幅クラスで分けて固定ピッチを立てるためのもの。
+**U+FFFD への退避は最外（`TinyGFX::drawChar`）でだけ行う** — デコーダの中でやると、
+その形式に豆腐があるだけで後段の別形式に到達できなくなる。
 
 ### 9.5 座標はベースラインでなく行の上端
 
-`drawChar(ch, x, y)` の `y` は**行の上端**（LovyanGFX 流）。u8g2 形式のデコーダは
-内部で `ascent` を足してベースラインに直している。**形式が違っても同じ位置に出る。**
+`drawChar(ch, x, y)` の `y` は**行の上端**（LovyanGFX 流）。
+
+内部では違う。**コアが連鎖の先頭フォントの `ascent` を足してベースラインに直してから**
+デコーダを呼ぶ（`TinyGFXFontOps::draw` の `y` はベースライン）。連鎖する各フォントは
+高さも `yOffset` も別々でよく、揃っているのはベースラインだけなので、
+**各デコーダが自分のメトリクスで換算すると字面がずれる。**
 
 ### 9.6 フォントデータはライブラリに同梱しない
 
@@ -447,7 +461,8 @@ lcd.println(3.14f);           // ここまで来ると浮動小数点書式化�
 
 | ヘッダ | 内容 | 状況 |
 | --- | --- | --- |
-| `TinyGFX/FontTiny.h` | TinyFont のデコーダ | 実装済み |
+| `CellFont.h`（ルート） | CellFont の構造体とアクセサ（仕様 §12.1） | 実装済み |
+| `TinyGFX/FontCell.h` | CellFont のデコーダ | 実装済み |
 | `TinyGFX/FontU8g2.h` | u8g2 のデコーダ | 実装済み |
 | `TinyGFX/Print.h` | `Print` 継承、`printf`、float | 実装済み |
 | `TinyGFX/TileCanvas.h` | 帯レンダリング（§12） | 実装済み |

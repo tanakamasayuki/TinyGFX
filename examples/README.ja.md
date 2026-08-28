@@ -54,10 +54,16 @@ arduino-cli compile --profile m5stack -u -p /dev/ttyUSB0 examples/M5StackBasic
 5x7（0x20-0x3F の 32 文字）で、実運用のフォントは
 [LGFXFontToolJs](https://www.npmjs.com/package/lgfx-font-tool) で作る。
 
-形式は独自の **TinyFont** と **u8g2**（[../docs/FONT_FORMAT.ja.md](../docs/FONT_FORMAT.ja.md)）。
-ビットマップの並びは GFXfont と同じなので、既存の Adafruit 用フォントは
-**ツール側で変換すれば**使える（構造体はそのままでは渡せない）。
-使わなかった形式のデコーダはリンクされない。
+形式は **CellFont**（外部仕様 v1）と **u8g2**。使わなかった形式のデコーダはリンクされない。
+
+生成されたヘッダは**純粋な CellFont** なので、`setFont()` に渡すには 1 行包む:
+
+```cpp
+#include <TinyGFX/FontCell.h>
+#include "font.h"
+
+static const TinyGFXFontRef myFont = {&Name, &tinygfxFontCellOps, nullptr};
+```
 
 **AVR では PROGMEM に置くこと。** 置かないと RAM を食い、絵も化ける。
 

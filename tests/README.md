@@ -8,7 +8,7 @@ The TinyGFX test suite. Strategy and case list live in
 - [pytest-embedded](https://docs.espressif.com/projects/pytest-embedded/en/latest/) with the Arduino CLI backend, dependencies managed by `uv`
 - **Tier 0 (`footprint/`, `linkprune/`) never runs a sketch.** It builds and inspects
   size and the symbol table, so there is no `dut` fixture and no hardware
-- **Tier 1 (`capture/` and 11 more) runs headless on the `lang-ship:host` core** and checks
+- **Tier 1 (`capture/` and 12 more) runs headless on the `lang-ship:host` core** and checks
   the drawn result pixel by pixel. No SDL2, no LovyanGFX, no hardware
 - **Tier 2 (`build_matrix/`) only compiles** the examples for several cores
 
@@ -19,6 +19,12 @@ uv sync
 uv run pytest -v -s          # everything (-s prints the footprint table)
 uv run pytest linkprune -v   # one suite
 ```
+
+**Never build the same sketch concurrently.** arduino-cli derives the build directory from
+the sketch path (`~/.cache/arduino/sketches/<hash>`), so two builds of the same sketch - even
+under different profiles - overwrite each other's files. `Image does not have a valid ELF
+header` and a missing `partitions.csv` are both this. Do not run `arduino-cli compile` by
+hand while pytest is running.
 
 Tier 0 needs a CH32 core; the tests skip without it:
 
@@ -46,6 +52,7 @@ tests/
   fill/               exact number of pixels pushed
   tile/               tile height never changes the image (invariant)
   text/               text: return value, scaling, missing glyphs, background, transparency
+  fontchain/          CellFont chaining, U+FFFD fallback, baseline alignment
   image/              pushImage placement, cropping, transparency
   hostbus/            captures the bytes the real SPI bus emitted and rebuilds the image
   u8g2/               u8g2-format font decoding

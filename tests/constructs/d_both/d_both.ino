@@ -1,7 +1,10 @@
 #include <TinyGFX.h>
 #include <TinyGFX/BusSoftSPI.h>
 #include <TinyGFX/PanelST7789.h>
+#include <TinyGFX/FontCell.h>
 #include <tinygfx_font5x7.h>
+
+static const TinyGFXFontRef font5x7 = {&tinygfxFont5x7, &tinygfxFontCellOps, nullptr};
 #include <TinyGFX/FontU8g2.h>
 #include <u8g2_ascii.h>
 
@@ -25,7 +28,7 @@ void setup() {
   lcd.drawTriangle(0, 60, 20, 90, 40, 60, TFT_WHITE);
   lcd.fillTriangle(50, 60, 70, 90, 90, 60, TFT_WHITE);
   lcd.setTextColor(TFT_WHITE);
-  lcd.setFont(&tinygfxFont5x7);
+  lcd.setFont(&font5x7);
   lcd.drawString("0123456789", 0, 100);
   lcd.setFont(&u8g2_ascii);
   lcd.drawString("0123456789", 0, 110);

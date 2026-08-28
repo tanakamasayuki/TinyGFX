@@ -40,15 +40,15 @@ COMMON_FORBIDDEN = [
 
 # フォント形式ごとのデコーダのシンボル。使っていない形式は 1 つも出てはいけない。
 FORMAT_SYMBOLS = {
-    "tiny": "tinygfx_tiny",
+    "cell": "tinygfx_cell",
     "u8g2": "tinygfx_u8g2",
 }
 
 # 構成 -> 使っている形式
 FORMAT_USED = {
-    "d": {"tiny"},
+    "d": {"cell"},
     "d_u8g2": {"u8g2"},
-    "d_both": {"tiny", "u8g2"},
+    "d_both": {"cell", "u8g2"},
 }
 
 

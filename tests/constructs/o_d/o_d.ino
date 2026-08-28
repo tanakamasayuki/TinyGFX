@@ -1,7 +1,10 @@
 #include <TinyGFX.h>
 #include <TinyGFX/BusI2C.h>
 #include <TinyGFX/PanelSSD1306.h>
+#include <TinyGFX/FontCell.h>
 #include <tinygfx_font5x7.h>
+
+static const TinyGFXFontRef font5x7 = {&tinygfxFont5x7, &tinygfxFontCellOps, nullptr};
 
 
 static uint8_t fb[128 * 64 / 8];
@@ -25,7 +28,7 @@ void setup() {
   lcd.fillRoundRect(50, 40, 30, 20, 4, TFT_YELLOW);
   lcd.drawTriangle(0, 60, 20, 90, 40, 60, TFT_WHITE);
   lcd.fillTriangle(50, 60, 70, 90, 90, 60, TFT_WHITE);
-  lcd.setFont(&tinygfxFont5x7);
+  lcd.setFont(&font5x7);
   lcd.setTextColor(TFT_WHITE);
   lcd.drawString("0123456789", 0, 40);
   panel.display();

@@ -19,7 +19,7 @@ TinyGFX の設計文書。**たたき台だが、フットプリントの数字�
 | **API の形と内部構造を知る** | **[CORE_DESIGN.ja.md](CORE_DESIGN.ja.md)** |
 | **なぜそう設計したのかを知る／論点を潰す** | **[DECISIONS.ja.md](DECISIONS.ja.md)** |
 | フラッシュ・RAM の予算と実測値を見る | [FOOTPRINT.ja.md](FOOTPRINT.ja.md) |
-| **フォント形式（TinyFont）の定義と実測を知る** | **[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md)** |
+| **フォントまわりの実測を知る**（形式そのものは外部仕様） | **[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md)** |
 | テストの方針とケース一覧を知る | [TEST_PLAN.ja.md](TEST_PLAN.ja.md) |
 | 現在地と残作業、実装の順序を知る | [DEVELOPMENT_PLAN.ja.md](DEVELOPMENT_PLAN.ja.md) |
 | **外部（コア・ツール）に何を頼む必要があるか知る** | **[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md)** |

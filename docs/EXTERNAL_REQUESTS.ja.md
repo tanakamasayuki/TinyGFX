@@ -11,7 +11,7 @@
 | [E2](#e2) | ch32-riscv-ug/arduino_core_ch32_riscv_arduino | SPI ライブラリが無い。base が 5.9KB → **新コアで解消見込み** | 低 | しない |
 | [E3](#e3) | openwch / YuukiUmeta-UIAP コア | CH32V00x の `PinMap_SPI_*` が無い → **新コアで解消見込み** | 低 | しない |
 | [E7](#e7) | **ArduinoCore-CH32（開発中）** | **リリースを待つ。それまで測定は symlink 運用** | 高 | しない |
-| [E4](#e4) | LGFXFontToolJs | **TinyFont エンコーダ**（形式を変えたので依頼内容も変わった） | 中 | しない |
+| [E4](#e4) | LGFXFontToolJs | **CellFont の CLI。** 形式そのものは v1 で確定・実装済み | 中 | しない |
 | [E5](#e5) | arduino-library-release-toolkit | リリース資産の同期（既に取り込み済み） | 低 | しない |
 | [E6](#e6) | 外部レジストリ | ライブラリ名 `TinyGFX` の重複確認 → **確認済み・問題なし** | 済 | 解消 |
 
@@ -323,108 +323,70 @@ E2 と同じ。`TinyGFXBusSoftSPI` を使う。
 
 ---
 
-## E4. LGFXFontToolJs — TinyFont エンコーダ {#e4}
+## E4. LGFXFontToolJs — CellFont の CLI {#e4}
 
-### 前提が変わった（2026-08-27）
+### 決着した（2026-08-28）
 
-当初は「GFXfont をそのまま食う」方針だったが、実測して **TinyFont という独自形式に変えた**
-（[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md)、[DECISIONS.ja.md](DECISIONS.ja.md) D17）。
+**形式は CellFont v1 として確定し、仕様書は LGFXFontToolJs 側にある。**
 
-変えた理由は 2 つとも数字で出ている。
+> `docs/formats/cellfont.ja.md`（+ `cellfont.en.md`）
 
-1. **GFXfont のグリフ表が重い。** ASCII 95 字の 5x7 固定ピッチで、
-   ビットマップ 475 B に対しグリフ表 665 B。固定ピッチなら中身は全字同一で丸ごと冗長。
-   TinyFont は固定ピッチならグリフ表を持たないので **1,152 B → 499 B（−57%）**
-2. **GFXfont は疎な文字集合を表せない。** `first`〜`last` が連続でないといけないので、
-   U+4E00〜U+9FA5 に散った 500 字だと 20,902 件のグリフ表 = **146 KB**。
-   TinyFont は昇順のコード表を持てるので 1 KB
+当初この節でお願いしていた「TinyFont エンコーダ」の中身は、**ほぼそのまま仕様に
+入っている** — 索引とグリフ表の自動選択（§10.3）、刈り込まずセルで出す判断（§10.1）、
+幅クラスで割って `next` で繋ぐ（§10.2）、PROGMEM を 4 つすべてに（§12.2）、
+決定的な出力（§10.4）。**依頼としては閉じてよい。**
 
-**ビットマップの並びは GFXfont と同じ**（行を連結した MSB first、グリフ間はバイト境界揃え）
-なので、`src/format/gfxfont.js` の成果はそのまま使える。**変わるのはメタデータの組み方だけ。**
+TinyGFX 側は **2026-08-28 に CellFont v1 の描画器を実装済み**
+（`src/CellFont.h` + `src/TinyGFX/FontCell.h`）。
 
-### 依頼内容
+### 仕様に取り込まれた指摘（TinyGFX 側から出したもの）
 
-#### 1. TinyFont のエンコーダ
+| # | 指摘 | 反映 |
+| --- | --- | --- |
+| 1 | 「`headCount` はアライメントの余りに収まる」は 16bit ABI では成り立たない（AVR で 19 → 20 バイト。実測） | §3 に ABI 別の表として反映 |
+| 2 | 頭ブロックの閾値は 2 でなく **1** でよい（`first` / `headCount` は元からあるので追加コスト 0、`codes` が 2 バイト減る） | §10.3 / §15.1 が `headCount >= 1` に |
+| 3 | **連鎖が入れ子になる描画器**では、U+FFFD 退避をデコーダの中に置いてはならない | §15.2 に注意書きとして追加 |
 
-構造は [FONT_FORMAT.ja.md](FONT_FORMAT.ja.md) §2。C ソースとして吐いてほしい。
+### 逆に仕様から学んだこと（TinyGFX 側の不具合 3 件）
 
-```c
-static const uint8_t      myFontBitmaps[...] TINYGFX_FONT_PROGMEM = { ... };
-static const TinyGFXGlyph myFontGlyphs[...]  TINYGFX_FONT_PROGMEM = { ... };  // 可変ピッチのときだけ
-static const uint16_t     myFontCodes[...]   TINYGFX_FONT_PROGMEM = { ... };  // 疎索引のときだけ
-static const TinyGFXFont  myFont             TINYGFX_FONT_PROGMEM = { ... };
+仕様 §12.2 / §15.2 / §7.1 が名指ししている失敗を、**TinyGFX が実際にやっていた。**
+
+1. **フォント構造体だけ PROGMEM が抜けていた** — AVR で文字が化ける。`avr-nm` で確認して修正
+2. 固定ピッチのビットマップオフセットが 16bit — 大きな集合で折り返す
+3. 二分探索の中央値が加算形 — 16bit 環境で折り返す
+
+### 残っている依頼 — CLI
+
+`docs/cli.ja.md`（草案）の `lgfx-font build` が揃えば、TinyGFX 側のつなぎ
+（`tools/gen_font.py`）を畳める。TinyGFX から見て要るのは 1 つだけ:
+
+```sh
+lgfx-font build --font <書体> --chars "..." --format cellfont --out font.h
 ```
 
-ヘッダの先頭に `#include <TinyGFX/Font.h>` を出せば自己完結する
-（型は TinyGFX が提供する。当初お願いしていた「Adafruit_GFX なしで通る出力」は不要になった）。
+**出力は仕様 §12.2 の形（純粋な `CellFont`）で十分。** TinyGFX 固有のものを
+含める必要はない。`setFont()` に渡すための 1 行はスケッチ側で書く:
 
-#### 2. 索引とグリフ表を自動で選ぶ
+```cpp
+static const TinyGFXFontRef myFont = {&Name, &tinygfxFontCellOps, nullptr};
+```
 
-利用者に選ばせる必要はない。**入力を見て小さいほうを選べばよい。**
+`tools/gen_font.py` は**既に §12.2 の形で吐いている**ので、CLI が揃ったら
+ファイルを差し替えるだけで済む（`tests/text/` がそのまま回帰検査になる）。
 
-| 判定 | 結果 |
-| --- | --- |
-| 全グリフの `width` と `xAdvance` が同一 | グリフ表を省く（`glyphs = nullptr`） |
-| 収録コードが連続 | コード表を省く（`codes = nullptr`） |
-| 疎なら | 昇順のコード表を出す |
+### CLI 草案へのコメント
 
-**選んだ結果とデータ量をヘッダのコメントに書いてほしい。** 利用者が
-「このフォントは何バイトで、なぜその形式か」を読めるようにしたい。
-
-#### 2-b. 生成の方針そのものが効く — 刈り込まず、割る
-
-TinyFont の強みは**グリフ表が消えること**だけなので、可変ピッチになった瞬間に
-u8g2 に負ける（12px で −17%、16px で −22%）。逆に固定ピッチなら u8g2 相手でも −47%。
-**だから「固定ピッチに持ち込めるか」が形式の選択より効く。**
-
-| 方針 | 効果（実測） |
-| --- | --- |
-| **墨面で刈り込まず、セル幅で出す**（`width = xAdvance`） | 半角 4x8 で 722 → **404 B**（−318 B）。詰め物より表 4 B/字の消滅が勝つ |
-| **半角と全角で 2 フォントに割り、`next` で繋ぐ** | 割っただけでは可変のまま。**セル幅とセット**で初めて両方が固定ピッチになる |
-
-2 つ揃うと 8px の混在サブセットが 2,349 → **1,471 B（−37%）**。u8g2 の 2,201 B より 33% 小さい。
-TinyGFX 側は `next` を実装済み（コスト +24 B）。
-
-#### 2-c. 対象は H≤16。外は u8g2 / GFXfont を勧めてほしい
-
-24px を超えると RLE も bbox も u8g2 も有利に反転する。
-**TinyFont で出せてしまうより、「その高さなら u8g2 のほうが小さい」と言ってくれるほうがよい。**
-根拠の表は [FONT_FORMAT.ja.md](FONT_FORMAT.ja.md) §0 / §6。
-
-#### 3. PROGMEM 属性を 4 つすべてに
-
-AVR ではビットマップ・グリフ表・コード表・`TinyGFXFont` の**全部**に PROGMEM が要る。
-どれか 1 つでも抜けると化ける（[DECISIONS.ja.md](DECISIONS.ja.md) D19）。
-
-#### 4. 決定的な出力
-
-同じ入力から**バイト一致**のヘッダが出ること。CI で再生成して
-`git diff --exit-code` する運用にしたい（TinyGFX 側は既に `tools/gen_font.py` でそうしている）。
-
-### 確認したいこと
-
-- **オフセットは 16bit で足りるか。** TinyFont は `offsetLo` / `offsetHi` の 2 バイト
-  （64KB まで）。超えるフォントは V003 級には載らないが、大きな欧文フォントで
-  実際に何バイトになるか知りたい
-- **`headCount` の意味を確認したい。** 「形式には手を入れず（`headCount` 1 バイトと
-  `next` ポインタだけ）」とあったが、`next` は実装した一方で `headCount` が何を指すか
-  こちらで確定できていない。**連続の頭 + 疎の尾**（先頭 `headCount` 字は `first` からの通し、
-  残りは `codes` 表）という混成索引の意図なら、半角/全角を割らずに 1 フォントで
-  済ませる道になるので実装する価値がある。**そういう理解で合っているか。**
-- **グリフごとの bbox は決着。** 連続索引では恒等式で常に +12 B 負けるので採らない
-  （[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md) §6.1）。24px 以上で有利になる帯は、
-  そもそも u8g2 の領分にする。
+- **`--format` の既定を `cellfont` にしてよいか**（§13 の未決事項）— TinyGFX の
+  利用者から見れば `cellfont` 既定がありがたいが、**汎用ツールとしては `--format` 必須の
+  ほうが素直**だと思う。既定を置くなら「対象機に載せるなら cellfont」と 1 行出るとよい
+- **`--px` が墨面の高さであること**（§13）— これは**出力ヘッダのコメントに実際の
+  `height` と `yAdvance` を書く**のが一番伝わる。利用者は数字を見て納得する
+- **`--check` の終了コード 2** — CI で使う。TinyGFX 側でも同じ運用にする
 
 ### サブセット化は TinyGFX の対象外
 
-「プロジェクトで使う文字だけを埋め込む」仕組みは、**完全に外部のツール**（Python 想定）として
-作る。TinyGFX 側は一切考慮しない。満たすべき条件は「TinyFont のヘッダを上書きするだけで
-成立すること」で、これは既に満たしている。
-
-### それまでどうするか
-
-`tools/gen_font.py` が 5x7（0x20-0x3F の 32 字）を 3 変種で吐く。**測定用であって製品ではない。**
-`tests/text/` が「変種を変えても描画結果が 1 画素も変わらない」ことを検査している。
+「プロジェクトで使う文字だけを埋め込む」仕組みは**完全に外部のツール**として作る。
+CLI 側も §1 で「ソースコードの走査はやらない」としており、認識は一致している。
 
 ## E5. arduino-library-release-toolkit — リリース資産の同期 {#e5}
 
