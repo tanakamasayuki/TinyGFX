@@ -8,9 +8,20 @@
 | [Shapes](Shapes) | Every primitive | ~4.9 KB |
 | [FlickerFree](FlickerFree) | Tiled rendering, no flicker, no framebuffer | ~7.6 KB / ~2.0 KB RAM |
 | [HardwareSPI](HardwareSPI) | The same drawing over hardware SPI | about the same as Shapes |
+| [OledI2C](OledI2C) | **A monochrome I2C OLED** (SSD1306) | ~5.6 KB / **~1.1 KB RAM** |
 
 Numbers come from [../docs/FOOTPRINT.ja.md](../docs/FOOTPRINT.ja.md) (Japanese).
 **Features you do not call are not linked in**, so call only what you need.
+
+## Monochrome OLEDs work differently
+
+[OledI2C](OledI2C) differs in two ways.
+
+1. **It needs a framebuffer** — 1,024 bytes for 128x64, supplied by you (512 for a 128x32 panel)
+2. **Nothing reaches the screen until `panel.display()`** — and only the pages that changed
+   are sent, so a change confined to one page (8 rows) costs 128 bytes
+
+The drawing API is the same as for colour panels; colours collapse to 1bpp as "non-zero lights up".
 
 ## Wiring
 

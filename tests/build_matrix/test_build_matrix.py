@@ -11,7 +11,7 @@ import pytest
 import tinygfx_build as tb
 
 EXAMPLES = tb.REPO / "examples"
-ALL = ["HelloWorld", "Shapes", "FlickerFree", "HardwareSPI"]
+ALL = ["HelloWorld", "Shapes", "FlickerFree", "HardwareSPI", "OledI2C"]
 
 # プロファイル名 -> それが要求するコア。入っていなければ skip する
 # （プロファイルは宣言したプラットフォームを勝手に入れないので、

@@ -523,3 +523,64 @@ canvas.render(scene, &state);                        // scene が帯の数だけ
 `TinyGFXPanelMemory` を**全画面サイズ**で使えば、ホスト上でそのままフレームバッファ検証になる。
 描画コードを関数にする形が強制されるので、同じ関数を実機とテストの両方から呼べる
 （[TEST_PLAN.ja.md](TEST_PLAN.ja.md) §2）。
+
+
+## 13. I2C とモノクロパネル（SSD1306）
+
+**コアには手を入れていない。** Bus と Panel を足しただけで動く。
+
+### 13.1 I2C は Bus に収まる
+
+SSD1306 系の I2C は「制御バイト + ペイロード」なので、既存の Bus インターフェースに
+そのまま乗る。
+
+| Bus のメソッド | I2C での中身 |
+| --- | --- |
+| `writeCommand(c)` | `beginTransmission` → `0x00` → `c` → `endTransmission` |
+| `writeData(p, n)` | `beginTransmission` → `0x40` → ペイロード → `endTransmission`（**Wire のバッファ上限で分割**） |
+| `beginTransaction` / `endTransaction` | **空。** I2C は転送ごとに start/stop する |
+| `writeColor` / `writePixels` | **使わない。** モノクロパネルは `writeData` だけ使う |
+
+制御バイトは `setControlBytes()` で変えられるので、同じ流儀の他のコントローラにも使える。
+
+### 13.2 モノクロは Panel が引き受ける
+
+**描画 API は RGB565 のまま。** `TinyGFXPanelSSD1306` が「0 でなければ点灯」で 1bpp に落とす。
+色深度の抽象化はコアに入れない（[DECISIONS.ja.md](DECISIONS.ja.md) D4 / D21）。
+
+SPI のカラーパネルとの違いは 2 つある。
+
+| | SPI カラーパネル | SSD1306 |
+| --- | --- | --- |
+| フレームバッファ | **不要**（画面へ直接流す） | **必要**（GRAM を読み戻せず、ページ単位でしか書けない） |
+| 転送のタイミング | 描いた瞬間 | **`display()` を呼んだとき** |
+
+```cpp
+static uint8_t fb[128 * 64 / 8];        // 1,024 バイト。利用者が用意する
+TinyGFXBusI2C bus(0x3C);
+TinyGFXPanelSSD1306 panel(bus, fb, 128, 64);
+TinyGFX lcd(panel);
+
+lcd.fillRect(8, 8, 32, 8, TFT_WHITE);
+panel.display();                        // ここで初めて流れる
+```
+
+**変更のあったページだけ流す。** 1 ページ（縦 8 画素）に収まる変更なら 128 バイトで済む。
+毎回 1KB 流すと I2C 400kHz で 25ms かかるので、これは効く。
+
+### 13.3 回転はバッファの添字で行う
+
+SSD1306 は 90 度回転を持たない（180 度は SEGREMAP/COMSCANDEC でできる）。
+**バッファは自分で持っているので、添字で回す**ほうが一貫する。0〜3 すべて対応。
+
+### 13.4 実測（[FOOTPRINT.ja.md](FOOTPRINT.ja.md) §6.4）
+
+**フラッシュは SPI + ST7789 より小さく、RAM はフレームバッファぶん増える。**
+
+| | CH32V003 flash | RAM |
+| --- | --- | --- |
+| SPI + ST7789（構成 D） | 11,808 | 572 |
+| **I2C + SSD1306（同じ描画）** | **11,476** | **1,612** |
+
+RAM 1,612 / 2,048 = 79%。**CH32V003 でも載る**が残りは 436 バイト。
+128x32 のパネルならフレームバッファが 512 バイトになるので余裕が出る。
