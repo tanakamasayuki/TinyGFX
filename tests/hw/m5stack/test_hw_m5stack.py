@@ -113,3 +113,47 @@ def test_readback_matches_golden(arduino_test):
     result = arduino_test.run("test_readback_scene")[0]
     art = {a.filename: a for a in result.artifact_files}
     _compare("readback", Path(art["readback.rgb565"].path).read_bytes(), w, rh, want[: w * rh])
+
+
+# 回転 0 のフレームで、回転 N のマーカーが落ちるべき色の並び。
+# スケッチ側が読む物理座標と対になっている（m5stack.ino の test_rotation_maps）。
+ROT_MARKS = [0xF800, 0x07E0, 0x001F, 0xFFFF]  # RED / GREEN / BLUE / WHITE
+ROT_NAMES = ["rotation 0", "rotation 1", "rotation 2", "rotation 3"]
+
+
+def test_rotation_maps(arduino_test):
+    """**回転 1〜3 が回転 0 に対して正しいこと。** MANUAL_TEST の M2 の自動版。
+
+    回転 N で 1 画素打ってから回転 0 に戻して読む。MADCTL はアクセスの写像を
+    変えるだけで GRAM の中身は動かさないので、回転 0 という固定フレームから
+    「物理的にどこに入ったか」が見える。同じ回転のまま読むと、MADCTL が
+    間違っていても自己無矛盾になって通ってしまう。
+
+    **回転 0 自体の向き（上下が合っているか）はこれでは分からない。**
+    それは目で見るしかなく、M0 で一度確認してある。ここが守るのは
+    「回転 0 を基準に 1〜3 がずれていないこと」。
+    """
+    probe = arduino_test.run("test_panel_readable")[0]
+    if not probe.metrics.get("readable", [0])[0]:
+        pytest.skip("このパネルは読み戻せない")
+
+    result = arduino_test.run("test_rotation_maps")[0]
+    assert result.status == "passed", f"実機で失敗: {result.logs}"
+
+    got = result.metrics.get("rot_found", [])
+    assert len(got) == 4, f"4 回転ぶん来ていない: {got}"
+
+    wrong = [i for i in range(4) if got[i] != ROT_MARKS[i]]
+    if wrong:
+        lines = []
+        for i in wrong:
+            # どの回転のマーカーがそこに居たのかまで言う。取り違えが一目で分かる
+            found = next((n for n, c in enumerate(ROT_MARKS) if c == got[i]), None)
+            who = f"{ROT_NAMES[found]} のマーカー" if found is not None else "未知の色"
+            lines.append(
+                f"  {ROT_NAMES[i]}: want={ROT_MARKS[i]:#06x} got={got[i]:#06x} ({who})"
+            )
+        pytest.fail(
+            "回転の写像が違う（MADCTL か PanelILI9342::setRotation）\n" + "\n".join(lines)
+        )
+    print(f"  rotation marks: {result.artifacts.get('rotation_marks.txt', '')}")
