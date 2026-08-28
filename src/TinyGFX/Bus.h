@@ -16,6 +16,11 @@ class TinyGFXBus {
   virtual void writeData(const uint8_t* data, size_t len) { (void)data; (void)len; }  // DC High
   virtual void writeColor(uint16_t color, uint32_t count) { (void)color; (void)count; }
   virtual void writePixels(const uint16_t* data, uint32_t count) { (void)data; (void)count; }
+  /// パネルから読み戻す。**読めないバスでは何もしない**（buf は触らない）。
+  ///
+  /// ILI934x 系は書き込みより低いクロックでしか読めないので、実装側で
+  /// トランザクションを張り直す。CS は落としたままにすること。
+  /// 実測: この 1 本を足す代金は CH32V003 で **+8 バイト**（vtable の枠ぶん）。
   virtual void readData(uint8_t* buf, size_t len) { (void)buf; (void)len; }
 
  protected:

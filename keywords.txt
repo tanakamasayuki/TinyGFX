@@ -43,6 +43,8 @@ clearClipRect	KEYWORD2
 setAddrWindow	KEYWORD2
 writeColor	KEYWORD2
 writePixels	KEYWORD2
+readData	KEYWORD2
+setReadFreq	KEYWORD2
 drawPixel	KEYWORD2
 fillRect	KEYWORD2
 fillScreen	KEYWORD2

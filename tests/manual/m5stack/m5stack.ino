@@ -12,7 +12,8 @@
 //   6   クリップ       外に 1 画素も漏れないか
 //   7   直接描画       同じ動きを消してから描く。**ちらつくはず**
 //   8   帯レンダリング 同じ動きを TileCanvas で。**ちらつかないはず**
-//   9   速度           **まだ 1 度も測っていない。** シリアルに ms を出す
+//   9   速度           シリアルに ms を出す
+//  10   読み出し       **パネルから読み戻せるか。** できれば実機の自動検証に道が開ける
 #include <TinyGFX.h>
 #include <TinyGFX/BusSPI.h>
 #include <TinyGFX/FontCell.h>
@@ -51,7 +52,7 @@ static const int16_t BAND_ROWS = 20;
 static uint16_t band[320 * BAND_ROWS];
 TinyGFXTileCanvas canvas(panel, band, sizeof(band) / sizeof(band[0]));
 
-static const uint8_t PAGES = 10;
+static const uint8_t PAGES = 11;
 static uint8_t page = 0;
 static uint32_t shownAt = 0;
 
@@ -250,6 +251,72 @@ static void pageBench() {
   lcd.setTextSize(1);
 }
 
+
+/// パネルから読み戻せるか。**できるかどうかを決める実験。**
+///
+/// できれば「描いて読み戻して比べる」で実機を自動検証できる。ホストのテストと
+/// 同じ厳しさが実機に持ち込める。まずは線が繋がっているかを見る。
+///
+/// ILI934x の作法は 3 つ。どれも外すと化けるので、生のバイトをそのまま出す。
+///   1. 読み出しは書き込みより低いクロック（ここでは 8MHz）
+///   2. RAMRD(0x2E) の先頭にダミーが 1 バイト入る
+///   3. 16bpp で書いても**読み出しは 1 画素 3 バイト**（RGB666 が上詰め）
+static void dump(const char* label, uint8_t cmd, uint8_t n) {
+  uint8_t buf[16];
+  for (uint8_t i = 0; i < n && i < 16; ++i) buf[i] = 0;
+  bus.beginTransaction();
+  bus.writeCommand(cmd);
+  bus.readData(buf, n);
+  bus.endTransaction();
+  Serial.print("  ");
+  Serial.print(label);
+  Serial.print(" (0x");
+  if (cmd < 16) Serial.print('0');
+  Serial.print(cmd, HEX);
+  Serial.print("):");
+  for (uint8_t i = 0; i < n && i < 16; ++i) {
+    Serial.print(' ');
+    if (buf[i] < 16) Serial.print('0');
+    Serial.print(buf[i], HEX);
+  }
+  Serial.println();
+}
+
+static void pageReadback() {
+  lcd.setRotation(0);
+  header(10);
+  bus.setReadFreq(8000000UL);
+
+  // 読み戻す先に、見分けのつく色を置く
+  lcd.fillRect(0, 100, 2, 1, TFT_RED);      // (0,100) 赤
+  lcd.drawPixel(1, 100, TFT_GREEN);         // (1,100) 緑
+
+  Serial.println(F("--- read-back probe ---"));
+  dump("RDDID ", 0x04, 5);   // ILI9341 なら 00 00 93 41 ... 全部 00 なら MISO が来ていない
+  dump("RDID4 ", 0xD3, 5);
+  dump("RDDST ", 0x09, 6);
+
+  // (0,100)-(1,100) の 2 画素を読む。ダミー 1 + 3 バイト x 2 = 7 バイト
+  uint8_t a[4];
+  bus.beginTransaction();
+  a[0] = 0; a[1] = 0; a[2] = 0; a[3] = 1;
+  bus.writeCommand(0x2A);
+  bus.writeData(a, 4);                       // CASET 0..1
+  a[0] = 0; a[1] = 100; a[2] = 0; a[3] = 100;
+  bus.writeCommand(0x2B);
+  bus.writeData(a, 4);                       // RASET 100..100
+  bus.endTransaction();
+
+  Serial.println(F("  wrote: (0,100)=F800 red  (1,100)=07E0 green"));
+  dump("RAMRD ", 0x2E, 8);   // 期待: dummy, F8 00 00, 00 FC 00 （上位 6bit が有効）
+
+  lcd.setTextColor(TFT_WHITE);
+  lcd.setTextSize(2);
+  lcd.drawString("0123456789", 12, 140);     // 画面側は「見に行った」目印だけ
+  lcd.setTextSize(1);
+  Serial.println(F("  all-zero or all-FF => MISO not usable; read-back is off the table"));
+}
+
 static const char* PAGE_HINT[PAGES] = {
     "rot 0 : red square top-left, digits upright, 320:240",
     "rot 1 : same picture turned 90 deg, 240:320",
@@ -261,6 +328,7 @@ static const char* PAGE_HINT[PAGES] = {
     "direct: same motion, cleared each frame -- SHOULD flicker",
     "tiled : same motion via TileCanvas -- should NOT flicker",
     "bench : timings on serial",
+    "read  : can the panel be read back? raw bytes on serial",
 };
 
 static void show(uint8_t n) {
@@ -271,7 +339,8 @@ static void show(uint8_t n) {
     case 6: pageClip(); break;
     case 7: pageDirect(); break;
     case 8: pageTiled(); break;
-    default: pageBench(); break;
+    case 9: pageBench(); break;
+    default: pageReadback(); break;
   }
   Serial.print(n);
   Serial.print(F(" | "));

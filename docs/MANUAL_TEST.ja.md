@@ -122,7 +122,7 @@ fillScreen x5 / fillRect 100x100 x200 / drawLine diag x200 /
 fillCircle r100 x200 / drawString 10 chars x200 / TileCanvas full frame x20
 ```
 
-- [ ] 数字を控える。**速度の基準値がまだどこにも無い**
+- [x] **2026-08-28 取得。**[FOOTPRINT.ja.md](FOOTPRINT.ja.md) §7 に記録した
 
 そのあと 2 つ変えて測り直すと、効くところが分かる。どちらも 1 行:
 
@@ -131,7 +131,21 @@ fillCircle r100 x200 / drawString 10 chars x200 / TileCanvas full frame x20
 | `TinyGFXBusSPI bus(..., 40000000UL)` | SPI クロックが効くか（24 → 40MHz） |
 | `#define TINYGFX_FILL_CHUNK 32` を `#include <TinyGFX/BusSPI.h>` の前に | まとめ書きが効くか。**絵が変わらないこと**も確認（M3 の項目） |
 
-結果は下の「記録」に貼ってほしい。[FOOTPRINT.ja.md](FOOTPRINT.ja.md) に速度の節を作る。
+**1 回目の結果を見て `TINYGFX_FILL_CHUNK` の実装を直した**（効かない作りだった。
+[FOOTPRINT.ja.md](FOOTPRINT.ja.md) §7.1）。**上の 2 つはまだ測っていない。**
+
+#### ページ 10 — 読み戻せるか 【**次の道が決まる**】
+
+パネルから読み戻せれば、**描いて読み戻して比べる**で実機を自動検証できる。
+ホストのテストと同じ厳しさが実機に持ち込める。まず線が繋がっているかを見る。
+
+シリアルに生のバイトが出る。
+
+- [ ] `RDDID` / `RDID4` が **00 でも FF でもない**（MISO が来ている）
+- [ ] `RAMRD` が `F8 00 00` `00 FC 00` に近い並びを返す（赤・緑を書いた 2 画素）
+
+**全部 00 か全部 FF なら読み出しは無理。** そのときはこの道を閉じる。
+先頭のダミーバイト数と RGB666 の詰め方は、返ってきた並びを見て決める。
 
 ## M1 — CH32V003 + ST7789 で構成 B が出る
 
@@ -203,5 +217,7 @@ ST7789 でしか分からない。**
 | --- | --- | --- | --- |
 | 2026-08-28 | **M0** | M5Stack BASIC（ILI9342C） | **通過。** 既定（`INVON` / BGR / ミラー無し）のまま正常に描画 |
 | 2026-08-28 | M0（反転） | M5Stack BASIC（**古い世代**） | **色が反転。** `invertDisplay(false)` を `begin()` の後に入れて解決 |
-| — | **M0b** | M5Stack | **未。スケッチは用意済み**（`tests/manual/m5stack`） |
+| 2026-08-28 | M0b ページ 9（速度） | M5Stack BASIC | **取得。**[FOOTPRINT.ja.md](FOOTPRINT.ja.md) §7。塗り 2.3µs/画素、点 19.8µs/画素 |
+| 2026-08-28 | M0b 全体 | M5Stack BASIC | 「動いているように見える」との報告。**個別項目（回転の向き・ベースライン・背景セル）は未確認** |
+| — | M0b ページ 10（読み戻し） | M5Stack | **未。スケッチは用意済み** |
 | — | M1 / M2 / M3 / M4 | — | 未 |
