@@ -8,9 +8,21 @@
 | [Shapes](Shapes) | 使えるプリミティブを一通り | 約 4.9 KB |
 | [FlickerFree](FlickerFree) | 帯レンダリングでちらつきを消す | 約 7.6 KB / RAM 約 2.0 KB |
 | [HardwareSPI](HardwareSPI) | ハードウェア SPI を使う版 | Shapes とほぼ同じ |
+| [OledI2C](OledI2C) | **I2C のモノクロ OLED**（SSD1306） | 約 5.6 KB / **RAM 約 1.1 KB** |
 
 増分の根拠は [../docs/FOOTPRINT.ja.md](../docs/FOOTPRINT.ja.md)。
 **使わない機能はフラッシュに載らない**ので、必要なものだけ呼べばよい。
+
+## モノクロ OLED は勝手が違う
+
+[OledI2C](OledI2C) だけ 2 点ちがう。
+
+1. **フレームバッファが要る。** 128x64 で 1,024 バイト。利用者が用意する
+   （128x32 のパネルなら 512 バイト）
+2. **`panel.display()` を呼ぶまで画面は変わらない。** 変更のあったページだけ流すので、
+   1 ページ（縦 8 画素）に収まる変更なら 128 バイトで済む
+
+描画 API はカラーパネルと同じ。色は「0 でなければ点灯」で 1bpp に落ちる。
 
 ## 配線
 

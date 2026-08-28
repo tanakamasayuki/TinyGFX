@@ -127,6 +127,8 @@ TINYGFX_FQBN='ch32-riscv-ug:ch32v:CH32V003:pnum=CH32V003F4P6' uv run pytest foot
 | `tile/` | **不変条件。** 帯の行数（1/2/3/5/7/8）を変えても直接描画と 1 画素も違わないこと。端数帯、バッファ不足、`setAutoClear(false)` | 通過 |
 | `text/` | `drawString` の戻り値が `textWidth` と一致すること、はみ出さないこと、倍角、収録外の文字、背景色つきのセル塗り、透過 | 通過 |
 | `image/` | `pushImage` の配置、四隅の切り取り、クリップとの重なり、transparent 版、画面外 | 通過 |
+| `i2c/` | **I2C + モノクロ OLED**（SSD1306）。ホストの Wire 観測フックで本番の `TinyGFXBusI2C` が流したバイトを拾い、SSD1306 の模型で組み立て直す。`display()` まで転送されないこと、変更のあったページだけ流れること、回転 | 通過 |
+| `u8g2/` | u8g2 形式のデコーダが LGFXFontToolJs の描いた絵と一致すること（ASCII / CJK） | 通過 |
 | `hostbus/` | **本番の Bus 実装**（§2.1）。ソフト SPI とハードウェア SPI が同じ絵を出すこと、ビット順・クロック・モード、アイドル時の CS / DC | 通過 |
 
 **期待画像は持たない。** 「クリップ内 == クリップ無し」「帯を変えても同じ」のような
