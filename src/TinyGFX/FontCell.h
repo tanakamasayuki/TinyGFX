@@ -154,16 +154,35 @@ inline int16_t draw(TinyGFX& g, const void* font, uint16_t ch, int16_t x, int16_
     const uint8_t* src = bm + bmOffset;
     const int16_t gx = (int16_t)(x + (int16_t)((int8_t)CELLFONT_READ_U8(&f->xOffset) * sz));
     int16_t py = (int16_t)(y + (int16_t)((int8_t)CELLFONT_READ_U8(&f->yOffset) * sz));
-    // Rows concatenated into one MSB-first bit stream; rows do not realign to
-    // byte boundaries.
+    // Rows are concatenated into one MSB-first bit stream and do not realign
+    // to byte boundaries. There are two ways to walk it, and which one is
+    // smaller depends on the machine (both measured, same glyphs):
+    //
+    //   - AVR has no barrel shifter and no 32-bit registers, so indexing with
+    //     a bit counter costs a shift by a variable amount on every pixel.
+    //     Eating the stream a byte at a time instead is 162 bytes smaller.
+    //   - RISC-V shifts in one instruction and works in 32-bit registers, so
+    //     the counter is free there and the extra per-pixel branch would cost
+    //     16 bytes on the CH32V003 - the reference board.
+#if defined(__AVR__)
+    uint8_t acc = 0, left = 0;
+#else
     uint32_t bit = 0;
+#endif
     for (uint8_t r = 0; r < gh; ++r) {
       int16_t px = gx;
       uint8_t runStart = 0;
       bool cur = false;
       for (uint8_t c = 0; c < gw; ++c) {
+#if defined(__AVR__)
+        if (left == 0) { acc = CELLFONT_READ_U8(src++); left = 8; }
+        const bool on = (acc & 0x80) != 0;
+        acc = (uint8_t)(acc << 1);
+        --left;
+#else
         const bool on = ((CELLFONT_READ_U8(&src[bit >> 3]) >> (7 - (bit & 7))) & 1) != 0;
         ++bit;
+#endif
         if (c == 0) {
           cur = on;
           continue;
