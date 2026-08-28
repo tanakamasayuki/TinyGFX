@@ -92,6 +92,66 @@ TEST_CASE(test_readback_solid) {
   }
 }
 
+/// **回転が MADCTL に正しく降りているか。** 読み戻しでしか見られない。
+///
+/// 素直に「回転 N のまま描いて回転 N のまま読む」では何も分からない。RAMRD は
+/// 書き込みと同じアドレスカウンタを通るので、MADCTL が間違っていても自己
+/// 無矛盾になって読めてしまう。
+/// Reading in the same rotation you drew in proves nothing: RAMRD goes through
+/// the same address counter as the write, so a wrong MADCTL reads back
+/// consistently wrong.
+///
+/// So: draw in rotation N, then go back to rotation 0 and read. Changing
+/// MADCTL remaps the access order, it does not move what is already in GRAM,
+/// so rotation 0 gives a fixed frame to look at what physically landed where.
+///
+/// Derived from the MADCTL table in PanelILI9342.h (MV transposes, MX flips
+/// the column, MY flips the row), for a 320x240 landscape GRAM:
+///
+///   rotation 0  MADCTL 0        (lx, ly)
+///   rotation 1  MADCTL MV|MX    (W-1-ly, lx)
+///   rotation 2  MADCTL MX|MY    (W-1-lx, H-1-ly)
+///   rotation 3  MADCTL MV|MY    (ly, H-1-lx)
+///
+/// (5, 2) puts the four markers in four different corners, so a marker cannot
+/// be mistaken for another rotation's, and each gets its own colour so a stale
+/// pixel cannot fake a pass.
+///
+/// **What this locks is rotations 1-3 against rotation 0.** Rotation 0 being
+/// the right way up is not something read-back can see - that was checked by
+/// eye once (docs/MANUAL_TEST.ja.md M0).
+TEST_CASE(test_rotation_maps) {
+  static const uint16_t MARK[4] = {TFT_RED, TFT_GREEN, TFT_BLUE, TFT_WHITE};
+  static const int16_t LX = 5, LY = 2;
+  static const int16_t W = 320, H = 240;
+
+  lcd.setRotation(0);
+  lcd.fillScreen(TFT_BLACK);
+  for (uint8_t r = 0; r < 4; ++r) {
+    lcd.setRotation(r);
+    lcd.fillRect(LX, LY, 1, 1, MARK[r]);
+  }
+  lcd.setRotation(0);  // back to the fixed frame
+
+  const uint16_t px[4] = {(uint16_t)LX, (uint16_t)(W - 1 - LY),
+                          (uint16_t)(W - 1 - LX), (uint16_t)LY};
+  const uint16_t py[4] = {(uint16_t)LY, (uint16_t)LX,
+                          (uint16_t)(H - 1 - LY), (uint16_t)(H - 1 - LX)};
+
+  char text[96];
+  int n = 0;
+  for (uint8_t r = 0; r < 4; ++r) {
+    uint16_t got = 0;
+    panel.readPixels(px[r], py[r], 1, 1, &got);
+    ArduTest.reportMetric("rot_found", (long)got);
+    hex2(&text[n], (uint8_t)(got >> 8)); n += 2;
+    hex2(&text[n], (uint8_t)got); n += 2;
+    text[n++] = ' ';
+  }
+  text[n] = 0;
+  ArduTest.attachText("rotation_marks.txt", text);
+}
+
 /// **本命。** 実機の上で共通シーンを描き、そのまま送る。
 ///
 /// 実機のコンパイラ・実機の int 幅・実機の PROGMEM を通った結果が見える。
