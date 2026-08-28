@@ -58,6 +58,7 @@ tests/
   u8g2/               u8g2-format font decoding
   i2c/                I2C + SSD1306 (monochrome, page transfer, dirty pages)
   build_matrix/       examples compile for ch32v003 / uno / esp32 / m5stack (never run)
+  manual/m5stack/     **hardware check sketch.** Not run by pytest (only compiled)
 ```
 
 ## What `linkprune/` checks

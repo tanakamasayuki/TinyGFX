@@ -16,6 +16,7 @@ class TinyGFXBus {
   virtual void writeData(const uint8_t* data, size_t len) { (void)data; (void)len; }  // DC High
   virtual void writeColor(uint16_t color, uint32_t count) { (void)color; (void)count; }
   virtual void writePixels(const uint16_t* data, uint32_t count) { (void)data; (void)count; }
+  virtual void readData(uint8_t* buf, size_t len) { (void)buf; (void)len; }
 
  protected:
   ~TinyGFXBus() = default;  // 非仮想・protected。トリビアルなまま保つ

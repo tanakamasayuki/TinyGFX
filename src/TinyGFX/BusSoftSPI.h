@@ -32,6 +32,10 @@ class TinyGFXBusSoftSPI : public TinyGFXBus {
     if (_cs >= 0) digitalWrite(_cs, HIGH);
   }
 
+  void readData(uint8_t* buf, size_t len) override {
+    (void)buf; (void)len;  // MISO を持たない構成では読めない
+  }
+
   void writeCommand(uint8_t cmd) override {
     digitalWrite(_dc, LOW);
     shiftOutByte(cmd);
