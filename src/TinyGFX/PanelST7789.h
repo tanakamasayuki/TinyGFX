@@ -31,6 +31,9 @@ class TinyGFXPanelST7789 : public TinyGFXPanel {
   void endTransaction() override { _bus->endTransaction(); }
 
   // 仮想にしない（全員が払うほどではない。docs/DECISIONS.ja.md Q7）
+  //
+  // **どれも init()（= lcd.begin()）の後に呼ぶこと。** 前に呼ぶとバスがまだ
+  // 初期化されておらず、通っても init() の初期化列に上書きされる。
   void invertDisplay(bool invert) { cmd(invert ? 0x21 : 0x20); }
   void setSleep(bool sleep) { cmd(sleep ? 0x10 : 0x11); }
   void displayOn(bool on) { cmd(on ? 0x29 : 0x28); }

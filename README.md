@@ -7,16 +7,21 @@
 On a CH32V003 (16 KB flash, 2 KB RAM), **every feature together costs +6.5 KB**.
 Anything you do not call costs nothing at all.
 
-> ### Not yet run on real hardware
+> ### Only one setup has run on real hardware
 >
-> 40 host tests pass, but **this has never driven a physical display.**
-> Init-sequence timing, SPI mode and panel origin offsets can only be confirmed on hardware.
+> **On 2026-08-28 this drove a physical display for the first time**: an M5Stack BASIC
+> (ILI9342C). 40 host tests also pass. But that is **the only configuration confirmed on
+> real glass.**
 >
-> The surest way to try it is **[examples/M5StackBasic](examples/M5StackBasic)** on an
-> M5Stack Core / BASIC - **no wiring at all**. It puts the border, colour order, text
-> orientation and primitives on one screen and prints how to fix each one if it comes out
-> wrong. The procedure is M0 in [docs/MANUAL_TEST.ja.md](docs/MANUAL_TEST.ja.md) (Japanese).
-> The API may still move.
+> | | |
+> | --- | --- |
+> | Confirmed | ILI9342C over hardware SPI (ESP32), primitives, text, rotation 0 |
+> | **Unconfirmed** | **ST7789 / SSD1306 / software SPI / I2C / CH32V003 / rotations 1-3 / tiled rendering** |
+>
+> The surest way to try it is **[examples/M5StackBasic](examples/M5StackBasic)** - **no wiring
+> at all**. It puts the border, colour order, text orientation and primitives on one screen
+> and prints how to fix each one if it comes out wrong. The procedure is M0 in
+> [docs/MANUAL_TEST.ja.md](docs/MANUAL_TEST.ja.md) (Japanese). The API may still move.
 
 ## What makes it different
 
