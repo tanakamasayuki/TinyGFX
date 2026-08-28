@@ -175,12 +175,14 @@ canvas.render(scene);
 **プロジェクトで使う文字だけ**を焼き込める形で出します。
 
 ```sh
-npx lgfx-font build --google "Noto Sans JP" --em 12 \
+npx -p lgfx-font-tool lgfx-font build --google "Noto Sans JP" --em 12 \
     --chars "温度設定完了 23.5℃" --format cellfont --out font.h
 ```
 
-> `node_modules` のあるディレクトリで実行すると npx が 404 を返します。
-> そのときは `npx -p lgfx-font-tool lgfx-font ...` と書いてください。
+> **`npx -p lgfx-font-tool lgfx-font ...` と書いてください。** パッケージ名
+> （`lgfx-font-tool`）とコマンド名（`lgfx-font`）が違うため、素の `npx lgfx-font` は
+> **環境によって 404 になります**（npx のキャッシュや `node_modules` の有無で変わる）。
+> CI もこの形で書いています。
 
 上の 12 文字なら **245 バイト**。使う文字を増やした分だけ増えます。
 
@@ -215,7 +217,8 @@ lcd.drawString("23.5", 8, 8);
 `docs/formats/cellfont.ja.md`。TinyGFX はその描画器の 1 実装です。
 デコーダの大きさは 2 形式でほぼ同じ（684 B / 693 B）なので、選択はデータ量で決まります。
 
-連鎖（`next`）は形式をまたげるので、**半角を CellFont、全角を u8g2**という組み方もできます。
+半角と全角を混ぜたいときは、**その文字集合をまるごと 1 回生成してください。**
+ツールが中で幅クラスに割って、1 つのフォントにまとめます。
 
 ## 入れかた
 

@@ -14,7 +14,7 @@
 #include <TinyGFX/FontCell.h>
 #include <tgfx_digits.h>
 
-static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps, nullptr};
+static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps};
 #include <Wire.h>
 
 static const int W = 128, H = 64;

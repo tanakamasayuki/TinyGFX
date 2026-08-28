@@ -55,7 +55,7 @@ arduino-cli compile --profile m5stack -u -p /dev/ttyUSB0 examples/M5StackBasic
 `lgfxJapanGothic_8` から数字と `:` `.` 空白だけを取り出した 13 字で、**1,743 バイト**。
 
 ```sh
-npx lgfx-font build --font lgfxJapanGothic_8 --sets digits --chars ":. " \
+npx -p lgfx-font-tool lgfx-font build --font lgfxJapanGothic_8 --sets digits --chars ":. " \
     --format cellfont --name tgfxClock --out tgfx_clock.h
 ```
 

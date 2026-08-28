@@ -12,9 +12,9 @@
 #include <tgfx_digits_sparse.h>
 #include <tgfx_digits_chain.h>
 
-static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps, nullptr};
-static const TinyGFXFontRef sparseFont = {&tgfxDigitsSparse, &tinygfxFontCellOps, nullptr};
-static const TinyGFXFontRef chainFont = {&tgfxDigitsChain, &tinygfxFontCellOps, nullptr};
+static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps};
+static const TinyGFXFontRef sparseFont = {&tgfxDigitsSparse, &tinygfxFontCellOps};
+static const TinyGFXFontRef chainFont = {&tgfxDigitsChain, &tinygfxFontCellOps};
 
 static const int W = 64, H = 32;
 static uint16_t gram[W * H];

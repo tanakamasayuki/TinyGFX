@@ -26,7 +26,7 @@
 #include <TinyGFX/FontCell.h>
 #include "tgfx_clock.h"
 
-static const TinyGFXFontRef clockFont = {&tgfxClock, &tinygfxFontCellOps, nullptr};
+static const TinyGFXFontRef clockFont = {&tgfxClock, &tinygfxFontCellOps};
 
 // The built-in LCD of an M5Stack Core / BASIC
 static const int8_t PIN_DC = 27;

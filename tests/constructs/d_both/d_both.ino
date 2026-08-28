@@ -4,11 +4,11 @@
 #include <TinyGFX/FontCell.h>
 #include <tgfx_digits.h>
 
-static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps, nullptr};
+static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps};
 #include <TinyGFX/FontU8g2.h>
 #include <u8g2_ascii.h>
 
-static const TinyGFXFontRef u8g2AsciiFont = {u8g2Ascii_data, &tinygfxFontU8g2Ops, nullptr};
+static const TinyGFXFontRef u8g2AsciiFont = {u8g2Ascii_data, &tinygfxFontU8g2Ops};
 
 TinyGFXBusSoftSPI bus(/*sck*/5, /*mosi*/6, /*dc*/3, /*cs*/4);
 TinyGFXPanelST7789 panel(bus, 240, 240, /*rst*/2);

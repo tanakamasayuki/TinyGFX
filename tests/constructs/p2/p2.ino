@@ -5,7 +5,7 @@
 #include <TinyGFX/FontCell.h>
 #include <tgfx_digits.h>
 
-static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps, nullptr};
+static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps};
 
 TinyGFXBusSoftSPI bus(/*sck*/5, /*mosi*/6, /*dc*/3, /*cs*/4);
 TinyGFXPanelST7789 panel(bus, 240, 240, /*rst*/2);

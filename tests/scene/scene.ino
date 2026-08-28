@@ -10,7 +10,7 @@
 #include <tgfx_scene.h>
 #include <tgfx_digits.h>
 
-static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps, nullptr};
+static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps};
 
 static uint16_t gram[TGFX_SCENE_W * TGFX_SCENE_H];
 TinyGFXBusCapture bus(gram, TGFX_SCENE_W, TGFX_SCENE_H);

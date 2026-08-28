@@ -14,7 +14,7 @@
 #include <TinyGFX/FontCell.h>
 #include "tgfx_clock.h"
 
-static const TinyGFXFontRef clockFont = {&tgfxClock, &tinygfxFontCellOps, nullptr};
+static const TinyGFXFontRef clockFont = {&tgfxClock, &tinygfxFontCellOps};
 
 // Change these to match your wiring
 static const int8_t PIN_SCK = 5;
