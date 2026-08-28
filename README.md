@@ -1,0 +1,216 @@
+# TinyGFX
+
+**A LovyanGFX-flavoured drawing API, cut down until it fits MCUs with very little flash and RAM.**
+
+> 日本語: [README.ja.md](README.ja.md)
+
+On a CH32V003 (16 KB flash, 2 KB RAM), **every feature together costs +6.5 KB**.
+Anything you do not call costs nothing at all.
+
+> ### Not yet run on real hardware
+>
+> 38 host tests pass, but **this has never driven a physical display.**
+> Init-sequence timing, SPI mode and panel origin offsets can only be confirmed on
+> hardware, so if you are about to wire one up, read
+> [docs/MANUAL_TEST.ja.md](docs/MANUAL_TEST.ja.md) (Japanese) first.
+> The API may still move.
+
+## What makes it different
+
+| | |
+| --- | --- |
+| **Unused features cost 0 bytes** | A sketch that only calls `fillScreen` contains no circles and no text. **A test checks this mechanically** |
+| **No framebuffer required** | Drawing streams straight to the panel. Keep one only when you want to (see below) |
+| **No dynamic allocation** | No `malloc`, `new` or `String`. Buffers are supplied by you |
+| **Bus, panel and font format are all swappable** | and **the implementations you do not use are not linked in** |
+| **Decisions are made from measurements** | every design call is backed by a number measured on a CH32V003 (`docs/FOOTPRINT.ja.md`) |
+
+## Getting started
+
+### A colour TFT over SPI (ST7789)
+
+```cpp
+#include <TinyGFX.h>
+#include <TinyGFX/BusSoftSPI.h>
+#include <TinyGFX/PanelST7789.h>
+
+TinyGFXBusSoftSPI  bus(/*sck*/5, /*mosi*/6, /*dc*/3, /*cs*/4);
+TinyGFXPanelST7789 panel(bus, 240, 240, /*rst*/2);
+TinyGFX            lcd(panel);
+
+void setup() {
+  lcd.begin();
+  lcd.setRotation(1);
+  lcd.fillScreen(TFT_BLACK);
+  lcd.fillRect(10, 40, 80, 20, TFT_GREEN);
+}
+void loop() {}
+```
+
+The default bus is **bit-banged SPI**, because the CH32V003 Arduino core ships no SPI
+library at all. Where hardware SPI is available, swap in `<TinyGFX/BusSPI.h>` — the
+drawing code does not change by a single line.
+
+### A monochrome OLED over I2C (SSD1306)
+
+```cpp
+#include <TinyGFX.h>
+#include <TinyGFX/BusI2C.h>
+#include <TinyGFX/PanelSSD1306.h>
+
+static uint8_t fb[128 * 64 / 8];        // 1,024 bytes, supplied by you
+
+TinyGFXBusI2C       bus(/*address*/0x3C);
+TinyGFXPanelSSD1306 panel(bus, fb, 128, 64);
+TinyGFX             lcd(panel);
+
+void setup() {
+  lcd.begin();
+  lcd.fillRect(8, 8, 40, 16, TFT_WHITE);
+  panel.display();                      // nothing reaches the screen until this
+}
+void loop() {}
+```
+
+Monochrome panels differ in exactly two ways: **they need a framebuffer**, and
+**nothing is sent until `display()`** (which transfers only the pages that changed).
+The drawing API is identical; colours collapse to 1bpp as "non-zero lights up".
+
+More in [examples/](examples/).
+
+## What is included
+
+| Kind | Implementation | Header |
+| --- | --- | --- |
+| Bus | Software SPI (default, portable) | `TinyGFX/BusSoftSPI.h` |
+| | Hardware SPI | `TinyGFX/BusSPI.h` |
+| | I2C (Wire) | `TinyGFX/BusI2C.h` |
+| | Command-stream capture (for verification) | `TinyGFX/BusCapture.h` |
+| Panel | ST7789 (colour TFT) | `TinyGFX/PanelST7789.h` |
+| | SSD1306 (monochrome OLED) | `TinyGFX/PanelSSD1306.h` |
+| | RAM buffer (tests, tiled rendering) | `TinyGFX/PanelMemory.h` |
+| Font | TinyFont (own format, for H≤16) | `TinyGFX/FontTiny.h` |
+| | u8g2 | `TinyGFX/FontU8g2.h` |
+| Extras | Tiled rendering (flicker-free) | `TinyGFX/TileCanvas.h` |
+| | `print` / `printf` / float | `TinyGFX/Print.h` |
+
+**What you do not include is not linked in** — buses, panels and font formats alike.
+
+## What it draws
+
+```
+drawPixel  drawFastHLine  drawFastVLine  drawLine  drawRect  fillRect  fillScreen  clear
+drawCircle  fillCircle  drawRoundRect  fillRoundRect  drawTriangle  fillTriangle
+pushImage (with a transparent variant)  setAddrWindow  writeColor  writePixels
+setClipRect  setRotation  startWrite / endWrite
+setFont  setCursor  setTextColor  setTextSize  drawChar  drawString  textWidth  fontHeight
+```
+
+Names follow LovyanGFX wherever the name was the only thing at stake.
+**This is not a compatibility layer.**
+
+## Footprint (CH32V003, `-Os`, measured)
+
+An empty sketch is 5,892 bytes on this core, so the budget is tracked as the
+**increment over that**.
+
+| Cumulative | Δ flash | Δ RAM |
+| --- | --- | --- |
+| Bus + panel + `fillScreen` | +1,712 | +68 |
+| + rectangles, pixels, H/V lines | +1,988 | +68 |
+| + every primitive (lines, circles, rounded, triangles) | +4,880 | +68 |
+| + text | +5,916 | +68 |
+| **+ `pushImage` (everything)** | **+6,536** | **+68** |
+| + tiled rendering (240px × 1 row) | +7,524 | +624 |
+| + `print` / `println` (no float) | +6,200 | +80 |
+| + `println(float)` | **does not fit** (~ +8,650) | — |
+
+That last row is a measurement, not a policy: float formatting alone eats more than half
+of the CH32V003's flash. **It is not forbidden** — pull in `TinyGFX/Print.h` and it works;
+skip it and you pay nothing.
+
+Confirmed targets: **CH32V003** (the reference board), **Arduino Uno R3**, **ESP32**.
+Everything else is in `docs/FOOTPRINT.ja.md`.
+
+## Flicker
+
+With no framebuffer, clearing before drawing flickers. A full one is 115 KB at
+240x240 RGB565 and simply does not fit, so instead the screen is **split into horizontal
+bands, each rendered into a small RAM buffer and then pushed**.
+
+```cpp
+static uint16_t band[240 * 2];          // width × rows × 2 bytes
+TinyGFXTileCanvas canvas(panel, band, sizeof(band) / sizeof(band[0]));
+
+static void scene(TinyGFX& g, void* ctx) {   // called once per band
+  g.fillCircle(120, 120, 40, TFT_CYAN);      // coordinates are full-screen
+}
+canvas.render(scene);
+```
+
+The RAM cost is **width × rows × 2 bytes** and nothing else (240px × 1 row = 480 bytes).
+**Changing the row count does not change a single pixel** — a test enforces that.
+
+## Fonts
+
+**The library bundles no font data at all.** Fonts live in your sketch.
+
+Generation is expected to go through
+[LGFXFontToolJs](https://www.npmjs.com/package/lgfx-font-tool). Two formats are supported,
+and **the decoder for the one you do not use is not linked in**.
+
+| Format | Suited to |
+| --- | --- |
+| **TinyFont** (`FontTiny.h`) | pixel-grid fonts **16 pixels tall or less** |
+| u8g2 (`FontU8g2.h`) | taller than that, where RLE and per-glyph bboxes start to pay |
+
+H≈16 is where three independent mechanisms flip at once — that boundary is measured, not
+chosen (`docs/FONT_FORMAT.ja.md`). Font chaining (`next`) crosses formats, so **Latin in
+TinyFont and CJK in u8g2** is a valid combination.
+
+## Installing
+
+Not in the Arduino Library Manager yet (unreleased). For now, drop a ZIP or a clone into
+your `libraries/` folder.
+
+```cpp
+#include <TinyGFX.h>
+#include <TinyGFX/BusSoftSPI.h>     // the bus you use
+#include <TinyGFX/PanelST7789.h>    // the panel you use
+```
+
+## Documentation
+
+The design record is Japanese only; [docs/README.ja.md](docs/README.ja.md) is the index.
+
+| To read about | Document |
+| --- | --- |
+| What the library is for, and where its responsibility ends | [docs/REQUIREMENTS.ja.md](docs/REQUIREMENTS.ja.md) |
+| The API shape and internal structure | [docs/CORE_DESIGN.ja.md](docs/CORE_DESIGN.ja.md) |
+| **Why it is built this way (reasons, and the options not taken)** | [docs/DECISIONS.ja.md](docs/DECISIONS.ja.md) |
+| Flash and RAM budgets, and the measurements | [docs/FOOTPRINT.ja.md](docs/FOOTPRINT.ja.md) |
+| The TinyFont format and the numbers behind it | [docs/FONT_FORMAT.ja.md](docs/FONT_FORMAT.ja.md) |
+| Test strategy | [docs/TEST_PLAN.ja.md](docs/TEST_PLAN.ja.md) |
+| **What to check on real hardware** | [docs/MANUAL_TEST.ja.md](docs/MANUAL_TEST.ja.md) |
+| Where the project stands and what is left | [docs/DEVELOPMENT_PLAN.ja.md](docs/DEVELOPMENT_PLAN.ja.md) |
+
+## Tests
+
+```sh
+cd tests && uv sync && uv run pytest -v -s
+```
+
+No hardware needed: everything either runs on the host core or just builds and inspects
+size and symbols. Details in [tests/README.md](tests/README.md).
+
+Of the 38, the characteristic ones:
+
+- **`linkprune/`** — `nm` proves that unused features and unused font formats are absent from the final binary
+- **`footprint/`** — per-configuration increments stay within budget, and **the numbers are always printed**
+- **`tile/`** — changing the band height must not change a single pixel
+- **`hostbus/`** — captures what the real SPI bus actually put on the wire and turns it back into an image
+- **`i2c/`** — the same, over I2C to an SSD1306
+
+## License
+
+MIT — see [LICENSE](LICENSE).

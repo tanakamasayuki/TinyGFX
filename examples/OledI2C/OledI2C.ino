@@ -10,7 +10,6 @@
 #include <TinyGFX.h>
 #include <TinyGFX/BusI2C.h>
 #include <TinyGFX/PanelSSD1306.h>
-#include <TinyGFX/FontTiny.h>
 
 #include "tinygfx_font5x7.h"
 
