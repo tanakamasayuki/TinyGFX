@@ -19,6 +19,14 @@
 #pragma once
 #include <stdint.h>
 
+// Fill whole bytes when a rectangle covers a page, instead of setting one bit
+// at a time. Costs 512 bytes of flash on a CH32V003 and saves roughly 6ms of
+// the ~30ms it takes to clear and push a 128x64 frame - the I2C transfer is
+// the bigger half and this does not touch it. Set to 0 to get the flash back.
+#ifndef TINYGFX_MONO_FAST_FILL
+#define TINYGFX_MONO_FAST_FILL 1
+#endif
+
 #include "Panel.h"
 
 class TinyGFXPanelSSD1306 : public TinyGFXPanel {
@@ -44,6 +52,18 @@ class TinyGFXPanelSSD1306 : public TinyGFXPanel {
   }
   void writeColor(uint16_t color, uint32_t count) override {
     const bool on = (color != 0);
+    // A solid fill of the whole window is the common case - fillRect,
+    // fillScreen, every glyph run, the background cell behind text. Painting
+    // it a bit at a time is wasteful when eight vertical pixels share a byte,
+    // so fill whole bytes wherever a page is fully covered.
+#if TINYGFX_MONO_FAST_FILL
+    if (_cx == _xs && _cy == _ys && count == windowPixels()) {
+      fillWindow(on);
+      _cx = _xs;
+      _cy = (uint16_t)(_ye + 1);  // the window is spent
+      return;
+    }
+#endif
     while (count--) put(on);
   }
   void writePixels(const uint16_t* data, uint32_t count) override {
@@ -66,6 +86,63 @@ class TinyGFXPanelSSD1306 : public TinyGFXPanel {
  private:
   void cmd(uint8_t c) { _bus->writeCommand(c); }
 
+#if TINYGFX_MONO_FAST_FILL
+  uint32_t windowPixels() const {
+    if (_xe < _xs || _ye < _ys) return 0;
+    return (uint32_t)(_xe - _xs + 1) * (uint32_t)(_ye - _ys + 1);
+  }
+
+  /// Paint the whole current window one colour, a byte at a time.
+  ///
+  /// Whatever the rotation, an axis-aligned logical rectangle is still an
+  /// axis-aligned rectangle in the buffer, so map the two corners and fill
+  /// that. Within a page the covered rows become one mask, and every column
+  /// in the run shares it.
+  void fillWindow(bool on) {
+    int16_t ax, ay, bx, by;
+    toBuffer((int16_t)_xs, (int16_t)_ys, &ax, &ay);
+    toBuffer((int16_t)_xe, (int16_t)_ye, &bx, &by);
+    if (ax > bx) { const int16_t t = ax; ax = bx; bx = t; }
+    if (ay > by) { const int16_t t = ay; ay = by; by = t; }
+    if (ax < 0) ax = 0;
+    if (ay < 0) ay = 0;
+    if (bx > (int16_t)(_natW - 1)) bx = (int16_t)(_natW - 1);
+    if (by > (int16_t)(_natH - 1)) by = (int16_t)(_natH - 1);
+    if (ax > bx || ay > by) return;
+
+    for (int16_t y = ay; y <= by;) {
+      const int16_t page = (int16_t)(y >> 3);
+      const int16_t pageTop = (int16_t)(page << 3);
+      const int16_t lo = (int16_t)(y - pageTop);
+      int16_t hi = (int16_t)(by - pageTop);
+      if (hi > 7) hi = 7;
+      uint8_t mask = 0;
+      for (int16_t b = lo; b <= hi; ++b) mask = (uint8_t)(mask | (uint8_t)(1u << b));
+      uint8_t* row = &_buf[(int32_t)page * _natW];
+      if (on) {
+        for (int16_t x = ax; x <= bx; ++x) row[x] = (uint8_t)(row[x] | mask);
+      } else {
+        const uint8_t clear = (uint8_t)~mask;
+        for (int16_t x = ax; x <= bx; ++x) row[x] = (uint8_t)(row[x] & clear);
+      }
+      if (page < _dirtyLo) _dirtyLo = page;
+      if (page > _dirtyHi) _dirtyHi = page;
+      y = (int16_t)(pageTop + 8);
+    }
+  }
+
+#endif  // TINYGFX_MONO_FAST_FILL
+
+  /// Logical coordinates to buffer coordinates. Rotation lives here.
+  void toBuffer(int16_t x, int16_t y, int16_t* fx, int16_t* fy) const {
+    switch (_rotation) {
+      case 1:  *fx = y;                        *fy = (int16_t)(_natH - 1 - x); break;
+      case 2:  *fx = (int16_t)(_natW - 1 - x); *fy = (int16_t)(_natH - 1 - y); break;
+      case 3:  *fx = (int16_t)(_natW - 1 - y); *fy = x;                        break;
+      default: *fx = x;                        *fy = y;                        break;
+    }
+  }
+
   /// Logical coordinates to a bit in the buffer. Out-of-range writes are dropped.
   void put(bool on) {
     int16_t x = (int16_t)_cx, y = (int16_t)_cy;
@@ -74,12 +151,7 @@ class TinyGFXPanelSSD1306 : public TinyGFXPanel {
     if (x < 0 || y < 0 || x >= _width || y >= _height) return;
 
     int16_t fx, fy;
-    switch (_rotation) {
-      case 1:  fx = y;                       fy = (int16_t)(_natH - 1 - x); break;
-      case 2:  fx = (int16_t)(_natW - 1 - x); fy = (int16_t)(_natH - 1 - y); break;
-      case 3:  fx = (int16_t)(_natW - 1 - y); fy = x;                       break;
-      default: fx = x;                       fy = y;                        break;
-    }
+    toBuffer(x, y, &fx, &fy);
     const int16_t page = (int16_t)(fy >> 3);
     uint8_t* slot = &_buf[(int32_t)page * _natW + fx];
     const uint8_t mask = (uint8_t)(1u << (fy & 7));

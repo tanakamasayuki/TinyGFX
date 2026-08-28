@@ -64,3 +64,8 @@ def test_i2c(dut):
     rot = tc.image(SKETCH, "rot1").load()
     assert rot[0, 63] == WHITE and rot[23, 56] == WHITE, "回転後の矩形の位置が違う"
     assert rot[24, 63] == BLACK and rot[0, 55] == BLACK, "回転後の矩形がはみ出している"
+
+    # 速い経路（バイト単位の塗り）が 1 画素ずつ描いた結果と一致すること。
+    # 6 種類の矩形 x 回転 4 通り。**速いだけで絵が変わってはいけない。**
+    assert r["fillrect_fastpath_diff"] == 0, (
+        f"fillRect の速い経路で {r['fillrect_fastpath_diff']} バイト違う")
