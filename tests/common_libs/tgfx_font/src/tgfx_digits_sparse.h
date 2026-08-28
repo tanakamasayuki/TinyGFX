@@ -17,6 +17,9 @@
 // Glyphs   : 11
 // Data     : 109 bytes
 // Coverage : U+0030-U+0039, U+2103
+// 
+// Rebuild with:
+//   npx lgfx-font build --font lgfxJapanGothic_8 --chars ℃ --sets digits --format cellfont --name tgfxDigitsSparse --max-chain 1 --out tests/common_libs/tgfx_font/src/tgfx_digits_sparse.h
 
 #pragma once
 #include <stdint.h>
