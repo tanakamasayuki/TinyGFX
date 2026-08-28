@@ -22,7 +22,10 @@
 #include <TinyGFX/BusSPI.h>
 #include <TinyGFX/PanelILI9342.h>
 
+#include <TinyGFX/FontCell.h>
 #include "tinygfx_font5x7.h"
+
+static const TinyGFXFontRef font5x7 = {&tinygfxFont5x7, &tinygfxFontCellOps, nullptr};
 
 // M5Stack Core / BASIC の内蔵 LCD
 static const int8_t PIN_DC = 27;
@@ -73,7 +76,7 @@ void setup()
   lcd.fillRect((int16_t)(4 + bar * 2), 12, bar, 40, TFT_BLUE);
 
   // 3. 向き。鏡像・上下逆なら数字を見ればすぐ分かる
-  lcd.setFont(&tinygfxFont5x7);
+  lcd.setFont(&font5x7);
   lcd.setTextColor(TFT_WHITE);
   lcd.setTextSize(3);
   const char *digits = "0123456789";

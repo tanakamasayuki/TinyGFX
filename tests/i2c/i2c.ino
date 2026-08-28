@@ -11,7 +11,10 @@
 #include <TinyGFX/BusI2C.h>
 #include <TinyGFX/PanelSSD1306.h>
 #include <tgfx_test.h>
+#include <TinyGFX/FontCell.h>
 #include <tinygfx_font5x7.h>
+
+static const TinyGFXFontRef font5x7 = {&tinygfxFont5x7, &tinygfxFontCellOps, nullptr};
 #include <Wire.h>
 
 static const int W = 128, H = 64;
@@ -106,7 +109,7 @@ void setup() {
   lcd.drawRect(0, 0, W, H, TFT_WHITE);
   lcd.drawLine(0, 0, W - 1, H - 1, TFT_WHITE);
   lcd.fillCircle(96, 32, 12, TFT_WHITE);
-  lcd.setFont(&tinygfxFont5x7);
+  lcd.setFont(&font5x7);
   lcd.setTextColor(TFT_WHITE);
   lcd.drawString("12:34", 8, 24);
   panel.display();

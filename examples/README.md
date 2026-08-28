@@ -52,10 +52,17 @@ Every example declares its pins at the top. Change them to match your board.
 stopgap 5x7 face covering only `0x20`-`0x3F`. Real fonts are generated with
 [LGFXFontToolJs](https://www.npmjs.com/package/lgfx-font-tool).
 
-The formats are TinyGFX's own **TinyFont** and **u8g2**
-([../docs/FONT_FORMAT.ja.md](../docs/FONT_FORMAT.ja.md), Japanese). The bitmap layout matches
-GFXfont, so existing Adafruit faces can be **converted** by the tool - but the struct itself
-cannot be handed to `setFont()` as is. Decoders for formats you do not use are not linked in.
+The formats are **CellFont** (an external spec, v1) and **u8g2**. Decoders for formats you do
+not use are not linked in.
+
+A generated header is **plain CellFont**, so wrap it in one line to hand it to `setFont()`:
+
+```cpp
+#include <TinyGFX/FontCell.h>
+#include "font.h"
+
+static const TinyGFXFontRef myFont = {&Name, &tinygfxFontCellOps, nullptr};
+```
 
 **On AVR the font must be in PROGMEM**, otherwise it eats RAM and renders as garbage.
 

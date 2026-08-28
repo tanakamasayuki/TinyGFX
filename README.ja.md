@@ -10,7 +10,7 @@ CH32V003（フラッシュ 16KB / RAM 2KB）で、**全機能を使っても +6.
 > ### 実機で動いたのは M5Stack だけです
 >
 > **2026-08-28、M5Stack BASIC（ILI9342C）で初めて実機に絵が出ました。** ホスト上のテストも
-> 40 本通っています。ただし**実物のディスプレイで確かめたのはこの 1 構成だけ**です。
+> 41 本通っています。ただし**実物のディスプレイで確かめたのはこの 1 構成だけ**です。
 >
 > | | |
 > | --- | --- |
@@ -97,7 +97,7 @@ void loop() {}
 | | ILI9342C（M5Stack Core / BASIC） | `TinyGFX/PanelILI9342.h` |
 | | SSD1306（モノクロ OLED） | `TinyGFX/PanelSSD1306.h` |
 | | RAM バッファ（テスト・帯用） | `TinyGFX/PanelMemory.h` |
-| フォント | TinyFont（H≤16 向けの独自形式） | `TinyGFX/FontTiny.h` |
+| フォント | CellFont（H≤16 向けの外部仕様 v1） | `TinyGFX/FontCell.h` |
 | | u8g2 | `TinyGFX/FontU8g2.h` |
 | 拡張 | 帯レンダリング（ちらつき対策） | `TinyGFX/TileCanvas.h` |
 | | `print` / `printf` / float | `TinyGFX/Print.h` |
@@ -166,11 +166,15 @@ canvas.render(scene);
 
 | 形式 | 向き |
 | --- | --- |
-| **TinyFont**（`FontTiny.h`） | **高さ 16 画素以下**のピクセルグリッドフォント |
-| u8g2（`FontU8g2.h`） | 16 画素超。RLE とグリフごとの bbox が効き始める帯 |
+| **CellFont**（`FontCell.h`） | **高さ 16 画素以下**、または**字数が少ない**もの |
+| u8g2（`FontU8g2.h`） | 16 画素超**かつ字数が多い**帯。RLE と bbox が効きます |
 
-境界が H≈16 なのは実測上の変曲点だからです（[docs/FONT_FORMAT.ja.md](docs/FONT_FORMAT.ja.md)）。
-連鎖（`next`）は形式をまたげるので、**半角を TinyFont、全角を u8g2**という組み方もできます。
+**CellFont の仕様は TinyGFX の外にあります** —
+[LGFXFontToolJs](https://github.com/tanakamasayuki/LGFXFontToolJs) の
+`docs/formats/cellfont.ja.md`。TinyGFX はその描画器の 1 実装です。
+デコーダの大きさは 2 形式でほぼ同じ（684 B / 693 B）なので、選択はデータ量で決まります。
+
+連鎖（`next`）は形式をまたげるので、**半角を CellFont、全角を u8g2**という組み方もできます。
 
 ## 入れかた
 
@@ -193,7 +197,7 @@ Arduino IDE のライブラリマネージャからはまだ入りません（�
 | API の形と内部構造 | [docs/CORE_DESIGN.ja.md](docs/CORE_DESIGN.ja.md) |
 | **なぜそう設計したのか（理由と、採らなかった案）** | [docs/DECISIONS.ja.md](docs/DECISIONS.ja.md) |
 | フラッシュ・RAM の予算と実測 | [docs/FOOTPRINT.ja.md](docs/FOOTPRINT.ja.md) |
-| フォント形式 TinyFont の定義と実測 | [docs/FONT_FORMAT.ja.md](docs/FONT_FORMAT.ja.md) |
+| フォントまわりの実測（形式そのものは外部仕様） | [docs/FONT_FORMAT.ja.md](docs/FONT_FORMAT.ja.md) |
 | テストの方針 | [docs/TEST_PLAN.ja.md](docs/TEST_PLAN.ja.md) |
 | **実機で何を確かめるか** | [docs/MANUAL_TEST.ja.md](docs/MANUAL_TEST.ja.md) |
 | 現在地と残作業 | [docs/DEVELOPMENT_PLAN.ja.md](docs/DEVELOPMENT_PLAN.ja.md) |
@@ -207,13 +211,14 @@ cd tests && uv sync && uv run pytest -v -s
 実機は要りません。ホスト実行と、ビルドしてサイズ・シンボルを見るだけのテストです。
 詳細は [tests/README.ja.md](tests/README.ja.md)。
 
-40 本のうち特徴的なもの:
+41 本のうち特徴的なもの:
 
 - **`linkprune/`** — 使っていない機能・フォント形式が最終バイナリに残っていないことを `nm` で検査
 - **`footprint/`** — 構成ごとの増分が予算内か。**数字は常に出します**
 - **`tile/`** — 帯の行数を変えても直接描画と 1 画素も違わないこと
 - **`hostbus/`** — 本番の SPI バスが実際に流したバイトを拾って画に戻す
 - **`i2c/`** — 同じことを I2C + SSD1306 で
+- **`fontchain/`** — 前段のフォントに豆腐があっても後段の字が出ること（**わざと壊して落ちることを確認済み**）
 - **`ili9342/`** — MADCTL・色順・ミラーの組み立て（**表が実機で正しいかは M0 で確かめます**）
 
 ## ライセンス

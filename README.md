@@ -10,7 +10,7 @@ Anything you do not call costs nothing at all.
 > ### Only one setup has run on real hardware
 >
 > **On 2026-08-28 this drove a physical display for the first time**: an M5Stack BASIC
-> (ILI9342C). 40 host tests also pass. But that is **the only configuration confirmed on
+> (ILI9342C). 41 host tests also pass. But that is **the only configuration confirmed on
 > real glass.**
 >
 > | | |
@@ -98,7 +98,7 @@ More in [examples/](examples/).
 | | ILI9342C (M5Stack Core / BASIC) | `TinyGFX/PanelILI9342.h` |
 | | SSD1306 (monochrome OLED) | `TinyGFX/PanelSSD1306.h` |
 | | RAM buffer (tests, tiled rendering) | `TinyGFX/PanelMemory.h` |
-| Font | TinyFont (own format, for H≤16) | `TinyGFX/FontTiny.h` |
+| Font | CellFont (external spec v1, for H≤16) | `TinyGFX/FontCell.h` |
 | | u8g2 | `TinyGFX/FontU8g2.h` |
 | Extras | Tiled rendering (flicker-free) | `TinyGFX/TileCanvas.h` |
 | | `print` / `printf` / float | `TinyGFX/Print.h` |
@@ -170,12 +170,14 @@ and **the decoder for the one you do not use is not linked in**.
 
 | Format | Suited to |
 | --- | --- |
-| **TinyFont** (`FontTiny.h`) | pixel-grid fonts **16 pixels tall or less** |
-| u8g2 (`FontU8g2.h`) | taller than that, where RLE and per-glyph bboxes start to pay |
+| **CellFont** (`FontCell.h`) | pixel-grid fonts **16 pixels tall or less**, or **few glyphs** |
+| u8g2 (`FontU8g2.h`) | taller than that **and many glyphs**, where RLE and per-glyph bboxes pay |
 
-H≈16 is where three independent mechanisms flip at once — that boundary is measured, not
-chosen (`docs/FONT_FORMAT.ja.md`). Font chaining (`next`) crosses formats, so **Latin in
-TinyFont and CJK in u8g2** is a valid combination.
+**The CellFont format is specified outside TinyGFX** — see `docs/formats/cellfont.ja.md` in
+[LGFXFontToolJs](https://github.com/tanakamasayuki/LGFXFontToolJs). TinyGFX is one renderer
+for it. The two decoders are nearly the same size (684 B and 693 B), so the choice comes
+down to data. Font chaining (`next`) crosses formats, so **Latin in CellFont and CJK in
+u8g2** is a valid combination.
 
 ## Installing
 
@@ -198,7 +200,7 @@ The design record is Japanese only; [docs/README.ja.md](docs/README.ja.md) is th
 | The API shape and internal structure | [docs/CORE_DESIGN.ja.md](docs/CORE_DESIGN.ja.md) |
 | **Why it is built this way (reasons, and the options not taken)** | [docs/DECISIONS.ja.md](docs/DECISIONS.ja.md) |
 | Flash and RAM budgets, and the measurements | [docs/FOOTPRINT.ja.md](docs/FOOTPRINT.ja.md) |
-| The TinyFont format and the numbers behind it | [docs/FONT_FORMAT.ja.md](docs/FONT_FORMAT.ja.md) |
+| Font measurements (the format itself is specified elsewhere) | [docs/FONT_FORMAT.ja.md](docs/FONT_FORMAT.ja.md) |
 | Test strategy | [docs/TEST_PLAN.ja.md](docs/TEST_PLAN.ja.md) |
 | **What to check on real hardware** | [docs/MANUAL_TEST.ja.md](docs/MANUAL_TEST.ja.md) |
 | Where the project stands and what is left | [docs/DEVELOPMENT_PLAN.ja.md](docs/DEVELOPMENT_PLAN.ja.md) |
@@ -212,13 +214,14 @@ cd tests && uv sync && uv run pytest -v -s
 No hardware needed: everything either runs on the host core or just builds and inspects
 size and symbols. Details in [tests/README.md](tests/README.md).
 
-Of the 40, the characteristic ones:
+Of the 41, the characteristic ones:
 
 - **`linkprune/`** — `nm` proves that unused features and unused font formats are absent from the final binary
 - **`footprint/`** — per-configuration increments stay within budget, and **the numbers are always printed**
 - **`tile/`** — changing the band height must not change a single pixel
 - **`hostbus/`** — captures what the real SPI bus actually put on the wire and turns it back into an image
 - **`i2c/`** — the same, over I2C to an SSD1306
+- **`fontchain/`** — a font later in the chain is still reachable past an earlier notdef (**verified by deliberately breaking it**)
 - **`ili9342/`** — MADCTL, colour order and mirroring (**whether the table is right on real
   glass is what M0 checks**)
 

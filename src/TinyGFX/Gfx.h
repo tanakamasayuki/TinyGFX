@@ -12,6 +12,11 @@
 #include "Panel.h"
 
 
+/// 収録外の字に使う退避先（REPLACEMENT CHARACTER）。
+/// 豆腐を出すかどうかは**フォントに U+FFFD を入れるかどうか**で決まる。
+/// コアは独自の既定の箱を持たない（CellFont 仕様 §7.2）。
+#define TINYGFX_NOTDEF 0xFFFDu
+
 class TinyGFX {
  public:
   explicit TinyGFX(TinyGFXPanel& panel) : _panel(&panel) {}
@@ -339,8 +344,17 @@ class TinyGFX {
   bool hasTextBg() const { return _textHasBg; }
 
   int16_t fontHeight() const {
-    if (_font == nullptr) return 0;
-    return (int16_t)((uint16_t)_font->ops->lineHeight(_font->data) * _textSize);
+    return (int16_t)((uint16_t)getTextLineHeight() * _textSize);
+  }
+
+  // デコーダが読む行のメトリクス。**連鎖の先頭のものだけを使う。**
+  // 連鎖する各フォントは高さも yOffset も別々でよいが、ベースラインは共通なので、
+  // ここを各フォントの値にすると段組みと背景セルがずれる。
+  uint8_t getTextLineHeight() const {
+    return (_font == nullptr) ? 0 : _font->ops->lineHeight(_font->data);
+  }
+  int16_t getTextAscent() const {
+    return (_font == nullptr) ? 0 : _font->ops->ascent(_font->data);
   }
 
   int16_t textWidth(const char* str) const {
@@ -353,13 +367,18 @@ class TinyGFX {
     return total;
   }
 
-  /// 1 文字描く。y は行の上端。戻り値は送り幅（倍率込み）。収録外は 0。
+  /// 1 文字描く。**y は行の上端。** 戻り値は送り幅（倍率込み）。
+  ///
+  /// 収録外なら U+FFFD（豆腐）へ退避する。**退避は連鎖を全部引き終えてから**
+  /// 1 度だけ行う（CellFont 仕様 §7.2 / §15.2）。フォントごとに退避すると、
+  /// 1 本目の豆腐が 2 本目に載っている字を潰す。
+  /// 豆腐も無ければ 0 を返す（何も描かず、ペンを進めない）。
   int16_t drawChar(uint16_t ch, int16_t x, int16_t y) {
-    for (const TinyGFXFontRef* f = _font; f != nullptr; f = f->next) {
-      const int16_t a = f->ops->draw(*this, f->data, ch, x, y);
-      if (a >= 0) return (int16_t)(a * _textSize);
-    }
-    return 0;
+    if (_font == nullptr) return 0;
+    const int16_t base = (int16_t)(y + (int16_t)(getTextAscent() * _textSize));
+    int16_t a = drawIn(ch, x, base);
+    if (a < 0 && ch != TINYGFX_NOTDEF) a = drawIn(TINYGFX_NOTDEF, x, base);
+    return (a < 0) ? 0 : (int16_t)(a * _textSize);
   }
 
   /// 文字列を描く。戻り値は描いた幅。改行は解釈しない。
@@ -375,11 +394,27 @@ class TinyGFX {
   }
 
  protected:
-  /// 送り幅（倍率込み）。収録外は -1。
+  /// 連鎖を引いて 1 文字描く。**退避はしない。** 収録外は -1。
+  int16_t drawIn(uint16_t ch, int16_t x, int16_t base) {
+    for (const TinyGFXFontRef* f = _font; f != nullptr; f = f->next) {
+      const int16_t a = f->ops->draw(*this, f->data, ch, x, base);
+      if (a >= 0) return a;
+    }
+    return -1;
+  }
+
+  /// 送り幅（倍率込み）。収録外は U+FFFD へ退避し、それも無ければ -1。
+  /// **drawChar と同じ退避をする**（textWidth と描いた幅がずれないように）。
   int16_t advanceOf(uint16_t ch) const {
+    int16_t a = advanceIn(ch);
+    if (a < 0 && ch != TINYGFX_NOTDEF) a = advanceIn(TINYGFX_NOTDEF);
+    return (a < 0) ? -1 : (int16_t)(a * _textSize);
+  }
+
+  int16_t advanceIn(uint16_t ch) const {
     for (const TinyGFXFontRef* f = _font; f != nullptr; f = f->next) {
       const int16_t a = f->ops->advance(f->data, ch);
-      if (a >= 0) return (int16_t)(a * _textSize);
+      if (a >= 0) return a;
     }
     return -1;
   }

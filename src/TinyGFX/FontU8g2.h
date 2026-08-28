@@ -1,10 +1,10 @@
 // TinyGFX - u8g2 形式のフォント
 //
-// **高さ 16 画素を超えるフォントはこちらのほうが小さい。**
+// **高さ 16 画素を超えて、かつ収録字数が多いフォントはこちらのほうが小さい。**
 // RLE とグリフごとの bbox が効き始めるため（docs/FONT_FORMAT.ja.md §0）。
-// H≤16 のピクセルグリッドフォントなら TinyFont（FontTiny.h）のほうが小さい。
+// H≤16 なら、字数が少なければ H>16 でも CellFont（FontCell.h）のほうが小さい。
 //
-// デコーダのコード量は TinyFont とほぼ同じ（693 B vs 684 B、実測）。
+// デコーダのコード量は CellFont とほぼ同じ（693 B vs 684 B、実測）。
 // **include しなければ 1 バイトもリンクされない。**
 //
 // 正しさは LGFXFontToolJs が描いた絵との一致で確認している（tests/u8g2/）。
@@ -99,6 +99,12 @@ inline uint8_t lineHeight(const void* font) {
   return (uint8_t)(f.ascentPara() - f.descentPara());
 }
 
+/// ベースラインから行の箱の上端まで。u8g2 の ascent_para。
+inline int16_t ascent(const void* font) {
+  const TinyGFXFontU8g2 f = {(const uint8_t*)font};
+  return (int16_t)f.ascentPara();
+}
+
 /// 描かずに送り幅だけ返す。収録外は -1。
 inline int16_t advance(const void* font, uint16_t ch) {
   const TinyGFXFontU8g2 f = {(const uint8_t*)font};
@@ -112,7 +118,7 @@ inline int16_t advance(const void* font, uint16_t ch) {
   return (int16_t)bits.getSigned(f.bitsD());
 }
 
-/// 1 文字描く。**y は行の上端**（TinyFont と揃えてある。u8g2 本来のベースライン基準ではない）。
+/// 1 文字描く。**y はベースライン**（u8g2 本来の基準と同じ）。
 /// 戻り値は送り幅（倍率をかける前）。収録外は -1。
 inline int16_t draw(TinyGFX& g, const void* font, uint16_t ch, int16_t x, int16_t y) {
   const TinyGFXFontU8g2 f = {(const uint8_t*)font};
@@ -128,14 +134,15 @@ inline int16_t draw(TinyGFX& g, const void* font, uint16_t ch, int16_t x, int16_
 
   const uint8_t sz = g.getTextSize();
   if (g.hasTextBg()) {
-    g.fillRect(x, y, (int16_t)((int16_t)adv * sz),
-               (int16_t)((uint16_t)lineHeight(font) * sz), g.getTextBgColor());
+    // 行の箱は**連鎖先頭のメトリクス**で決める（フォントごとに変えると段がずれる）
+    const int16_t cellTop = (int16_t)(y - (int16_t)(g.getTextAscent() * sz));
+    g.fillRect(x, cellTop, (int16_t)((int16_t)adv * sz),
+               (int16_t)((uint16_t)g.getTextLineHeight() * sz), g.getTextBgColor());
   }
   if (gw == 0 || gh == 0) return (int16_t)adv;
 
-  const int16_t baseline = (int16_t)(y + (int16_t)(f.ascentPara() * sz));
   const int16_t left = (int16_t)(x + (int16_t)(gx * sz));
-  const int16_t top = (int16_t)(baseline - (int16_t)((gh + gy) * sz));
+  const int16_t top = (int16_t)(y - (int16_t)((gh + gy) * sz));
   const uint8_t b0 = f.bitsPer0();
   const uint8_t b1 = f.bitsPer1();
   const uint16_t fg = g.getTextColor();
@@ -177,4 +184,5 @@ static const TinyGFXFontOps tinygfxFontU8g2Ops = {
     &tinygfx_u8g2::draw,
     &tinygfx_u8g2::advance,
     &tinygfx_u8g2::lineHeight,
+    &tinygfx_u8g2::ascent,
 };

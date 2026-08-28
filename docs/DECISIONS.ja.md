@@ -167,20 +167,45 @@ LGFXVirtualCanvas と同じ帯レンダリングを最初から入れる。た�
 
 **制約**: 描画コールバックは帯の数だけ呼ばれる。重い前処理をコールバックに書くとその回数だけ走る。
 
-### D17. フォント形式は独自の TinyFont。データはライブラリに同梱しない
+### D17. フォント形式は CellFont。**形式の仕様は TinyGFX の外に置く**
 
-**2026-08-27 改訂。** 当初は GFXfont（Adafruit 互換）をそのまま食う形にしていたが、
-実測して **TinyFont という独自形式に変えた**。形式の定義と数字は
-[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md)。
+**2026-08-28 再改訂。GFXfont → TinyFont（独自）→ CellFont（外部仕様）と 2 度動いた。**
+
+| 日付 | 形式 | 何が変わったか |
+| --- | --- | --- |
+| 2026-08-26 | GFXfont | 既存資産をそのまま食う案 |
+| 2026-08-27 | TinyFont（独自） | 索引とグリフ表を生成時に選ぶ。GFXfont より 236 B 小さい |
+| **2026-08-28** | **CellFont v1** | **仕様を LGFXFontToolJs 側の文書に切り出した** |
+
+**仕様を外に置く理由。** 形式は生成器と描画器の**間**の取り決めであって、どちらか一方の
+持ち物ではない。TinyGFX の docs に置くと、生成器（LGFXFontToolJs）が TinyGFX の内部文書を
+読まないと実装できないことになる。**仕様は
+[LGFXFontToolJs `docs/formats/cellfont.ja.md`](https://github.com/tanakamasayuki/LGFXFontToolJs)
+が正**で、TinyGFX はその描画器の 1 実装にすぎない。
+
+**名前が TinyFont から変わった理由**は、TinyFont が他所で使われている語だったため。
+「全グリフが 1 つのセルを共有し、字ごとに持つのは変わるものだけ」から CellFont。
+
+**TinyFont から実質的に増えたもの**（どれも TinyGFX 側の実装に取り込み済み）:
+
+- **頭ブロック（`headCount`）** — 疎索引でも連続部分にコード表を付けない。ASCII 95 字 + 記号 6 字で −190 B
+- **形式内の連鎖（`CellFont::next`）** — セル幅クラスで分けて固定ピッチを立てる。8px 混在 190 字で −690 B
+- **U+FFFD への退避** — 豆腐を出すかどうかが「文字集合に U+FFFD を入れるか」という生成時の選択になる
+- **ベースライン基準** — 連鎖する各フォントが別々の高さを持てる
+
+代金は **+248 B**（うち U+FFFD 退避が 64 B）。最初の実フォント 1 本で返ってくる。
+数字は [FONT_FORMAT.ja.md](FONT_FORMAT.ja.md) §2。
+
+以下は TinyFont を選んだときの理由。**CellFont でもそのまま成立している。**
 
 **理由 1 — GFXfont のグリフ表が重い。** ASCII 95 字の 5x7 固定ピッチで、
 ビットマップ 475 B に対しグリフ表が 665 B。しかも固定ピッチなら**中身は全字同一**で
-丸ごと冗長。TinyFont は固定ピッチならグリフ表を持たない（`glyphs = nullptr`）ので、
+丸ごと冗長。CellFont は固定ピッチならグリフ表を持たない（`glyphs = nullptr`）ので、
 **同じフォントが 1,152 B → 499 B（−57%）**になる。
 
 **理由 2 — GFXfont は疎な文字集合を表せない。** `first`〜`last` が連続でなければならず、
 CJK のサブセット（U+4E00〜U+9FA5 に散った 500 字）だと 20,902 件のグリフ表 = **146 KB**
-が要る。TinyFont は昇順のコード表を持てる（`codes != nullptr`）ので 1 KB で済む。
+が要る。CellFont は昇順のコード表を持てる（`codes != nullptr`）ので 1 KB で済む。
 
 **理由 3 — 両方に対応するコストが小さい。** 索引 2 通り × グリフ表 2 通りの 4 組を
 1 つのデコーダが扱い、**分岐のコストは合計 76 バイト**（疎索引 56 B、レコード 24 B）。
@@ -207,7 +232,8 @@ GFXfont 版より 24 バイト小さい**（ascent の走査が消え、レコ�
 サブセット化の運用（プロジェクトで使う文字だけ）と自然に噛み合う。
 
 **残っている作業**: [EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E4（LGFXFontToolJs の
-TinyFont エンコーダ）。いまは `tools/gen_font.py` の 5x7（32 字）を測定用のつなぎに使っている。
+CLI）。いまは `tools/gen_font.py` の 5x7（32 字）をつなぎに使っている。
+**出力は仕様 §12.2 の形そのまま**なので、CLI が揃ったらファイルを差し替えるだけで済む。
 
 ### D18. 既定の Bus はハードウェア SPI ではなくソフト SPI にする
 
@@ -253,8 +279,30 @@ TinyFont エンコーダ）。いまは `tools/gen_font.py` の 5x7（32 字）�
 - *PROGMEM 版の API を別に生やす*（`drawStringP` など）— API が 2 系統になる。
   Adafruit も LovyanGFX も「フォントは常に PROGMEM」で統一しているのでそれに倣う。
 
-**制約**: **AVR ではフォントを PROGMEM に置くこと。** 置かないと化ける。
-`tools/gen_font.py` の出力には `TINYGFX_FONT_PROGMEM` が付く。
+**制約**: **AVR ではフォントデータを 4 つとも PROGMEM に置くこと。**
+ビットマップ・グリフ表・コード表・**フォント構造体そのもの**。
+逆に `TinyGFXFontRef` / `TinyGFXFontOps` は素の const（RAM）に置き、素の参照で読む。
+
+**2026-08-28 に不具合を 1 件直した。** `tools/gen_font.py` が
+`TinyGFXFontTiny` **構造体だけ** `TINYGFX_FONT_PROGMEM` を付けずに出していた。
+デコーダは `tinygfx_rd16(&f->count)` のように**全フィールドを PROGMEM 経由で読む**ので、
+AVR では `pgm_read_word` が RAM のアドレスをプログラム空間として読み、**文字が化ける。**
+
+`avr-nm` で確認した実際の配置:
+
+| シンボル | 修正前 | 修正後 |
+| --- | --- | --- |
+| `...Bitmaps` | `t`（フラッシュ） | `t` |
+| `...Data`（構造体） | **`d`（RAM）** | **`t`（フラッシュ）** |
+| `TinyGFXFontRef` | `d`（RAM。正しい） | `d` |
+
+**ホストのテストでは捕まらない。** Tier 1 は `lang-ship:host` で走り、そこでは
+`tinygfx_rd*` が素の参照に展開されるため、置き場所の間違いが表に出ない。
+Tier 2 は AVR でビルドするだけで実行しない。**AVR の実機（M1 相当）でしか出ない類**。
+
+CellFont 仕様（§12.2）が「4 つすべてに付ける。どれか 1 つでも抜けると化ける」と
+明記しているのは、まさにこの失敗の形である。
+
 LGFXFontToolJs 側も付くはず（[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E4-3 で確認中）。
 
 **まだやっていないこと**: `pushImage` の画像データは RAM 上のもののみ。AVR で PROGMEM の
@@ -269,23 +317,28 @@ LGFXFontToolJs 側も付くはず（[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.
 ための唯一の形だった。コアが形式ごとの `setFont` オーバーロードを持つと、
 コアがすべてのデコーダを参照することになり R3 を破る（[CORE_DESIGN.ja.md](CORE_DESIGN.ja.md) §7.4）。
 
-**実測で確かめたこと**（[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md) §8）:
+**実測で確かめたこと**（[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md) §4）:
 
-- TinyFont だけのスケッチに u8g2 のシンボルは **0 個**（`nm` で確認、`tests/linkprune/` が常時検査）
-- TinyFont のスケッチに u8g2 を足すと +1,180 B。**使わなければ +0 B**
+- CellFont だけのスケッチに u8g2 のシンボルは **0 個**（`nm` で確認、`tests/linkprune/` が常時検査）
+- CellFont のスケッチに u8g2 を足すと約 +1,180 B。**使わなければ +0 B**
 - 仕組みそのものの代金は **+144 B**。うち 124 B は「定数畳み込みが効かなくなったぶん」で、
-  `-DTINYGFX_FONT_SPARSE=0 -DTINYGFX_FONT_RECORDS=0` で 116 B 取り戻せる。
-  **純粋な間接呼び出しは約 28 B**
+  `-DTINYGFX_FONT_SPARSE=0 -DTINYGFX_FONT_RECORDS=0` で取り戻せる（CellFont では −164 B）
+
+**2026-08-28 追記 — この形が仕様に取り込まれた。** CellFont は形式の中にも連鎖
+（`CellFont::next`）を持つので、TinyGFX では連鎖が 2 段になる。このとき
+**U+FFFD への退避をデコーダの中でやると、その形式に豆腐があるだけで後段の別形式に
+到達できなくなる。** 退避は最外（`TinyGFX::drawChar`）でだけ行う。
+これは TinyGFX 側から指摘して仕様 §15.2 に入った。
 
 **採らなかった案**:
 - *形式ごとの `setFont` オーバーロード* — 素直だが、コアが全形式を参照する。R3 違反。
 - *テンプレートで形式を静的に結ぶ* — サイズが読めなくなる（D2 と同じ理由）。
   連鎖で形式を混ぜられなくもなる。
-- *形式を 1 つに絞る（TinyFont だけ）* — 一番小さいが、TinyFont が勝てるのは
-  **H≤16 の帯だけ**（[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md) §0）。その外を扱う道を塞ぐ。
+- *形式を 1 つに絞る（CellFont だけ）* — 一番小さいが、CellFont が負ける帯がある
+  （H>16 かつ字数が多いとき。CellFont 仕様 §13.5）。その外を扱う道を塞ぐ。
 
-**副産物**: `next` の連鎖が**形式をまたげる**ようになった。半角を TinyFont、
-全角を u8g2、という組み方ができる。
+**副産物**: `TinyGFXFontRef::next` の連鎖が**形式をまたげる**ようになった。
+半角を CellFont、全角を u8g2、という組み方ができる。
 
 **R2 との関係**: 「関数ポインタの表を持つな」は**全機能を並べた表**（1 つ使うと全部載る）を
 禁じたもの。ここの表は形式ごとに 1 枚で、その形式を include した人だけが参照する。

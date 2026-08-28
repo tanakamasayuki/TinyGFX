@@ -10,7 +10,10 @@
 #include <TinyGFX/BusSoftSPI.h>
 #include <TinyGFX/PanelST7789.h>
 
+#include <TinyGFX/FontCell.h>
 #include "tinygfx_font5x7.h"
+
+static const TinyGFXFontRef font5x7 = {&tinygfxFont5x7, &tinygfxFontCellOps, nullptr};
 
 // 配線に合わせて変える
 static const int8_t PIN_SCK = 5;
@@ -31,7 +34,7 @@ void setup() {
   lcd.fillRect(8, 8, 100, 24, TFT_NAVY);
   lcd.drawRect(8, 8, 100, 24, TFT_WHITE);
 
-  lcd.setFont(&tinygfxFont5x7);
+  lcd.setFont(&font5x7);
   lcd.setTextColor(TFT_WHITE);
   lcd.setTextSize(2);
   lcd.drawString("12:34", 16, 14);
