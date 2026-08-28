@@ -19,10 +19,17 @@
 #pragma once
 #include <stdint.h>
 
-// Fill whole bytes when a rectangle covers a page, instead of setting one bit
-// at a time. Costs 512 bytes of flash on a CH32V003 and saves roughly 6ms of
-// the ~30ms it takes to clear and push a 128x64 frame - the I2C transfer is
-// the bigger half and this does not touch it. Set to 0 to get the flash back.
+// Take over fillRect and paint whole bytes, instead of letting the base class
+// go through the address window and set one bit per pixel.
+//
+// Eight vertical pixels share a byte here, so this is most of the work for
+// every rectangle, every span of a circle or a triangle, the background cell
+// behind text, and every run of every glyph. It saves roughly 6ms of the ~30ms
+// it takes to clear and push a 128x64 frame - the I2C transfer is the bigger
+// half and this does not touch it.
+//
+// Set to 0 to get the flash back: 428 bytes on a CH32V003, 596 on AVR
+// (measured 2026-08-29). Drawing then goes back to one bit at a time.
 #ifndef TINYGFX_MONO_FAST_FILL
 #define TINYGFX_MONO_FAST_FILL 1
 #endif
