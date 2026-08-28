@@ -17,6 +17,9 @@
 // Glyphs   : 10
 // Data     : 58 bytes
 // Coverage : U+0030-U+0039
+// 
+// Rebuild with:
+//   npx lgfx-font build --font lgfxJapanGothic_8 --sets digits --format cellfont --name tgfxDigits --out tests/common_libs/tgfx_font/src/tgfx_digits.h
 
 #pragma once
 #include <stdint.h>

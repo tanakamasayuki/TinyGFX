@@ -17,6 +17,9 @@
 // Glyphs   : 95
 // Data     : 408 bytes
 // Coverage : U+0020-U+007E
+// 
+// Rebuild with:
+//   npx lgfx-font build --font lgfxJapanGothic_8 --sets ascii --format cellfont --name tgfxAscii --out tests/common_libs/tgfx_font/src/tgfx_ascii.h
 
 #pragma once
 #include <stdint.h>

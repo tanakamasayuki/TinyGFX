@@ -17,6 +17,9 @@
 // Glyphs   : 13
 // Data     : 71 bytes
 // Coverage : U+0020, U+002E, U+0030-U+003A
+// 
+// Rebuild with:
+//   npx lgfx-font build --font lgfxJapanGothic_8 --chars ':. ' --sets digits --format cellfont --name tgfxClock --out examples/HelloWorld/tgfx_clock.h
 
 #pragma once
 #include <stdint.h>
