@@ -32,7 +32,7 @@ TinyGFXBusSPI bus(SPI, PIN_DC, PIN_CS, /*freq*/ 24000000UL);
 TinyGFXPanelILI9342 panel(bus, 320, 240, PIN_RST);
 TinyGFX lcd(panel);
 
-static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps, nullptr};
+static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps};
 // **読み戻すのは上 2 行だけ。** 読み出しは 1 回ごとに線を張り替えるので、
 // 何十回も回すとボードが固まる（実測）。デバッグ用途なので小さく取る。
 static const int16_t TGFX_READBACK_H = 2;

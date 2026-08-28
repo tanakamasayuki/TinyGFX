@@ -4,7 +4,7 @@
 #include <TinyGFX/FontCell.h>
 #include <tgfx_digits.h>
 
-static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps, nullptr};
+static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps};
 
 
 static uint8_t fb[128 * 64 / 8];

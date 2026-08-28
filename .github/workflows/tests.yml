@@ -58,14 +58,36 @@ jobs:
         working-directory: tests
         run: uv sync
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # フォントは LGFXFontToolJs の CLI が出したものをそのままコミットしている。
+      # ここでは書き換えず --check で照合するだけ（不一致なら終了コード 2）。
+      #
+      # **`npx -p lgfx-font-tool lgfx-font` と書くこと。** パッケージ名とコマンド名が
+      # 違うので、素の `npx lgfx-font` は環境によって 404 になる。
+      #
+      # 使うのは同梱ビットマップフォントだけなので、npm 以外の外部取得は無い。
+      # tests/clifont/ は --google（Google Fonts の取得）なので CI からは外してある。
+      # 中身はテストが毎回描いて検査しているが、「いま CLI が同じものを出すか」までは見ない。
       - name: Check the generated fonts are current
+        shell: bash
         run: |
+          set -euo pipefail
+          chk() {
+            npx --yes -p lgfx-font-tool lgfx-font build \
+              --font lgfxJapanGothic_8 --format cellfont --check "$@"
+          }
           F=tests/common_libs/tgfx_font/src
-          python3 tools/gen_font.py --mode fixed   --symbol tinygfxFont5x7       --out $F/tinygfx_font5x7.h
-          python3 tools/gen_font.py --mode records --symbol tinygfxFont5x7Rec    --out $F/tinygfx_font5x7_rec.h
-          python3 tools/gen_font.py --mode fixed --sparse --symbol tinygfxFont5x7Sparse --out $F/tinygfx_font5x7_sparse.h
-          python3 tools/gen_font.py --mode fixed   --symbol tinygfxFont5x7 --out examples/HelloWorld/tinygfx_font5x7.h
-          git diff --exit-code tests/common_libs/tgfx_font/ examples/HelloWorld/
+          chk --sets digits                          --name tgfxDigits       --out "$F/tgfx_digits.h"
+          chk --sets digits --chars "℃"              --name tgfxDigitsChain  --out "$F/tgfx_digits_chain.h"
+          chk --sets digits --chars "℃" --max-chain 1 --name tgfxDigitsSparse --out "$F/tgfx_digits_sparse.h"
+          chk --sets ascii                           --name tgfxAscii        --out "$F/tgfx_ascii.h"
+          for d in examples/HelloWorld examples/OledI2C examples/M5StackBasic tests/manual/m5stack; do
+            chk --sets digits --chars ":. " --name tgfxClock --out "$d/tgfx_clock.h"
+          done
 
       - name: Run pytest
         working-directory: tests

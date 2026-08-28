@@ -15,7 +15,7 @@
 
 #include "cli_font.h"
 
-static const TinyGFXFontRef cliFont = {&font, &tinygfxFontCellOps, nullptr};
+static const TinyGFXFontRef cliFont = {&font, &tinygfxFontCellOps};
 
 static const int W = 128, H = 16;
 static uint16_t gram[W * H];

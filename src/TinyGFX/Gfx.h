@@ -375,16 +375,17 @@ class TinyGFX {
   /// Draw one glyph. `y` is the top of the line. Returns the advance,
   /// multiplier included.
   ///
-  /// An uncovered code falls back to U+FFFD, and that fallback happens once,
-  /// only after the whole chain has been searched (CellFont spec 7.2 and
-  /// 15.2). Falling back per font would let the first font's notdef hide a
-  /// glyph the second font actually has.
+  /// An uncovered code falls back to U+FFFD, once, after the decoder has
+  /// searched its whole chain (CellFont spec 7.2 and 15.2). The fallback lives
+  /// here rather than in the decoder for exactly that reason.
   /// With no notdef either, this returns 0: nothing drawn, pen not advanced.
   int16_t drawChar(uint16_t ch, int16_t x, int16_t y) {
     if (_font == nullptr) return 0;
     const int16_t base = (int16_t)(y + (int16_t)(getTextAscent() * _textSize));
-    int16_t a = drawIn(ch, x, base);
-    if (a < 0 && ch != TINYGFX_NOTDEF) a = drawIn(TINYGFX_NOTDEF, x, base);
+    int16_t a = _font->ops->draw(*this, _font->data, ch, x, base);
+    if (a < 0 && ch != TINYGFX_NOTDEF) {
+      a = _font->ops->draw(*this, _font->data, TINYGFX_NOTDEF, x, base);
+    }
     return (a < 0) ? 0 : (int16_t)(a * _textSize);
   }
 
@@ -401,30 +402,14 @@ class TinyGFX {
   }
 
  protected:
-  /// Walk the chain and draw one glyph. No fallback here; -1 when uncovered.
-  int16_t drawIn(uint16_t ch, int16_t x, int16_t base) {
-    for (const TinyGFXFontRef* f = _font; f != nullptr; f = f->next) {
-      const int16_t a = f->ops->draw(*this, f->data, ch, x, base);
-      if (a >= 0) return a;
-    }
-    return -1;
-  }
-
   /// The advance, multiplier included. Falls back to U+FFFD, then -1.
   /// It falls back exactly as drawChar does, so textWidth and the width
   /// actually drawn cannot disagree.
   int16_t advanceOf(uint16_t ch) const {
-    int16_t a = advanceIn(ch);
-    if (a < 0 && ch != TINYGFX_NOTDEF) a = advanceIn(TINYGFX_NOTDEF);
+    if (_font == nullptr) return -1;
+    int16_t a = _font->ops->advance(_font->data, ch);
+    if (a < 0 && ch != TINYGFX_NOTDEF) a = _font->ops->advance(_font->data, TINYGFX_NOTDEF);
     return (a < 0) ? -1 : (int16_t)(a * _textSize);
-  }
-
-  int16_t advanceIn(uint16_t ch) const {
-    for (const TinyGFXFontRef* f = _font; f != nullptr; f = f->next) {
-      const int16_t a = f->ops->advance(f->data, ch);
-      if (a >= 0) return a;
-    }
-    return -1;
   }
 
   static void swap16(int16_t& a, int16_t& b) {

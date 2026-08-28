@@ -362,17 +362,14 @@ TinyGFX 側は **2026-08-28 に CellFont v1 の描画器を実装済み**
 `lgfx-font-tool` **2.0.0** で `lgfx-font build` が使える。**依頼としては閉じてよい。**
 
 ```sh
-npx lgfx-font build --google "Noto Sans JP" --em 12 \
+npx -p lgfx-font-tool lgfx-font build --google "Noto Sans JP" --em 12 \
     --chars "温度設定完了 23.5℃" --format cellfont --out font.h
 ```
 
-パッケージ名（`lgfx-font-tool`）とコマンド名（`lgfx-font`）は違うが、
-**npx はコマンド名から引けるのでそのまま動く。**
-
-ただし **`node_modules` のあるディレクトリで実行すると 404 になる**（npx が
-そこをプロジェクトとみなしてローカルの bin を探し、見つからないと
-`lgfx-font` という名前のパッケージを取りに行くため）。そういう場所で使うなら
-`npx -p lgfx-font-tool lgfx-font ...` と書く。
+**`-p` を付けないと環境によって 404 になる。** パッケージ名（`lgfx-font-tool`）と
+コマンド名（`lgfx-font`）が違うためで、npx のキャッシュに入っていれば素の
+`npx lgfx-font` でも引けるが、当てにできない（`node_modules` の有無でも変わる）。
+**README に `-p` 付きの形を書いておくと親切だと思う。**
 
 出力を `tests/clifont/` にそのまま置いて回帰検査にした。**ローカルの checkout と
 公開版でデータはバイト一致**（違いはシンボル名だけ。出力ファイル名から取るため）。

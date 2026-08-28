@@ -180,12 +180,14 @@ Generation is expected to go through
 The CLI bakes in **only the characters your project uses**.
 
 ```sh
-npx lgfx-font build --google "Noto Sans JP" --em 12 \
+npx -p lgfx-font-tool lgfx-font build --google "Noto Sans JP" --em 12 \
     --chars "温度設定完了 23.5℃" --format cellfont --out font.h
 ```
 
-> Inside a directory that has its own `node_modules`, npx answers 404;
-> use `npx -p lgfx-font-tool lgfx-font ...` there.
+> **Write `npx -p lgfx-font-tool lgfx-font ...`.** The package is `lgfx-font-tool`
+> but the command is `lgfx-font`, and plain `npx lgfx-font` **404s in some
+> environments** - it depends on the npx cache and on whether a `node_modules`
+> is around. CI uses the `-p` form for that reason.
 
 Those twelve characters come to **245 bytes**. It grows with what you add.
 
@@ -218,8 +220,8 @@ lcd.drawString("23.5", 8, 8);
 **The CellFont format is specified outside TinyGFX** — see `docs/formats/cellfont.ja.md` in
 [LGFXFontToolJs](https://github.com/tanakamasayuki/LGFXFontToolJs). TinyGFX is one renderer
 for it. The two decoders are nearly the same size (684 B and 693 B), so the choice comes
-down to data. Font chaining (`next`) crosses formats, so **Latin in CellFont and CJK in
-u8g2** is a valid combination.
+down to data. To mix, say, Latin and CJK, **generate the whole character set in one go** -
+the tool splits it by width class internally and hands you one font.
 
 ## Installing
 

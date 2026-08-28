@@ -10,17 +10,16 @@
 // linked. Adding formats does not grow the footprint - an unused one is zero
 // bytes.
 //
-// There are two levels of chaining, and both are needed because they do
-// different jobs:
+// Chaining lives inside the format, not here. CellFont::next splits a font by
+// cell width class so each part stays fixed pitch, and the generator builds
+// that chain itself. There is deliberately no way to chain across formats:
+// the font tool already covers "Latin plus CJK" by emitting one font for the
+// whole character set, so a second mechanism here would only cost bytes.
 //
-//   TinyGFXFontRef::next  across formats - Latin in CellFont, CJK in u8g2
-//   CellFont::next        within one format - split by cell width class so
-//                         each part stays fixed pitch
-//
-// Falling back to U+FFFD happens only at the outermost level, in
-// TinyGFX::drawChar. Doing it inside a decoder means a notdef in the first
-// format hides every glyph that a later format would have provided (CellFont
-// spec 15.2). A decoder only ever reports found or not found.
+// Falling back to U+FFFD is the core's job, in TinyGFX::drawChar, and happens
+// once the decoder has searched its whole chain. A decoder must not fall back
+// on its own - a notdef in the first link would hide a glyph the second link
+// actually has (CellFont spec 15.2). A decoder only reports found or not found.
 #pragma once
 #include <stddef.h>
 #include <stdint.h>
@@ -46,9 +45,6 @@ struct TinyGFXFontOps {
 struct TinyGFXFontRef {
   const void* data;
   const TinyGFXFontOps* ops;
-  /// Where to look next when this font has no such glyph; nullptr ends the
-  /// chain. The next font may be in a different format.
-  const TinyGFXFontRef* next;
 };
 
 // ---------------------------------------------------------------------------

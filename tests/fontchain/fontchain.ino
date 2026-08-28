@@ -1,12 +1,15 @@
-// CellFont の連鎖と U+FFFD 退避。
+// CellFont::next chaining and the U+FFFD fallback.
 //
-// 生成されたフォントでは踏めない道を、手で組んだ小さな CellFont で通す。
+// Small CellFonts written by hand, to walk paths a generated font cannot
+// reach. Three things are pinned here:
 //
-//   1. 退避は**連鎖を全部引き終えてから** 1 度だけ（CellFont 仕様 §7.2 / §15.2）
-//      前段に豆腐があるだけで後段の字が潰れる、という事故を捕まえる
-//   2. ベースラインは**連鎖の先頭のメトリクス**で決まる（仕様 §8）
-//      高さの違うフォントを繋いでも字面が揃うこと
-//   3. 疎索引の頭ブロックと、first より小さいコードのしっぽ（仕様 §7.1）
+//   1. The fallback happens once, after the whole chain has been searched
+//      (CellFont spec 7.2 and 15.2). This catches the accident where a notdef
+//      in the first link hides a glyph the second link actually has.
+//   2. The baseline comes from the chain head's metrics (spec 8), so links of
+//      different heights still sit on one line.
+//   3. A sparse index's head block, and a tail holding codes lower than
+//      `first` (spec 7.1).
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
 #include <TinyGFX/FontCell.h>
@@ -19,8 +22,21 @@ TinyGFXBusCapture bus(gram, W, H);
 TinyGFXPanelST7789 panel(bus, W, H);
 TinyGFX lcd(panel);
 
-// --- フォント 1: 'A' と U+FFFD を持つ疎索引（頭ブロック 1、しっぽ 1）------------
-// 3x5 のセル。グリフ 0 = 'A'（全部塗る） / グリフ 1 = U+FFFD（上 1 行だけ）
+// --- Font 2 of the chain: only 'B', and a different height (3 px, ascent 3) --
+// Declared first because the link before it has to point at it.
+static const uint8_t bBits[2] CELLFONT_PROGMEM = {0xFF, 0x80};  // 3x3, solid
+static const CellFont fontB CELLFONT_PROGMEM = {
+    bBits, nullptr, nullptr, nullptr,
+    0x42, 1,   // first='B', count=1
+    3, 3,      // width, height
+    4, 6,      // xAdvance, yAdvance
+    0, -3,     // xOffset, yOffset (ascent=3, unlike the head)
+    2,         // bytesPerGlyph
+    0,
+};
+
+// --- Font 1: sparse, holding 'A' and U+FFFD (head block 1, tail 1) -----------
+// A 3x5 cell. Glyph 0 = 'A' (solid), glyph 1 = U+FFFD (top row only).
 static const uint8_t anBits[4] CELLFONT_PROGMEM = {0xFF, 0xFE, 0xE0, 0x00};
 static const uint16_t anCodes[1] CELLFONT_PROGMEM = {0xFFFD};
 static const CellFont fontAN CELLFONT_PROGMEM = {
@@ -28,26 +44,21 @@ static const CellFont fontAN CELLFONT_PROGMEM = {
     0x41, 2,   // first='A', count=2
     3, 5,      // width, height
     4, 6,      // xAdvance, yAdvance
-    0, -5,     // xOffset, yOffset（ascent=5）
+    0, -5,     // xOffset, yOffset (ascent=5)
     2,         // bytesPerGlyph
-    1,         // headCount（'A' だけが頭。U+FFFD はしっぽ）
+    1,         // headCount ('A' is the head; U+FFFD is the tail)
 };
 
-// --- フォント 2: 'B' だけ。**高さが違う**（3 画素、ascent 3）------------------
-static const uint8_t bBits[2] CELLFONT_PROGMEM = {0xFF, 0x80};  // 3x3 全部塗る
-static const CellFont fontB CELLFONT_PROGMEM = {
-    bBits, nullptr, nullptr, nullptr,
-    0x42, 1,   // first='B', count=1
-    3, 3,      // width, height
-    4, 6,      // xAdvance, yAdvance
-    0, -3,     // xOffset, yOffset（ascent=3。fontAN と違う）
-    2,         // bytesPerGlyph
-    0,
+// The same font again, this time chained to fontB. This is the pair that
+// catches the accident: fontAN has a notdef, fontB has 'B'.
+static const CellFont fontANChain CELLFONT_PROGMEM = {
+    anBits, nullptr, anCodes, &fontB,
+    0x41, 2, 3, 5, 4, 6, 0, -5, 2, 1,
 };
 
-// --- フォント 3: first より小さいコードをしっぽに持つ疎索引 ---------------------
-// 頭ブロックを 'B'（0x42）に取り、しっぽに 'A'（0x41）を置く。
-// 仕様 §7.1 が「c < first で打ち切ってよいのは連続索引のときだけ」と警告している道。
+// --- Font 3: sparse, with a tail code lower than `first` ---------------------
+// The head block is 'B' (0x42) and the tail holds 'A' (0x41). This is the path
+// spec 7.1 warns about: only a contiguous index may bail out on `c < first`.
 static const uint16_t loCodes[1] CELLFONT_PROGMEM = {0x0041};
 static const CellFont fontLo CELLFONT_PROGMEM = {
     anBits, nullptr, loCodes, nullptr,
@@ -56,10 +67,10 @@ static const CellFont fontLo CELLFONT_PROGMEM = {
     1,         // headCount=1
 };
 
-static const TinyGFXFontRef refB = {&fontB, &tinygfxFontCellOps, nullptr};
-static const TinyGFXFontRef refAN = {&fontAN, &tinygfxFontCellOps, nullptr};
-static const TinyGFXFontRef refChain = {&fontAN, &tinygfxFontCellOps, &refB};
-static const TinyGFXFontRef refLo = {&fontLo, &tinygfxFontCellOps, nullptr};
+static const TinyGFXFontRef refB = {&fontB, &tinygfxFontCellOps};
+static const TinyGFXFontRef refAN = {&fontAN, &tinygfxFontCellOps};
+static const TinyGFXFontRef refChain = {&fontANChain, &tinygfxFontCellOps};
+static const TinyGFXFontRef refLo = {&fontLo, &tinygfxFontCellOps};
 
 static void clear() {
   bus.fill(0);
@@ -72,7 +83,7 @@ static long lit() {
   return n;
 }
 
-/// 点いている行の範囲。無ければ -1 / -1。
+/// The range of rows with ink, or -1 / -1 when there is none.
 static void litRows(long* top, long* bottom) {
   *top = -1;
   *bottom = -1;
@@ -105,15 +116,15 @@ void setup() {
   lcd.begin();
   lcd.setTextColor(TFT_WHITE);
 
-  scene("a", &refAN, 'A');            // 収録あり: 3x5 を全部塗る = 15
-  scene("nd", &refAN, 'Z');           // 収録なし -> U+FFFD へ退避: 上 1 行 = 3
-  scene("ndself", &refAN, 0xFFFD);    // 要求が U+FFFD 自身: 再検索しない
-  scene("chain", &refChain, 'B');     // **前段の豆腐に潰されず、後段の 'B' が出ること**
-  scene("miss", &refB, 'Z');          // どこにも無い: 何も描かず送り 0
-  scene("lo", &refLo, 'A');           // first より小さいコードがしっぽに居る
-  scene("lohead", &refLo, 'B');       // 同じフォントの頭ブロック
+  scene("a", &refAN, 'A');          // covered: a solid 3x5 = 15 pixels
+  scene("nd", &refAN, 'Z');         // uncovered -> U+FFFD: the top row = 3
+  scene("ndself", &refAN, 0xFFFD);  // asking for U+FFFD itself: no second search
+  scene("chain", &refChain, 'B');   // the notdef in link 1 must not hide 'B' in link 2
+  scene("miss", &refB, 'Z');        // nowhere at all: nothing drawn, advance 0
+  scene("lo", &refLo, 'A');         // a tail code lower than `first`
+  scene("lohead", &refLo, 'B');     // the head block of the same font
 
-  // 行送りと ascent は**連鎖の先頭**のもの
+  // Line advance and ascent both come from the head of the chain
   lcd.setFont(&refChain);
   tgfxReport("chain_line", (long)lcd.fontHeight());
   tgfxReport("chain_ascent", (long)lcd.getTextAscent());

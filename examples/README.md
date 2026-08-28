@@ -54,7 +54,7 @@ characters - the digits plus `:`, `.` and space - taken from `lgfxJapanGothic_8`
 **1,743 bytes**.
 
 ```sh
-npx lgfx-font build --font lgfxJapanGothic_8 --sets digits --chars ":. " \
+npx -p lgfx-font-tool lgfx-font build --font lgfxJapanGothic_8 --sets digits --chars ":. " \
     --format cellfont --name tgfxClock --out tgfx_clock.h
 ```
 

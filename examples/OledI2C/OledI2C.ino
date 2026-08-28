@@ -16,7 +16,7 @@
 #include <TinyGFX/FontCell.h>
 #include "tgfx_clock.h"
 
-static const TinyGFXFontRef clockFont = {&tgfxClock, &tinygfxFontCellOps, nullptr};
+static const TinyGFXFontRef clockFont = {&tgfxClock, &tinygfxFontCellOps};
 
 static const int16_t WIDTH = 128;
 static const int16_t HEIGHT = 64;

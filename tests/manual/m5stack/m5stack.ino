@@ -8,12 +8,11 @@
 //
 //   0-3 回転 0..3      MADCTL の表が実機で正しいか（回転 0 だけ確認済み）
 //   4   文字           CellFont 移行後の描画。倍角・背景セル・収録外
-//   5   連鎖           高さの違う 2 フォントがベースラインで揃うか
-//   6   クリップ       外に 1 画素も漏れないか
-//   7   直接描画       同じ動きを消してから描く。**ちらつくはず**
-//   8   帯レンダリング 同じ動きを TileCanvas で。**ちらつかないはず**
-//   9   速度           シリアルに ms を出す
-//  10   読み出し       **パネルから読み戻せるか。** できれば実機の自動検証に道が開ける
+//   5   クリップ       外に 1 画素も漏れないか
+//   6   直接描画       同じ動きを消してから描く。**ちらつくはず**
+//   7   帯レンダリング 同じ動きを TileCanvas で。**ちらつかないはず**
+//   8   速度           シリアルに ms を出す
+//   9   読み出し       **パネルから読み戻せるか**
 #include <TinyGFX.h>
 #include <TinyGFX/BusSPI.h>
 #include <TinyGFX/FontCell.h>
@@ -31,28 +30,14 @@ TinyGFXBusSPI bus(SPI, PIN_DC, PIN_CS, /*freq*/ 24000000UL);
 TinyGFXPanelILI9342 panel(bus, 320, 240, PIN_RST);
 TinyGFX lcd(panel);
 
-static const TinyGFXFontRef clockFont = {&tgfxClock, &tinygfxFontCellOps, nullptr};
-
-// --- 連鎖の相手。**高さが違う**（3 画素、ascent 3）。'A'..'C' が塗り潰しの帯 ---
-// 正しければ数字の**下端に揃う**。デコーダが自分の ascent で換算すると上端に出る。
-static const uint8_t barBits[6] CELLFONT_PROGMEM = {0xFF, 0xFE, 0xFF, 0xFE, 0xFF, 0xFE};
-static const CellFont fontBar CELLFONT_PROGMEM = {
-    barBits, nullptr, nullptr, nullptr,
-    0x41, 3,   // 'A'..'C'
-    5, 3,      // width, height
-    6, 8,      // xAdvance, yAdvance（行送りは連鎖先頭と揃える）
-    0, -3,     // xOffset, yOffset（ascent=3）
-    2, 0,
-};
-static const TinyGFXFontRef refBar = {&fontBar, &tinygfxFontCellOps, nullptr};
-static const TinyGFXFontRef refChain = {&tgfxClock, &tinygfxFontCellOps, &refBar};
+static const TinyGFXFontRef clockFont = {&tgfxClock, &tinygfxFontCellOps};
 
 // 帯レンダリング用。ESP32 なので広めに取る（320 x 20 x 2 = 12,800 B）
 static const int16_t BAND_ROWS = 20;
 static uint16_t band[320 * BAND_ROWS];
 TinyGFXTileCanvas canvas(panel, band, sizeof(band) / sizeof(band[0]));
 
-static const uint8_t PAGES = 11;
+static const uint8_t PAGES = 10;
 static uint8_t page = 0;
 static uint32_t shownAt = 0;
 
@@ -118,27 +103,10 @@ static void pageText() {
   lcd.setTextSize(1);
 }
 
-/// 連鎖。高さの違う 2 フォントがベースラインで揃うか。
-static void pageChain() {
-  lcd.setRotation(0);
-  header(5);
-  lcd.setFont(&refChain);
-  lcd.setTextColor(TFT_WHITE);
-  for (uint8_t sz = 1; sz <= 4; ++sz) {
-    lcd.setTextSize(sz);
-    // 'A'..'C' は 3 画素の帯。数字の**下端**に揃っていれば正しい
-    lcd.drawString("012ABC345", 10, (int16_t)(40 + (sz - 1) * 46));
-  }
-  lcd.setTextSize(1);
-  // 目安線: 1 倍のときのベースライン
-  lcd.drawFastHLine(4, 47, 312, TFT_DARKGREY);
-  lcd.setFont(&clockFont);
-}
-
 /// クリップ。外に 1 画素も漏れないこと。
 static void pageClip() {
   lcd.setRotation(0);
-  header(6);
+  header(5);
   lcd.drawRect(59, 59, 202, 122, TFT_DARKGREY);   // クリップ枠の外側 1 画素
   lcd.setClipRect(60, 60, 200, 120);
   lcd.fillCircle(160, 120, 200, TFT_NAVY);        // 画面より大きい円
@@ -196,7 +164,7 @@ static void pageTiled() {
 /// 速度。**まだ 1 度も測っていない。** シリアルに出す。
 static void pageBench() {
   lcd.setRotation(0);
-  header(9);
+  header(8);
   struct { const char* name; uint32_t ms; } r[6];
   uint32_t t0;
 
@@ -232,7 +200,7 @@ static void pageBench() {
   lcd.setRotation(0);
 
   lcd.setTextSize(1);
-  header(9);
+  header(8);
   lcd.setTextColor(TFT_WHITE);
   lcd.setTextSize(2);
   Serial.println(F("--- speed (M5Stack Core, 24MHz SPI, TINYGFX_FILL_CHUNK off) ---"));
@@ -281,7 +249,7 @@ static void dump(const char* label, uint8_t cmd, uint8_t n) {
 
 static void pageReadback() {
   lcd.setRotation(0);
-  header(10);
+  header(9);
   // **M5Stack はデータ線が 1 本**（SDA=GPIO23）。SPI の MISO(19) には何も来ていない
   bus.setReadPins(/*sck*/ 18, /*sda*/ 23);
 
@@ -321,7 +289,6 @@ static const char* PAGE_HINT[PAGES] = {
     "rot 2 : turned 180 deg, 320:240",
     "rot 3 : turned 270 deg, 240:320",
     "text  : sizes 1-4, green background cell flush under glyphs, A-C blank",
-    "chain : A-C bars must sit on the BOTTOM of the digits (shared baseline)",
     "clip  : nothing outside the grey frame",
     "direct: same motion, cleared each frame -- SHOULD flicker",
     "tiled : same motion via TileCanvas -- should NOT flicker",
@@ -333,11 +300,10 @@ static void show(uint8_t n) {
   switch (n) {
     case 0: case 1: case 2: case 3: pageRotation(n); break;
     case 4: pageText(); break;
-    case 5: pageChain(); break;
-    case 6: pageClip(); break;
-    case 7: pageDirect(); break;
-    case 8: pageTiled(); break;
-    case 9: pageBench(); break;
+    case 5: pageClip(); break;
+    case 6: pageDirect(); break;
+    case 7: pageTiled(); break;
+    case 8: pageBench(); break;
     default: pageReadback(); break;
   }
   Serial.print(n);
