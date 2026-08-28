@@ -1,5 +1,7 @@
 # テスト
 
+> English: [README.md](README.md)
+
 TinyGFX のテスト一式。方針とケース一覧は [../docs/TEST_PLAN.ja.md](../docs/TEST_PLAN.ja.md)。
 
 - [pytest-embedded](https://docs.espressif.com/projects/pytest-embedded/en/latest/) + Arduino CLI バックエンド、`uv` で依存管理

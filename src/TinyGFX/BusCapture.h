@@ -1,8 +1,9 @@
 // TinyGFX - bus that decodes the outgoing command stream back into pixels
 //
-// パネルが出すバイト列（CASET / RASET / RAMWR）を解釈して仮想 GRAM に書き戻す。
-// ホストテストで「実際に送っているバイト」を検証するために使う。
-// コアからは参照されない（docs/CORE_DESIGN.ja.md §7.4 R3）。
+// Interprets the byte stream a panel emits (CASET / RASET / RAMWR) and paints
+// it back into a virtual GRAM. Host tests use it to check the bytes that are
+// actually being sent. The core never references it (docs/CORE_DESIGN.ja.md
+// 7.4, rule R3).
 #pragma once
 #include <stddef.h>
 #include <stdint.h>
@@ -13,7 +14,7 @@ class TinyGFXBusCapture : public TinyGFXBus {
  public:
   enum : uint8_t { CMD_CASET = 0x2A, CMD_RASET = 0x2B, CMD_RAMWR = 0x2C };
 
-  /// gram は w*h 画素ぶん。
+  /// `gram` holds w*h pixels.
   TinyGFXBusCapture(uint16_t* gram, uint16_t w, uint16_t h) : _gram(gram), _w(w), _h(h) {}
 
   void init() override { _initCalls++; }
@@ -42,7 +43,7 @@ class TinyGFXBusCapture : public TinyGFXBus {
     while (count--) put(*data++);
   }
 
-  // ---- 検証用 ----------------------------------------------------------
+  // ---- for tests -------------------------------------------------------
   const uint16_t* gram() const { return _gram; }
   uint16_t pixel(uint16_t x, uint16_t y) const {
     if (x >= _w || y >= _h) return 0;
@@ -59,7 +60,8 @@ class TinyGFXBusCapture : public TinyGFXBus {
   uint32_t endCalls() const { return _endCalls; }
   uint8_t txnDepth() const { return _txnDepth; }
   uint8_t lastCommand() const { return _lastCmd; }
-  /// 直近のコマンドに続く 1 バイト目。MADCTL など 1 引数のコマンドの確認に使う。
+  /// First byte after the most recent command; handy for one-argument
+  /// commands such as MADCTL.
   uint8_t lastCommandArg() const { return _lastArg0; }
   uint16_t windowXs() const { return _xs; }
   uint16_t windowYs() const { return _ys; }
@@ -68,7 +70,7 @@ class TinyGFXBusCapture : public TinyGFXBus {
 
  private:
   void feedArg(uint8_t b) {
-    if (_inRamwr) {  // RAMWR 後のデータは画素（ビッグエンディアン）
+    if (_inRamwr) {  // after RAMWR the data is pixels, big endian
       if (_argLen == 0) { _hi = b; _argLen = 1; }
       else { put((uint16_t)(((uint16_t)_hi << 8) | b)); _argLen = 0; _pixelCount++; }
       return;

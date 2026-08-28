@@ -1,14 +1,15 @@
 // TinyGFX - tiled virtual canvas (flicker-free drawing without a full framebuffer)
 //
-// 画面を横帯に分け、小さな RAM バッファへ 1 帯ずつ描いてから転送する。
-// 描画コールバックは帯の数だけ呼ばれるが、座標は常に画面全体のもの
-// （オフセットとクリップはこちらで隠す）。
+// Splits the screen into horizontal bands, draws one band at a time into a
+// small RAM buffer, then pushes it. The drawing callback runs once per band,
+// but always in whole-screen coordinates - the offset and the clip are hidden
+// in here.
 //
-// コアには一切手を入れていない。TinyGFXPanel を実装した PanelMemory を
-// 挟んでいるだけ（docs/DECISIONS.ja.md D16）。
-// このヘッダを include しなければ 1 バイトもリンクされない。
+// The core was not touched to make this work. It is just PanelMemory, which
+// implements TinyGFXPanel, slotted in front (docs/DECISIONS.ja.md D16).
+// Not including this header links not one byte of it.
 //
-// 必要 RAM = 画面幅 × 帯の行数 × 2 バイト。バッファは利用者が用意する。
+// RAM needed = screen width * band rows * 2 bytes, supplied by the caller.
 #pragma once
 #include <stdint.h>
 
@@ -18,10 +19,10 @@
 
 class TinyGFXTileCanvas {
  public:
-  /// 描画コールバック。帯ごとに呼ばれる。座標は画面全体のもの。
+  /// The drawing callback. Runs once per band, in whole-screen coordinates.
   typedef void (*DrawFn)(TinyGFX& gfx, void* ctx);
 
-  /// buffer は bufferPixels 画素ぶん。帯の行数は幅から自動で決まる。
+  /// `buffer` holds bufferPixels pixels. The band height follows from the width.
   TinyGFXTileCanvas(TinyGFXPanel& target, uint16_t* buffer, uint32_t bufferPixels)
       : _target(&target),
         _mem(buffer, target.width(), target.height()),
@@ -44,13 +45,14 @@ class TinyGFXTileCanvas {
   void setBackgroundColor(uint16_t color) { _bg = color; }
   void setAutoClear(bool on) { _autoClear = on; }
 
-  /// 帯 1 本の行数。バッファが 1 行ぶんも無ければ 0。
+  /// Rows in one band, or 0 when the buffer cannot even hold a single row.
   int16_t tileRows() const { return _rows; }
 
-  /// この描画面の設定（フォント・色など）はここで行う。render() 間で保持される。
+  /// Configure this surface (font, colours, ...) here; the settings persist
+  /// across render() calls.
   TinyGFX& gfx() { return _gfx; }
 
-  /// 1 フレーム描く。draw は帯の数だけ呼ばれる。
+  /// Draw one frame. `draw` runs once per band.
   bool render(DrawFn draw, void* ctx = nullptr) {
     if (_rows <= 0 || draw == nullptr) return false;
     const int16_t w = _target->width();
@@ -72,7 +74,8 @@ class TinyGFXTileCanvas {
   }
 
  private:
-  /// 帯の行数 = bufPixels / width。除算命令が無い前提なので引き算で求める。
+  /// Band rows = bufPixels / width, worked out by subtraction because a
+  /// divide instruction cannot be assumed.
   bool recalc() {
     const int16_t w = _target->width();
     const int16_t h = _target->height();
@@ -88,7 +91,7 @@ class TinyGFXTileCanvas {
   }
 
   TinyGFXPanel* _target;
-  TinyGFXPanelMemory _mem;  // _gfx より先に構築されること
+  TinyGFXPanelMemory _mem;  // must be constructed before _gfx
   TinyGFX _gfx;
   uint32_t _bufPixels;
   int16_t _rows = 0;

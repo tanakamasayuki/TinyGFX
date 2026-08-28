@@ -1,21 +1,23 @@
 // TinyGFX - Arduino SPI bus (default, portable)
 //
-// SCK / MOSI は Arduino Core の SPI に任せる。ピンを指定したい環境では
-// lcd.begin() より前に自分で SPI.begin(...) を呼び、initSpi=false にする。
+// SCK and MOSI are left to the core's SPI library. To choose the pins
+// yourself, call SPI.begin(...) before lcd.begin() and pass initSpi=false.
 #pragma once
 #include <Arduino.h>
 #include <SPI.h>
 
 #include "Bus.h"
 
-// まとめ書きの単位（画素）。0 で無効。
+// Block-write size in pixels; 0 disables it.
 //
-// 有効にすると `writeColor` / `writePixels` が **Arduino 標準の
-// `SPI.transfer(buf, len)`（ブロック転送）**を使う。1 バイトずつ `transfer()` を
-// 呼ぶより、コアがまとめて流せるぶん速い。RAM は「単位 x 2 バイト」の**スタック**だけ。
+// When enabled, writeColor and writePixels use the standard Arduino
+// SPI.transfer(buf, len) block transfer, which lets the core push bytes in
+// bulk instead of one transfer() call each. The only RAM cost is size * 2
+// bytes of stack.
 //
-// **効くのはブロック転送を持つコアだけ。** 持たないコアでは同じか少し遅くなる。
-// 32 なら 64 バイト。CH32V003（RAM 2KB）では 8〜16 くらいが上限。
+// This only helps on cores that actually implement a block transfer; elsewhere
+// it is a wash or marginally slower. 32 means 64 bytes; on a CH32V003 (2 KB of
+// RAM) 8 to 16 is about the ceiling.
 #ifndef TINYGFX_FILL_CHUNK
 #define TINYGFX_FILL_CHUNK 0
 #endif
@@ -37,20 +39,22 @@ class TinyGFXBusSPI : public TinyGFXBus {
   }
 
   void beginTransaction() override {
-    if (_rdActive) endRead();  // 読み出しの途中なら線を周辺機に戻してから
+    if (_rdActive) endRead();  // hand the line back to the peripheral first
     _spi->beginTransaction(SPISettings(_freq, MSBFIRST, SPI_MODE0));
     if (_cs >= 0) digitalWrite(_cs, LOW);
   }
 
-  /// 読み出しで手叩きに移した線を、SPI 周辺機に戻す。
-  /// **明示的に呼ばなくてよい**（次の描画が beginTransaction() で自動的に戻す）。
+  /// Hand the bit-banged data line back to the SPI peripheral.
+  /// You do not have to call this: the next draw does it from
+  /// beginTransaction().
   void endRead() {
     if (!_rdActive) return;
     _rdActive = false;
     digitalWrite(_rdSck, LOW);
     pinMode(_rdSda, OUTPUT);
-    // **end() を挟む**（ESP32 の begin() は開始済みなら何もしない）。
-    // 前後に間を置くのは安全側に倒すため。読み出しは速度を求める場面ではない。
+    // end() has to come first - ESP32's begin() does nothing when the bus is
+    // already started. The pauses around it are pure caution; nothing about
+    // read-back is speed-critical.
     delayMicroseconds(50);
     _spi->end();
     delayMicroseconds(50);
@@ -63,51 +67,59 @@ class TinyGFXBusSPI : public TinyGFXBus {
     _spi->endTransaction();
   }
 
-  /// **データ線が 1 本のパネル用**（M5Stack の ILI9342C など）。
+  /// For panels with a single shared data line (the ILI9342C on an M5Stack).
   ///
-  /// SDA が MOSI と MISO の兼用で、SPI 周辺機の MISO には何も来ていない基板がある。
-  /// このとき標準の `transfer()` では読めない（実測: 全ビット 1 が返る）。
-  /// SCK と SDA を渡すと、**読み出しのあいだだけ線を入力に向けて手で叩く。**
-  /// 書き込みは今までどおり周辺機に任せるので、速度は落ちない。
+  /// On some boards SDA doubles as MOSI and MISO, and the SPI peripheral's
+  /// MISO pin is connected to nothing. A plain transfer() cannot read there -
+  /// every bit comes back as 1 (measured). Given SCK and SDA, the line is
+  /// turned around and clocked by hand for the duration of a read. Writing
+  /// still goes through the peripheral, so nothing gets slower.
   ///
-  /// 例（M5Stack Core / BASIC）: `bus.setReadPins(18, 23);`
+  /// For an M5Stack Core / BASIC: bus.setReadPins(18, 23);
   ///
-  /// **制約**: 読み出しのたびに `SPI.end()` / `SPI.begin()` で線を張り直すので、
-  /// **既定以外のピンで `SPI.begin(...)` している構成では使えない**（既定に戻る）。
-  /// **【実験中。まだ当てにしないこと】**
+  /// Limitation: every read re-establishes the line with SPI.end() and
+  /// SPI.begin(), so this cannot be used together with SPI.begin(...) on
+  /// non-default pins - they would revert to the defaults.
   ///
-  /// 生のプローブ（コマンドの送出も含めて全部を手で叩く）では**確実に読めた** —
-  /// 書いた色が `FC 00 00 / 00 FC 00 / 00 00 FC / FC FC FC` としてそのまま返る
-  /// （RGB666、ダミー 1 バイト）。ところが**このクラス経由だと再現しない。**
-  /// ESP32 の GPIO マトリクスと `SPI` の取り合いが絡んでいて、まだ詰め切れていない。
-  /// 詳細と実測は docs/MANUAL_TEST.ja.md の「読み戻し」。
+  /// EXPERIMENTAL - do not rely on this yet.
   ///
-  /// **`startWrite()` / `endWrite()` の外で読むこと。** 読み出しは描画の
-  /// トランザクションとは別に線を取る。
+  /// A raw probe that bit-bangs the whole exchange, commands included, reads
+  /// reliably: colours written come back as FC 00 00 / 00 FC 00 / 00 00 FC /
+  /// FC FC FC (RGB666, one dummy byte). Going through this class does not
+  /// reproduce that. Something about how the ESP32 GPIO matrix and SPI share
+  /// the pin is still unresolved. Measurements are in docs/MANUAL_TEST.ja.md,
+  /// under the read-back section.
   ///
-  /// 読み出しは**デバッグと検証のためのもの**で、通常の描画では使わない。
-  /// なので**速さより確実さに全振りしてある。**
+  /// Read outside startWrite() / endWrite(). Read-back takes the line
+  /// independently of the drawing transaction.
   ///
-  /// `settleUs` は 1 エッジあたりの待ち。既定の 2µs でおよそ 125kHz。
-  /// 速くすると拾い損ねる（実測: 1µs 相当で 3,072 画素中 51 画素が 1 ビット化けた）。
+  /// Read-back exists for debugging and verification, not for normal drawing,
+  /// so it is tuned entirely for certainty over speed.
+  ///
+  /// `settleUs` is the wait per clock edge. The default of 2us is roughly
+  /// 125 kHz. Going faster misses bits: at the equivalent of 1us, 51 of 3,072
+  /// pixels came back with a bit flipped.
   void setReadPins(int8_t sck, int8_t sda, uint8_t settleUs = 2) {
     _rdSck = sck;
     _rdSda = sda;
     _rdSettle = settleUs;
   }
 
-  /// コマンドを送ってから読み戻す。**CS はここで落として、ここで上げる。**
+  /// Send commands, then read back. CS is asserted and released in here.
   ///
-  /// 読み出しピンを設定してあれば**全部を手で叩く**。周辺機と手叩きを途中で
-  /// 切り替えるとビットがずれるので、コマンドの送出も手で行う（実測で確認）。
+  /// Switching between the peripheral and bit-banging part way through shifts
+  /// the bits, so once read pins are configured the whole exchange is handled
+  /// consistently (measured).
   void readSequence(const uint8_t* script, uint8_t scriptLen, uint8_t dummy, uint8_t* buf,
                     size_t len) override {
     for (size_t i = 0; i < len; ++i) buf[i] = 0;
-    if (_rdSck < 0) return;  // 読めないバス
+    if (_rdSck < 0) return;  // this bus cannot read
 
-    // **コマンドは周辺機で送る。** ESP32 では pinMode(OUTPUT) では GPIO マトリクスから
-    // 線を取り戻せず、手で叩いても波形が出ない（実測。全部 FF が返る）。
-    // 一方 pinMode(INPUT) は確実に出力を止められるので、**受信だけ手で叩く。**
+    // Commands go out through the peripheral. On ESP32, pinMode(OUTPUT) does
+    // not win the pin back from the GPIO matrix, so bit-banging produces no
+    // waveform at all (measured: everything reads FF). pinMode(INPUT), on the
+    // other hand, reliably stops the output - so only the receive half is
+    // clocked by hand.
     beginTransaction();
     uint8_t i = 0;
     while (i < scriptLen) {
@@ -122,12 +134,12 @@ class TinyGFXBusSPI : public TinyGFXBus {
     digitalWrite(_rdSck, LOW);
     pinMode(_rdSck, OUTPUT);
     digitalWrite(_rdSck, LOW);
-    pinMode(_rdSda, INPUT);  // 線を相手に渡す
+    pinMode(_rdSda, INPUT);  // hand the line to the panel
     _rdActive = true;
     for (uint8_t d = 0; d < dummy; ++d) bbRead();
     for (size_t k = 0; k < len; ++k) buf[k] = bbRead();
     if (_cs >= 0) digitalWrite(_cs, HIGH);
-    endRead();  // 1 回ごとに線を戻す。**まとめて戻す作りにすると読めなくなる**（実測）
+    endRead();  // give the line back every time; batching it stops the reads working (measured)
   }
 
   void writeCommand(uint8_t cmd) override {
@@ -144,10 +156,11 @@ class TinyGFXBusSPI : public TinyGFXBus {
     const uint8_t hi = (uint8_t)(color >> 8), lo = (uint8_t)color;
 #if TINYGFX_FILL_CHUNK > 0
     if (count >= TINYGFX_FILL_CHUNK) {
-      uint8_t buf[TINYGFX_FILL_CHUNK * 2];  // スタック上。静的 RAM は増やさない
+      uint8_t buf[TINYGFX_FILL_CHUNK * 2];  // on the stack; no static RAM added
       do {
-        // **毎回詰め直す。** transfer(buf, n) は受信データで buf を上書きするため。
-        // それでも 1 バイトずつ送るより速い（コアがまとめて流せる）。
+        // Refill every time: transfer(buf, n) overwrites buf with what came
+        // back. Even so this beats sending a byte at a time, because the core
+        // can push the block in bulk.
         for (uint16_t i = 0; i < TINYGFX_FILL_CHUNK; ++i) {
           buf[i * 2] = hi;
           buf[i * 2 + 1] = lo;
@@ -162,8 +175,8 @@ class TinyGFXBusSPI : public TinyGFXBus {
 
   void writePixels(const uint16_t* data, uint32_t count) override {
 #if TINYGFX_FILL_CHUNK > 0
-    // 帯レンダリング（TileCanvas）と pushImage がここを通る。
-    // 送り出しはビッグエンディアンなので、詰め替えるついでに入れ替える。
+    // Tiled rendering (TileCanvas) and pushImage both come through here.
+    // The wire format is big endian, so swap while packing.
     if (count >= TINYGFX_FILL_CHUNK) {
       uint8_t buf[TINYGFX_FILL_CHUNK * 2];
       do {
@@ -188,7 +201,7 @@ class TinyGFXBusSPI : public TinyGFXBus {
  private:
   uint8_t bbRead() {
     uint8_t v = 0;
-    for (uint8_t i = 0; i < 8; ++i) {  // モード 0: 立ち上がりで拾う
+    for (uint8_t i = 0; i < 8; ++i) {  // mode 0: sample on the rising edge
       digitalWrite(_rdSck, HIGH);
       if (_rdSettle) delayMicroseconds(_rdSettle);
       v = (uint8_t)((v << 1) | (digitalRead(_rdSda) ? 1 : 0));

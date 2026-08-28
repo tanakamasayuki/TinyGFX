@@ -1,23 +1,24 @@
 // TinyGFX - M5StackBasic
 //
-// **実機の立ち上げ用スケッチ。** M5Stack Core / BASIC の内蔵 LCD（ILI9342C
-// 320x240）に、確かめたいことを 1 画面に全部出す。
+// A hardware bring-up sketch. It puts everything worth checking onto the
+// built-in LCD of an M5Stack Core / BASIC (ILI9342C, 320x240) in one screen.
 //
-// 配線が要らない・ピンが決まっている・電源が安定している、という理由で
-// 最初の実機確認にはこれが一番確実（docs/MANUAL_TEST.ja.md M0）。
+// No wiring, fixed pins and solid power make this the surest first thing to
+// try on real hardware (docs/MANUAL_TEST.ja.md, M0).
 //
-// 出るはずのもの:
-//   1. 画面の**外周 1 ドット**に白い枠。四辺とも切れていないこと
-//   2. 上に **赤・緑・青**の帯（左から順に）
-//   3. まん中に **0123456789**。鏡像でも上下逆でもないこと
-//   4. 下に円・三角・線
+// What you should see:
+//   1. A one-pixel white border, complete on all four sides
+//   2. Red, green and blue bars across the top, in that order
+//   3. 0123456789 in the middle, neither mirrored nor upside down
+//   4. A circle, a triangle and some lines below that
 //
-// 違っていたときの直し方（どれも 1 行）:
-//   - 真っ暗            -> バックライト（GPIO32）が HIGH になっているか
-//   - 白地に黒          -> panel.invertDisplay(false); **lcd.begin() の後で**
-//   - 帯が青・緑・赤    -> panel.setRgbOrder(false);
-//   - 数字が鏡像/逆さま -> panel.setMirror(true, false) など。**lcd.begin() より前に**
-//   - 端が欠ける/ずれる -> 320x240 になっているか（コンストラクタの引数）
+// If something is off, each fix is one line:
+//   - Nothing at all      -> is the backlight (GPIO32) driven high?
+//   - Black on white      -> panel.invertDisplay(false); AFTER lcd.begin()
+//   - Bars read blue-green-red -> panel.setRgbOrder(false);
+//   - Digits mirrored or upside down -> panel.setMirror(true, false) or
+//     similar, BEFORE lcd.begin()
+//   - Edges clipped or shifted -> check the 320x240 constructor arguments
 #include <TinyGFX.h>
 #include <TinyGFX/BusSPI.h>
 #include <TinyGFX/PanelILI9342.h>
@@ -27,15 +28,15 @@
 
 static const TinyGFXFontRef font5x7 = {&tinygfxFont5x7, &tinygfxFontCellOps, nullptr};
 
-// M5Stack Core / BASIC の内蔵 LCD
+// The built-in LCD of an M5Stack Core / BASIC
 static const int8_t PIN_DC = 27;
 static const int8_t PIN_CS = 14;
 static const int8_t PIN_RST = 33;
-static const int8_t PIN_BL = 32;   // バックライト。HIGH にしないと何も見えない
-static const int8_t PIN_SD_CS = 4; // SD と SPI を共有している。HIGH で切っておく
+static const int8_t PIN_BL = 32;   // backlight; nothing is visible until this is high
+static const int8_t PIN_SD_CS = 4; // the SD card shares this SPI bus; keep it deselected
 
-// SCK / MOSI は指定しない。M5Stack の既定（18 / 23）を Arduino Core の SPI が使う。
-// 40MHz でも動くが、最初は落としておく。
+// SCK and MOSI are not given here: the core's SPI library uses the M5Stack
+// defaults (18 and 23). 40 MHz works, but start slower.
 TinyGFXBusSPI bus(PIN_DC, PIN_CS, /*freq*/ 24000000UL);
 TinyGFXPanelILI9342 panel(bus, 320, 240, PIN_RST);
 TinyGFX lcd(panel);
@@ -51,12 +52,13 @@ void setup()
 
   lcd.begin();
 
-  // 古い世代の M5Stack BASIC は色が反転する（**実機で確認済み**）。
-  // そのときはこの 1 行を外す。
+  // Older M5Stack BASIC units come out inverted (confirmed on hardware).
+  // Uncomment this line when yours does.
   //
-  // **必ず lcd.begin() の後に置くこと。** 前に置くと 2 つの理由で効かない:
-  //   1. バスがまだ初期化されていない（SPI.begin() も pinMode もまだ）
-  //   2. 効いたとしても init() が最後に INVON を送って上書きする
+  // It has to sit after lcd.begin(). Before it, two separate things stop it
+  // working:
+  //   1. the bus is not up yet - neither SPI.begin() nor pinMode has run
+  //   2. even if the bytes got out, init() sends INVON last and overwrites it
   //
   // panel.invertDisplay(false);
 
@@ -66,23 +68,23 @@ void setup()
   lcd.startWrite();
   lcd.fillScreen(TFT_BLACK);
 
-  // 1. 端まで届いているか
+  // 1. Does it reach the edges?
   lcd.drawRect(0, 0, w, h, TFT_WHITE);
 
-  // 2. 色順（左から 赤・緑・青）
+  // 2. Colour order: red, green, blue from the left
   const int16_t bar = (int16_t)((w - 8) / 3);
   lcd.fillRect(4, 12, bar, 40, TFT_RED);
   lcd.fillRect((int16_t)(4 + bar), 12, bar, 40, TFT_GREEN);
   lcd.fillRect((int16_t)(4 + bar * 2), 12, bar, 40, TFT_BLUE);
 
-  // 3. 向き。鏡像・上下逆なら数字を見ればすぐ分かる
+  // 3. Orientation. Mirrored or upside down shows instantly in the digits
   lcd.setFont(&font5x7);
   lcd.setTextColor(TFT_WHITE);
   lcd.setTextSize(3);
   const char *digits = "0123456789";
   lcd.drawString(digits, (int16_t)((w - lcd.textWidth(digits)) / 2), 66);
 
-  // 4. 基本図形
+  // 4. The basic shapes
   lcd.fillCircle(64, 172, 32, TFT_YELLOW);
   lcd.drawCircle(64, 172, 40, TFT_WHITE);
   lcd.fillTriangle(160, 132, 128, 212, 192, 212, TFT_CYAN);

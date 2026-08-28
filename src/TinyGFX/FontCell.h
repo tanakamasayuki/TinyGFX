@@ -1,22 +1,26 @@
-// TinyGFX - CellFont 形式のデコーダ
+// TinyGFX - the CellFont decoder
 //
-// 形式そのものは TinyGFX の外の仕様（LGFXFontToolJs docs/formats/cellfont.ja.md）。
-// ここにあるのは**その仕様の描画器側**だけ。構造体とアクセサは TinyGFX/CellFont.h。
+// The format itself is specified outside TinyGFX (LGFXFontToolJs,
+// docs/formats/cellfont.ja.md). Only the renderer side lives here; the structs
+// and accessors are in TinyGFX/CellFont.h.
 //
-// **生成されたフォントヘッダより先にこれを include すること。** 生成ヘッダは
-// 描画器のヘッダを include せず、型が無ければ #error で止まる（仕様 §12.2）。
+// Include this before any generated font header. Generated headers do not
+// include the renderer's header and stop with an #error when the types are
+// missing (spec 12.2).
 //
-// **H≤16 のピクセルグリッドフォントで最良。** それより大きくても、収録字数が
-// 少なければ総量では勝つ（仕様 §13.4。TinyGFX のデコーダ追加コストは実測 693 B）。
+// Best for pixel-grid fonts 16 pixels tall or less. Above that it can still
+// win on total size when the glyph count is small (spec 13.4; adding TinyGFX's
+// second decoder measures 693 bytes).
 //
-// 決めることは 3 つ、どれもポインタが nullptr かどうかで決まる:
-//   codes  == nullptr  連続索引 / 非 nullptr  疎索引（頭ブロック + 二分探索）
-//   glyphs == nullptr  固定ピッチ / 非 nullptr  可変ピッチ（4 バイト/字）
-//   next   == nullptr  終端     / 非 nullptr  同じ形式の次のフォントを見る
+// Three choices, each expressed by whether a pointer is null:
+//   codes  == nullptr  contiguous index / non-null  sparse (head block + binary search)
+//   glyphs == nullptr  fixed pitch      / non-null  variable pitch (4 bytes per glyph)
+//   next   == nullptr  end of chain     / non-null  try the next font in this format
 //
-// **U+FFFD への退避はここではやらない**（仕様 §15.2）。TinyGFX は形式をまたぐ連鎖
-// （TinyGFXFontRef::next）を外側に持つので、ここで退避すると後段の別形式フォントに
-// 載っている字へ到達できなくなる。退避は TinyGFX::drawChar が最外で行う。
+// Falling back to U+FFFD does not happen here (spec 15.2). TinyGFX has an
+// outer, cross-format chain (TinyGFXFontRef::next), and falling back in here
+// would hide every glyph a later format could have supplied. The fallback
+// belongs to TinyGFX::drawChar, at the outermost level.
 #pragma once
 #include <stdint.h>
 
@@ -28,20 +32,20 @@
 #error "TinyGFX implements CellFont spec version 1"
 #endif
 
-// 使う変種が決まっているなら、要らない側の分岐を落とせる。
+// When the variants in use are known, the unused branches can be dropped.
 #ifndef TINYGFX_FONT_SPARSE
-#define TINYGFX_FONT_SPARSE 1  // 0 にすると疎索引（コード表・頭ブロック）を落とす
+#define TINYGFX_FONT_SPARSE 1  // 0 drops the sparse index (code table, head block)
 #endif
 #ifndef TINYGFX_FONT_RECORDS
-#define TINYGFX_FONT_RECORDS 1  // 0 にすると可変ピッチ（グリフ表）を落とす
+#define TINYGFX_FONT_RECORDS 1  // 0 drops variable pitch (the glyph table)
 #endif
 
 namespace tinygfx_cell {
 
-/// フォント 1 本を引く。見つかれば true。仕様 §7.1。
+/// Look one font up. Returns true when found. Spec 7.1.
 ///
-/// **16bit 環境でも壊れないよう、加算ではなく減算で書く。**
-/// `first + count` や `lo + hi` は int が 16bit だと折り返す。
+/// Written with subtraction rather than addition so it survives a 16-bit
+/// environment: `first + count` and `lo + hi` both wrap when int is 16 bits.
 inline bool indexIn(const CellFont* f, uint16_t ch, uint16_t* outIndex) {
   const uint16_t first = CELLFONT_READ_U16(&f->first);
   const uint16_t count = CELLFONT_READ_U16(&f->count);
@@ -49,14 +53,15 @@ inline bool indexIn(const CellFont* f, uint16_t ch, uint16_t* outIndex) {
   const uint16_t* codes = (const uint16_t*)CELLFONT_READ_PTR(&f->codes);
   if (codes != nullptr) {
     const uint8_t head = CELLFONT_READ_U8(&f->headCount);
-    if (head != 0 && ch >= first) {  // 頭ブロック（連続。コード表に載らない）
+    if (head != 0 && ch >= first) {  // head block: contiguous, absent from the code table
       const uint16_t rel = (uint16_t)(ch - first);
       if (rel < head) {
         *outIndex = rel;
         return true;
       }
     }
-    // しっぽ。**first より小さいコードが混ざりうる**ので ch < first で打ち切れない
+    // The tail. Codes smaller than `first` can appear here, so an early
+    // `ch < first` bail-out would be wrong.
     uint16_t lo = 0, hi = (uint16_t)(count - head);
     while (lo < hi) {
       const uint16_t mid = (uint16_t)(lo + ((hi - lo) >> 1));
@@ -71,14 +76,15 @@ inline bool indexIn(const CellFont* f, uint16_t ch, uint16_t* outIndex) {
     return false;
   }
 #endif
-  if (ch < first) return false;  // 連続
+  if (ch < first) return false;  // contiguous index
   const uint16_t rel = (uint16_t)(ch - first);
   if (rel >= count) return false;
   *outIndex = rel;
   return true;
 }
 
-/// 同じ形式の連鎖を辿る。見つかったフォントを返す。無ければ nullptr。
+/// Walk the chain within this format. Returns the font that has the glyph,
+/// or nullptr.
 inline const CellFont* findIn(const CellFont* f, uint16_t ch, uint16_t* outIndex) {
   while (f != nullptr) {
     if (indexIn(f, ch, outIndex)) return f;
@@ -98,17 +104,19 @@ inline int16_t advance(const void* font, uint16_t ch) {
   return (int16_t)CELLFONT_READ_U8(&f->xAdvance);
 }
 
-/// 行送り。連鎖全体で一致している前提（仕様 §8）なので先頭のものでよい。
+/// Line advance. Spec 8 requires it to match across the chain, so the first
+/// font's value will do.
 inline uint8_t lineHeight(const void* font) {
   return CELLFONT_READ_U8(&((const CellFont*)font)->yAdvance);
 }
 
-/// ベースラインから箱の上端まで。仕様 §4 の ascent = -yOffset。
+/// Baseline to the top of the box. Spec 4: ascent = -yOffset.
 inline int16_t ascent(const void* font) {
   return (int16_t)(-(int8_t)CELLFONT_READ_U8(&((const CellFont*)font)->yOffset));
 }
 
-/// 1 文字描く。**y はベースライン。** 戻り値は送り幅（倍率をかける前）。収録外は -1。
+/// Draw one glyph. `y` is the baseline. Returns the advance before the text
+/// size multiplier, or -1 when the code is not covered.
 inline int16_t draw(TinyGFX& g, const void* font, uint16_t ch, int16_t x, int16_t y) {
   uint16_t idx = 0;
   const CellFont* f = findIn((const CellFont*)font, ch, &idx);
@@ -119,13 +127,13 @@ inline int16_t draw(TinyGFX& g, const void* font, uint16_t ch, int16_t x, int16_
   uint8_t gw, adv;
 #if TINYGFX_FONT_RECORDS
   const CellGlyph* gp = (const CellGlyph*)CELLFONT_READ_PTR(&f->glyphs);
-  if (gp != nullptr) {  // 可変ピッチ: グリフ表から引く
+  if (gp != nullptr) {  // variable pitch: look it up in the glyph table
     bmOffset = CELLFONT_READ_U16(&gp[idx].offset);
     gw = CELLFONT_READ_U8(&gp[idx].width);
     adv = CELLFONT_READ_U8(&gp[idx].xAdvance);
   } else
 #endif
-  {  // 固定ピッチ: 表を引かない。**32bit で計算する**（仕様 §15.2）
+  {  // fixed pitch: no table. Compute in 32 bits (spec 15.2)
     bmOffset = (uint32_t)idx * (uint32_t)CELLFONT_READ_U8(&f->bytesPerGlyph);
     gw = CELLFONT_READ_U8(&f->width);
     adv = CELLFONT_READ_U8(&f->xAdvance);
@@ -133,7 +141,8 @@ inline int16_t draw(TinyGFX& g, const void* font, uint16_t ch, int16_t x, int16_
 
   g.startWrite();
   if (g.hasTextBg()) {
-    // 行の箱は**連鎖先頭のメトリクス**で決める。フォントごとの高さで塗ると段がずれる
+    // The line box comes from the chain head's metrics. Using each font's own
+    // height would make the rows drift apart.
     const int16_t top = (int16_t)(y - (int16_t)(g.getTextAscent() * sz));
     g.fillRect(x, top, (int16_t)((uint16_t)adv * sz),
                (int16_t)((uint16_t)g.getTextLineHeight() * sz), g.getTextBgColor());
@@ -145,7 +154,8 @@ inline int16_t draw(TinyGFX& g, const void* font, uint16_t ch, int16_t x, int16_
     const uint8_t* src = bm + bmOffset;
     const int16_t gx = (int16_t)(x + (int16_t)((int8_t)CELLFONT_READ_U8(&f->xOffset) * sz));
     int16_t py = (int16_t)(y + (int16_t)((int8_t)CELLFONT_READ_U8(&f->yOffset) * sz));
-    // 行を連結した MSB first のビット列。行の途中ではバイト境界に揃わない
+    // Rows concatenated into one MSB-first bit stream; rows do not realign to
+    // byte boundaries.
     uint32_t bit = 0;
     for (uint8_t r = 0; r < gh; ++r) {
       int16_t px = gx;
@@ -176,7 +186,8 @@ inline int16_t draw(TinyGFX& g, const void* font, uint16_t ch, int16_t x, int16_
 
 }  // namespace tinygfx_cell
 
-/// この形式の入口。生成したフォントヘッダが TinyGFXFontRef からここを指す。
+/// This format's entry point. A TinyGFXFontRef built around a generated font
+/// header points here.
 static const TinyGFXFontOps tinygfxFontCellOps = {
     &tinygfx_cell::draw,
     &tinygfx_cell::advance,

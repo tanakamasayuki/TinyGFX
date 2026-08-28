@@ -4,10 +4,11 @@
 
 #include "Bus.h"
 
-/// LCD コントローラ。初期化列・MADCTL・原点オフセット・ウィンドウを持つ。
+/// An LCD controller: init sequence, MADCTL, origin offset and address window.
 ///
-/// 仮想メソッドは 7 本だけ。invertDisplay / sleep のような「あると便利だが
-/// 全員が払うほどではない」ものは具象パネル側の非仮想メソッドに置く。
+/// Only seven virtual methods. Things that are handy but not worth charging
+/// everyone for - invertDisplay, sleep and friends - live as non-virtual
+/// methods on the concrete panels instead.
 class TinyGFXPanel {
  public:
   virtual bool init() { return false; }
@@ -20,8 +21,8 @@ class TinyGFXPanel {
   virtual void beginTransaction() {}
   virtual void endTransaction() {}
 
-  int16_t width() const { return _width; }    // 回転後
-  int16_t height() const { return _height; }  // 回転後
+  int16_t width() const { return _width; }    // after rotation
+  int16_t height() const { return _height; }  // after rotation
 
  protected:
   ~TinyGFXPanel() = default;

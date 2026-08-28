@@ -1,11 +1,12 @@
 // TinyGFX - Hello World
 //
-// ST7789 に矩形と文字を出すだけの最小例。
+// The smallest thing that puts a rectangle and some text on an ST7789.
 //
-// バスはソフト SPI（pinMode / digitalWrite だけ）。どの Arduino Core でも動く。
-// ハードウェア SPI が使える環境なら HardwareSPI の例を見ること。
+// The bus is software SPI - nothing but pinMode and digitalWrite - so it runs
+// on every Arduino core. Where hardware SPI is available, see the HardwareSPI
+// example instead.
 //
-// フォントはこのスケッチに同梱している。TinyGFX はフォントデータを持たない。
+// The font is bundled with this sketch; TinyGFX ships no font data itself.
 #include <TinyGFX.h>
 #include <TinyGFX/BusSoftSPI.h>
 #include <TinyGFX/PanelST7789.h>
@@ -15,12 +16,12 @@
 
 static const TinyGFXFontRef font5x7 = {&tinygfxFont5x7, &tinygfxFontCellOps, nullptr};
 
-// 配線に合わせて変える
+// Change these to match your wiring
 static const int8_t PIN_SCK = 5;
 static const int8_t PIN_MOSI = 6;
 static const int8_t PIN_DC = 3;
 static const int8_t PIN_CS = 4;
-static const int8_t PIN_RST = 2;  // 無ければ -1
+static const int8_t PIN_RST = 2;  // -1 if the module has no reset pin
 
 TinyGFXBusSoftSPI bus(PIN_SCK, PIN_MOSI, PIN_DC, PIN_CS);
 TinyGFXPanelST7789 panel(bus, 240, 240, PIN_RST);

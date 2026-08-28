@@ -2,12 +2,13 @@
 #pragma once
 #include <stdint.h>
 
-/// RGB888 -> RGB565. constexpr: 定数畳み込みされ、コードは残らない。
+/// RGB888 -> RGB565. constexpr, so it folds at compile time and leaves no code.
 constexpr uint16_t tinygfx_color565(uint8_t r, uint8_t g, uint8_t b) {
   return (uint16_t)(((uint16_t)(r & 0xF8) << 8) | ((uint16_t)(g & 0xFC) << 3) | (uint16_t)(b >> 3));
 }
 
-// 既存ライブラリと同居できるよう、定義済みなら尊重する。マクロなのでコストは 0。
+// Respect an existing definition so we can live alongside other libraries.
+// Macros, so this costs nothing.
 #ifndef TFT_BLACK
 #define TFT_BLACK   0x0000
 #define TFT_NAVY    0x000F

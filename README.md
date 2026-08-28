@@ -168,8 +168,41 @@ The RAM cost is **width × rows × 2 bytes** and nothing else (240px × 1 row = 
 **The library bundles no font data at all.** Fonts live in your sketch.
 
 Generation is expected to go through
-[LGFXFontToolJs](https://www.npmjs.com/package/lgfx-font-tool). Two formats are supported,
-and **the decoder for the one you do not use is not linked in**.
+[LGFXFontToolJs](https://www.npmjs.com/package/lgfx-font-tool).
+
+### Making one
+
+The CLI bakes in **only the characters your project uses**.
+
+```sh
+npx -p lgfx-font-tool lgfx-font build --google "Noto Sans JP" --em 12 \
+    --chars "温度設定完了 23.5℃" --format cellfont --out font.h
+```
+
+> The package is `lgfx-font-tool` but the command is `lgfx-font`, so the `-p` is required.
+
+Those twelve characters come to **245 bytes**. It grows with what you add.
+
+The output is **plain CellFont** and mentions nothing from TinyGFX. Wrap it in
+one line to hand it to `setFont()`:
+
+```cpp
+#include <TinyGFX.h>
+#include <TinyGFX/FontCell.h>   // the decoder, for the format you use
+#include "font.h"               // straight from the CLI, never hand-edited
+
+static const TinyGFXFontRef myFont = {&font, &tinygfxFontCellOps, nullptr};
+
+lcd.setFont(&myFont);
+lcd.drawString("23.5", 8, 8);
+```
+
+`TinyGFX.h` brings in the CellFont types, so **include order does not matter**
+(types only, zero bytes).
+
+### Two formats
+
+**The decoder for the one you do not use is not linked in.**
 
 | Format | Suited to |
 | --- | --- |

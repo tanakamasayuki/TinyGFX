@@ -1,18 +1,21 @@
-// TinyGFX - SSD1306（モノクロ OLED、I2C / SPI）
+// TinyGFX - SSD1306 (monochrome OLED, I2C or SPI)
 //
-// SPI のカラーパネルとの違いは 2 つ。
+// Two things differ from a colour SPI panel.
 //
-//   1. **フレームバッファが要る。** GRAM を読み戻せず、ページ単位（縦 8 画素）で
-//      しか書けないので、任意の描画には手元にビットを持つしかない。
-//      128x64 で 1,024 バイト。**バッファは利用者が用意する**（動的確保しない）。
-//   2. **転送が遅延する。** 描くたびに 1KB 流すのは論外なので、`display()` を
-//      呼んだときに**変更のあったページだけ**流す。
+//   1. It needs a framebuffer. The GRAM cannot be read back and only writes a
+//      page (8 rows) at a time, so arbitrary drawing means keeping the bits
+//      locally. That is 1,024 bytes for 128x64, and the buffer is supplied by
+//      the caller - nothing is allocated here.
+//   2. Transfers are deferred. Pushing 1 KB after every draw is out of the
+//      question, so display() sends only the pages that changed.
 //
-// 描画 API は RGB565 のまま。このパネルが「0 でなければ点灯」で 1bpp に落とす。
-// 色深度の抽象化はコアに入れない（docs/DECISIONS.ja.md D4）。
+// The drawing API stays RGB565; this panel is what collapses it to 1bpp, with
+// "non-zero lights up". Colour depth is deliberately not abstracted in the
+// core (docs/DECISIONS.ja.md D4).
 //
-// 回転はコントローラではなくバッファの添字で行う。SSD1306 は 90 度回転を
-// 持たないので、MADCTL 相当に頼れないため。
+// Rotation is done by indexing the buffer rather than in the controller: the
+// SSD1306 has no 90-degree rotation, so there is no MADCTL equivalent to lean
+// on.
 #pragma once
 #include <stdint.h>
 
@@ -20,7 +23,7 @@
 
 class TinyGFXPanelSSD1306 : public TinyGFXPanel {
  public:
-  /// buffer は w * h / 8 バイト（128x64 なら 1,024）。
+  /// `buffer` is w * h / 8 bytes - 1,024 for 128x64.
   TinyGFXPanelSSD1306(TinyGFXBus& bus, uint8_t* buffer, int16_t w = 128, int16_t h = 64)
       : _bus(&bus), _buf(buffer), _natW(w), _natH(h) {
     _width = w;
@@ -49,12 +52,13 @@ class TinyGFXPanelSSD1306 : public TinyGFXPanel {
   void beginTransaction() override {}
   void endTransaction() override {}
 
-  /// 変更のあったページだけ流す。**これを呼ぶまで画面は変わらない。**
+  /// Push only the pages that changed. Nothing reaches the screen until this
+  /// is called.
   void display();
-  /// 手元のバッファを消す（画面はまだ変わらない）。
+  /// Clear the local buffer. The screen is untouched until display().
   void clearBuffer(bool on = false);
 
-  // 仮想にしない（全員が払うほどではない）
+  // Deliberately not virtual - not worth charging everyone for
   void invertDisplay(bool invert) { cmd(invert ? 0xA7 : 0xA6); }
   void setSleep(bool sleep) { cmd(sleep ? 0xAE : 0xAF); }
   void setContrast(uint8_t value) { cmd(0x81); cmd(value); }
@@ -62,10 +66,10 @@ class TinyGFXPanelSSD1306 : public TinyGFXPanel {
  private:
   void cmd(uint8_t c) { _bus->writeCommand(c); }
 
-  /// 論理座標 -> バッファのビット。範囲外は捨てる。
+  /// Logical coordinates to a bit in the buffer. Out-of-range writes are dropped.
   void put(bool on) {
     int16_t x = (int16_t)_cx, y = (int16_t)_cy;
-    // 次の画素へ進めるのは先に済ませる（早期 return しても崩れないように）
+    // Advance to the next pixel up front, so an early return cannot desync it
     if (_cx >= _xe) { _cx = _xs; ++_cy; } else { ++_cx; }
     if (x < 0 || y < 0 || x >= _width || y >= _height) return;
 
@@ -128,7 +132,7 @@ inline void TinyGFXPanelSSD1306::clearBuffer(bool on) {
 }
 
 inline void TinyGFXPanelSSD1306::display() {
-  if (_dirtyHi < _dirtyLo) return;  // 変更なし
+  if (_dirtyHi < _dirtyLo) return;  // nothing changed
   cmd(0x21); cmd(0); cmd((uint8_t)(_natW - 1));                    // column range
   cmd(0x22); cmd((uint8_t)_dirtyLo); cmd((uint8_t)_dirtyHi);       // page range
   _bus->writeData(&_buf[(int32_t)_dirtyLo * _natW],

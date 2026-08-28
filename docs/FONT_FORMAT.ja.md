@@ -169,14 +169,18 @@ ASCII 95 字 + 記号 6 字で −190 B（仕様 §7）。
 
 ## 6. フォントをどう作るか
 
-**実運用のフォントは LGFXFontToolJs の CLI が出す。**
+**実運用のフォントは LGFXFontToolJs の CLI が出す**（`lgfx-font-tool` 2.0.0 で公開済み）。
+
+**パッケージ名は `lgfx-font-tool`、コマンド名は `lgfx-font`** と食い違うので、
+`npx lgfx-font` では解決しない。`-p` でパッケージを指定する。
 
 ```sh
-npx lgfx-font build --google "Noto Sans JP" --px 16 --charset chars.txt --out src/font.h
+npx -p lgfx-font-tool lgfx-font build --google "Noto Sans JP" --em 12 \
+    --chars "温度設定完了 23.5℃" --format cellfont --out src/font.h
 ```
 
-出力は仕様 §12.2 の形（`static const CellFont Name CELLFONT_PROGMEM = {...}`）。
-`setFont()` に渡すには TinyGFX 側で 1 行包む:
+出力は仕様 §12.2 の形（`static const CellFont Name CELLFONT_PROGMEM = {...}`）で、
+**描画器のヘッダを include しない**。TinyGFX 側で 1 行包んで `setFont()` に渡す:
 
 ```cpp
 #include <TinyGFX.h>

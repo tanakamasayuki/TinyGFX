@@ -1,66 +1,74 @@
-// TinyGFX - フォントの受け口（形式に依らない部分）
+// TinyGFX - the format-independent side of fonts
 //
-// **コアはフォント形式を 1 つも知らない。** 知っているのはフォント側で、
-// データと一緒に「自分をどう描くか」（TinyGFXFontOps）を指している。
+// The core knows nothing about font formats. The font does: it carries, next
+// to its data, a pointer to the code that draws it (TinyGFXFontOps).
 //
-//   スケッチ ── #include <TinyGFX/FontCell.h> ──▶ CellFont のデコーダ
-//            └─ #include <TinyGFX/FontU8g2.h> ──▶ u8g2 のデコーダ
+//   sketch ── #include <TinyGFX/FontCell.h> ──> the CellFont decoder
+//          └─ #include <TinyGFX/FontU8g2.h> ──> the u8g2 decoder
 //
-// include していない形式のデコーダは**どこからも参照されないのでリンクされない。**
-// 形式を増やしてもフットプリントは増えない（使わなければ 0 バイト）。
+// A decoder you do not include is referenced by nothing and therefore is not
+// linked. Adding formats does not grow the footprint - an unused one is zero
+// bytes.
 //
-// 連鎖は 2 段ある。**役割が違うので両方要る。**
+// There are two levels of chaining, and both are needed because they do
+// different jobs:
 //
-//   TinyGFXFontRef::next  形式をまたぐ連鎖。半角 CellFont → 全角 u8g2 など
-//   CellFont::next        同じ形式の中の連鎖。幅クラスで分けて固定ピッチを立てる
+//   TinyGFXFontRef::next  across formats - Latin in CellFont, CJK in u8g2
+//   CellFont::next        within one format - split by cell width class so
+//                         each part stays fixed pitch
 //
-// **U+FFFD への退避は最外（TinyGFX::drawChar）でだけ行う。** デコーダの中で
-// やると、その形式に U+FFFD があるだけで後段の別形式に到達できなくなる
-// （CellFont 仕様 §15.2）。デコーダは「見つかった / 見つからない」を返すに留める。
+// Falling back to U+FFFD happens only at the outermost level, in
+// TinyGFX::drawChar. Doing it inside a decoder means a notdef in the first
+// format hides every glyph that a later format would have provided (CellFont
+// spec 15.2). A decoder only ever reports found or not found.
 #pragma once
 #include <stddef.h>
 #include <stdint.h>
 
 class TinyGFX;
 
-/// 形式ごとの入口。「収録外なら -1」で統一する。
+/// The entry point for one format. Everything returns -1 for "not covered".
 struct TinyGFXFontOps {
-  /// 1 文字描いて送り幅を返す。**y はベースライン。** 収録外なら -1（何も描かない）。
+  /// Draw one glyph and return its advance. `y` is the baseline.
+  /// Returns -1 when the code is not covered, having drawn nothing.
   int16_t (*draw)(TinyGFX& gfx, const void* font, uint16_t ch, int16_t x, int16_t y);
-  /// 描かずに送り幅だけ返す。収録外なら -1。
+  /// The advance only, without drawing. -1 when not covered.
   int16_t (*advance)(const void* font, uint16_t ch);
-  /// 行送り（倍率をかける前）。
+  /// Line advance, before the text size multiplier.
   uint8_t (*lineHeight)(const void* font);
-  /// ベースラインから行の箱の上端まで（倍率をかける前）。
-  /// **コアはこれで「行の上端」をベースラインに直す。** 連鎖の先頭のものだけを使う。
+  /// Baseline to the top of the line box, before the text size multiplier.
+  /// The core uses this to turn a "line top" into a baseline, and it only ever
+  /// asks the first font in the chain.
   int16_t (*ascent)(const void* font);
 };
 
-/// スケッチが `setFont()` に渡すもの。フォントデータと入口の組。
+/// What a sketch hands to setFont(): font data paired with its entry point.
 struct TinyGFXFontRef {
   const void* data;
   const TinyGFXFontOps* ops;
-  /// この字を持っていないとき次に探すフォント。nullptr で終端。
-  /// **形式が違っていてもよい。**
+  /// Where to look next when this font has no such glyph; nullptr ends the
+  /// chain. The next font may be in a different format.
   const TinyGFXFontRef* next;
 };
 
 // ---------------------------------------------------------------------------
-// フォントデータの読み出し（CellFont 以外の形式用）
+// Reading font data (for formats other than CellFont)
 //
-// AVR はフラッシュとデータのアドレス空間が別なので、PROGMEM に置いたデータは
-// pgm_read_* でしか読めない。それ以外のアーキテクチャでは素の参照に展開され、
-// 1 命令も増えない。
+// AVR keeps flash and data in separate address spaces, so anything in PROGMEM
+// can only be read through pgm_read_*. On every other architecture these
+// expand to a plain dereference and cost not a single instruction.
 //
-// **フォントデータ側は 1 つ残らず PROGMEM に置く。** デコーダはこれらを必ず
-// tinygfx_rd* で読むので、**どれか 1 つでも外すと AVR で化ける**
-// （pgm_read_* が RAM のアドレスをプログラム空間として読むため）。生成器の責任。
+// Every last piece of font data belongs in PROGMEM. The decoders always read
+// it through tinygfx_rd*, so leaving the attribute off any one of them
+// produces garbage on AVR - pgm_read_* would be reading a RAM address out of
+// program space. That is the generator's responsibility.
 //
-// 逆に `TinyGFXFontRef` と `TinyGFXFontOps` は素の const（AVR では RAM）に置き、
-// 素の参照で読む。合わせて 1 フォントあたり 6〜12 バイトで、そのぶん分岐経路が安い。
+// TinyGFXFontRef and TinyGFXFontOps go the other way: plain const (RAM on
+// AVR), read by plain dereference. Together they are 6-12 bytes per font, and
+// in exchange the dispatch path stays cheap.
 //
-// CellFont は仕様が名前を決めているので、同じものを `CELLFONT_READ_*` として
-// <CellFont.h> が別に持つ（そちらは TinyGFX に依存しない）。
+// CellFont has its own spec-mandated spelling of the same thing,
+// CELLFONT_READ_*, which lives in CellFont.h and does not depend on TinyGFX.
 // ---------------------------------------------------------------------------
 #if defined(__AVR__)
 #include <avr/pgmspace.h>

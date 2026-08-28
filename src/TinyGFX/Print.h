@@ -1,10 +1,10 @@
 // TinyGFX - Print / printf / float support (opt-in)
 //
-// このヘッダを include したときだけ Print がリンクされる。
-// float を渡すと浮動小数点の書式化まで載る。CH32V003 では致命的に大きい。
-// コストは docs/FOOTPRINT.ja.md を見ること。
+// Print is linked in only when this header is included. Hand it a float and
+// floating-point formatting comes along too, which is fatally large on a
+// CH32V003. See docs/FOOTPRINT.ja.md for what it costs.
 #pragma once
-#include <Arduino.h>  // Print はコアの Arduino.h が出す（api/Print.h 型のコアにも対応）
+#include <Arduino.h>  // Print comes from the core's Arduino.h (also covers api/Print.h cores)
 
 #include "Gfx.h"
 
@@ -13,7 +13,7 @@ class TinyGFXPrint : public TinyGFX, public Print {
   explicit TinyGFXPrint(TinyGFXPanel& panel) : TinyGFX(panel) {}
 
   using TinyGFX::setTextSize;
-  /// 小数倍の文字サイズ。float を持ち込むのでコアには置かない。
+  /// Fractional text size. Kept out of the core because it drags in float.
   void setTextSize(float size) {
     int16_t s = (int16_t)(size + 0.5f);
     if (s < 1) s = 1;

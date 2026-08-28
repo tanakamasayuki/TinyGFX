@@ -1,8 +1,9 @@
 // TinyGFX - software (bit-banged) SPI bus
 //
-// pinMode / digitalWrite だけで動く。SPI ライブラリを持たない、あるいは
-// 対象バリアントで SPI がリンクできないコア（CH32V003 など）でも使える。
-// 遅いが、どの Arduino Core でも必ず動くのが取り柄。
+// Runs on nothing but pinMode and digitalWrite, so it works on cores that
+// ship no SPI library at all, or where SPI will not link for the target
+// variant (the CH32V003 cores, for instance). It is slow, but it is the one
+// bus that works on every Arduino core.
 #pragma once
 #include <Arduino.h>
 
@@ -32,9 +33,10 @@ class TinyGFXBusSoftSPI : public TinyGFXBus {
     if (_cs >= 0) digitalWrite(_cs, HIGH);
   }
 
-  /// **読めない。** このバスは MISO のピンを受け取っていないので線が無い。
-  /// 読み戻しが要る用途では TinyGFXBusSPI を使う。
-  /// 空のまま置いてあるのは、`__cxa_pure_virtual` を呼ばないため（Bus.h と同じ理由）。
+  /// Cannot read: this bus is never told a MISO pin, so there is no wire.
+  /// Use TinyGFXBusSPI when you need read-back.
+  /// It is left empty rather than pure so that __cxa_pure_virtual stays out
+  /// of the build (same reason as Bus.h).
   void readSequence(const uint8_t* script, uint8_t scriptLen, uint8_t dummy, uint8_t* buf,
                     size_t len) override {
     (void)script;

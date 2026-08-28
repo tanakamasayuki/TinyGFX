@@ -3,33 +3,37 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/// 転送層。SPI の叩き方と CS / DC を持つ。
+/// The transport layer: how bytes reach the panel, plus CS and DC.
 ///
-/// 純粋仮想にしていないのは __cxa_pure_virtual を持ち込まないため。
-/// 仮想デストラクタも置かない（vtable のスロットと operator delete を避ける）。
+/// None of these are pure virtual, so that __cxa_pure_virtual never gets
+/// pulled in. There is no virtual destructor either - that would cost a vtable
+/// slot and drag in operator delete.
 class TinyGFXBus {
  public:
   virtual void init() {}
-  virtual void beginTransaction() {}                            // CS Low
-  virtual void endTransaction() {}                              // CS High
-  virtual void writeCommand(uint8_t cmd) { (void)cmd; }         // DC Low
-  virtual void writeData(const uint8_t* data, size_t len) { (void)data; (void)len; }  // DC High
+  virtual void beginTransaction() {}                            // CS low
+  virtual void endTransaction() {}                              // CS high
+  virtual void writeCommand(uint8_t cmd) { (void)cmd; }         // DC low
+  virtual void writeData(const uint8_t* data, size_t len) { (void)data; (void)len; }  // DC high
   virtual void writeColor(uint16_t color, uint32_t count) { (void)color; (void)count; }
   virtual void writePixels(const uint16_t* data, uint32_t count) { (void)data; (void)count; }
-  /// コマンドを送ってから読み戻す。**読めないバスでは何もしない**（buf は触らない）。
+
+  /// Send commands, then read back. A bus that cannot read leaves `buf` alone.
   ///
-  /// `script` は `{コマンド, 引数の数, 引数...}` を並べたもの。最後のコマンドを
-  /// 送り終えたところから、ダミーを `dummy` バイト読み飛ばして `len` バイト読む。
+  /// `script` is a sequence of `{command, argument count, arguments...}`.
+  /// After the last command has gone out, `dummy` bytes are discarded and then
+  /// `len` bytes are read.
   ///
-  /// **送信と受信を 1 本の仮想メソッドにまとめてある。** データ線が 1 本の
-  /// パネル（M5Stack の ILI9342C など）では、コマンドの送出も含めて全部を
-  /// 手で叩かないと安定しない（周辺機と手叩きを途中で切り替えるとビットがずれる。
-  /// 実測で確認）。分けて置くとこれが書けない。
+  /// Send and receive are deliberately one method. On panels with a single
+  /// shared data line (the ILI9342C on an M5Stack, for instance) the whole
+  /// exchange has to be driven the same way; switching between the SPI
+  /// peripheral and bit-banging part way through shifts the bits (measured).
+  /// Splitting this in two would make that impossible to express.
   virtual void readSequence(const uint8_t* script, uint8_t scriptLen, uint8_t dummy,
                             uint8_t* buf, size_t len) {
     (void)script; (void)scriptLen; (void)dummy; (void)buf; (void)len;
   }
 
  protected:
-  ~TinyGFXBus() = default;  // 非仮想・protected。トリビアルなまま保つ
+  ~TinyGFXBus() = default;  // non-virtual and protected: keep this type trivial
 };

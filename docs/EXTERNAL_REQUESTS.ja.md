@@ -356,24 +356,24 @@ TinyGFX 側は **2026-08-28 に CellFont v1 の描画器を実装済み**
 2. 固定ピッチのビットマップオフセットが 16bit — 大きな集合で折り返す
 3. 二分探索の中央値が加算形 — 16bit 環境で折り返す
 
-### 残っている依頼 — CLI
+### CLI は公開された（2026-08-28）
 
-`docs/cli.ja.md`（草案）の `lgfx-font build` が揃えば、TinyGFX 側のつなぎ
-（`tools/gen_font.py`）を畳める。TinyGFX から見て要るのは 1 つだけ:
+`lgfx-font-tool` **2.0.0** で `lgfx-font build` が使える。**依頼としては閉じてよい。**
 
 ```sh
-lgfx-font build --font <書体> --chars "..." --format cellfont --out font.h
+npx -p lgfx-font-tool lgfx-font build --google "Noto Sans JP" --em 12 \
+    --chars "温度設定完了 23.5℃" --format cellfont --out font.h
 ```
 
-**出力は仕様 §12.2 の形（純粋な `CellFont`）で十分。** TinyGFX 固有のものを
-含める必要はない。`setFont()` に渡すための 1 行はスケッチ側で書く:
+**パッケージ名（`lgfx-font-tool`）とコマンド名（`lgfx-font`）が違う**ので、
+`npx lgfx-font build ...` は 404 になる。`-p` が要る。README に書いておくと親切かも。
 
-```cpp
-static const TinyGFXFontRef myFont = {&Name, &tinygfxFontCellOps, nullptr};
-```
+出力を `tests/clifont/` にそのまま置いて回帰検査にした。**ローカルの checkout と
+公開版でデータはバイト一致**（違いはシンボル名だけ。出力ファイル名から取るため）。
 
-`tools/gen_font.py` は**既に §12.2 の形で吐いている**ので、CLI が揃ったら
-ファイルを差し替えるだけで済む（`tests/text/` がそのまま回帰検査になる）。
+TinyGFX 側のつなぎ `tools/gen_font.py` は、外部ツールなしで `tests/` と
+`examples/` が走るために残す。**出力は仕様 §12.2 の形なので、置き換えたければ
+ファイルを差し替えるだけ。**
 
 ### CLI 草案へのコメント
 

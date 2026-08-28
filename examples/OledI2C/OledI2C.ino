@@ -1,12 +1,14 @@
 // TinyGFX - OledI2C
 //
-// I2C のモノクロ OLED（SSD1306 128x64）。
+// A monochrome OLED over I2C (SSD1306, 128x64).
 //
-// SPI のカラーパネルとの違いは 2 つ。
-//   1. **フレームバッファが要る。** 128x64 で 1,024 バイト。利用者が用意する
-//   2. **display() を呼ぶまで画面は変わらない。** 変更のあったページだけ流す
+// Two things differ from a colour SPI panel.
+//   1. It needs a framebuffer - 1,024 bytes for 128x64, supplied by you
+//   2. Nothing reaches the screen until display(), and only the pages that
+//      changed are sent
 //
-// 描画 API はカラーパネルと同じ。色は「0 でなければ点灯」で 1bpp に落ちる。
+// The drawing API is the same as for a colour panel; colours collapse to 1bpp
+// as "non-zero lights up".
 #include <TinyGFX.h>
 #include <TinyGFX/BusI2C.h>
 #include <TinyGFX/PanelSSD1306.h>
@@ -19,7 +21,7 @@ static const TinyGFXFontRef font5x7 = {&tinygfxFont5x7, &tinygfxFontCellOps, nul
 static const int16_t WIDTH = 128;
 static const int16_t HEIGHT = 64;
 
-// フレームバッファ。128x32 のパネルなら半分（512 バイト）で済む。
+// The framebuffer. A 128x32 panel needs half of this (512 bytes).
 static uint8_t framebuffer[WIDTH * HEIGHT / 8];
 
 TinyGFXBusI2C bus(/*address*/ 0x3C);
@@ -37,7 +39,7 @@ void setup() {
   lcd.setTextColor(TFT_WHITE);
   lcd.drawString("12:34", 12, 40);
 
-  panel.display();   // ここで初めて転送される
+  panel.display();   // nothing was sent until this line
 }
 
 void loop() {}
