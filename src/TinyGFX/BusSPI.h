@@ -21,6 +21,12 @@
 // bulk instead of one transfer() call each. The only RAM cost is size * 2
 // bytes of stack.
 //
+// How many bytes a read may be and still be retried until two attempts agree.
+// Only the read path uses this, and only on the stack.
+#ifndef TINYGFX_READ_AGREE_MAX
+#define TINYGFX_READ_AGREE_MAX 8
+#endif
+
 // This only helps on cores that actually implement a block transfer; elsewhere
 // it is a wash or marginally slower. 32 means 64 bytes; on a CH32V003 (2 KB of
 // RAM) 8 to 16 is about the ceiling.
@@ -51,24 +57,6 @@ class TinyGFXBusSPI : public TinyGFXBus {
     if (_cs >= 0) digitalWrite(_cs, LOW);
   }
 
-  /// Hand the bit-banged data line back to the SPI peripheral.
-  /// You do not have to call this: the next draw does it from
-  /// beginTransaction().
-  void endRead() {
-    if (!_rdActive) return;
-    _rdActive = false;
-    digitalWrite(_rdSck, LOW);
-    pinMode(_rdSda, OUTPUT);
-    // end() has to come first - ESP32's begin() does nothing when the bus is
-    // already started. The pauses around it are pure caution; nothing about
-    // read-back is speed-critical.
-    delayMicroseconds(50);
-    _spi->end();
-    delayMicroseconds(50);
-    _spi->begin();
-    delayMicroseconds(50);
-  }
-
   void endTransaction() override {
     if (_cs >= 0) digitalWrite(_cs, HIGH);
     _spi->endTransaction();
@@ -76,82 +64,72 @@ class TinyGFXBusSPI : public TinyGFXBus {
 
   /// For panels with a single shared data line (the ILI9342C on an M5Stack).
   ///
-  /// WARNING: this is the one path that touches the bus lifecycle. Turning the
-  /// line around needs SPI.end() and SPI.begin(), which re-establishes the bus
-  /// on its default pins. Do not use it when another device shares the wires.
-  /// Nothing happens unless you call this, so the normal path is unaffected.
-  ///
   /// On some boards SDA doubles as MOSI and MISO, and the SPI peripheral's
-  /// MISO pin is connected to nothing. A plain transfer() cannot read there -
-  /// every bit comes back as 1 (measured). Given SCK and SDA, the line is
-  /// turned around and clocked by hand for the duration of a read. Writing
-  /// still goes through the peripheral, so nothing gets slower.
+  /// MISO pin is connected to nothing. A plain transfer() cannot read there.
+  /// Given SCK and SDA, the whole exchange is clocked by hand instead, and the
+  /// pins are handed back to the peripheral before the next draw.
   ///
   /// For an M5Stack Core / BASIC: bus.setReadPins(18, 23);
   ///
-  /// Limitation: every read re-establishes the line with SPI.end() and
-  /// SPI.begin(), so this cannot be used together with SPI.begin(...) on
-  /// non-default pins - they would revert to the defaults.
+  /// Read-back is for debugging and verification. It is slow - roughly 150us
+  /// per pixel - and it is not something normal drawing should touch.
   ///
-  /// EXPERIMENTAL - do not rely on this yet.
-  ///
-  /// A raw probe that bit-bangs the whole exchange, commands included, reads
-  /// reliably: colours written come back as FC 00 00 / 00 FC 00 / 00 00 FC /
-  /// FC FC FC (RGB666, one dummy byte). Going through this class does not
-  /// reproduce that. Something about how the ESP32 GPIO matrix and SPI share
-  /// the pin is still unresolved. Measurements are in docs/MANUAL_TEST.ja.md,
-  /// under the read-back section.
-  ///
-  /// Read outside startWrite() / endWrite(). Read-back takes the line
-  /// independently of the drawing transaction.
-  ///
-  /// Read-back exists for debugging and verification, not for normal drawing,
-  /// so it is tuned entirely for certainty over speed.
-  ///
-  /// `settleUs` is the wait per clock edge. The default of 2us is roughly
-  /// 125 kHz. Going faster misses bits: at the equivalent of 1us, 51 of 3,072
-  /// pixels came back with a bit flipped.
-  void setReadPins(int8_t sck, int8_t sda, uint8_t settleUs = 2) {
+  /// Read outside startWrite() / endWrite(): it takes the line independently
+  /// of the drawing transaction.
+  void setReadPins(int8_t sck, int8_t sda) {
     _rdSck = sck;
     _rdSda = sda;
-    _rdSettle = settleUs;
+  }
+
+  /// Hand the bit-banged line back to the SPI peripheral.
+  ///
+  /// You do not have to call this - the next draw does it from
+  /// beginTransaction(). **end() then begin(), in that order**: ESP32's
+  /// SPI.begin() returns early when the bus is already started, so begin()
+  /// alone leaves the pins in GPIO mode and every later write silently goes
+  /// nowhere (measured).
+  void endRead() {
+    if (!_rdActive) return;
+    _rdActive = false;
+    digitalWrite(_rdSck, LOW);
+    pinMode(_rdSda, OUTPUT);
+    _spi->end();
+    _spi->begin();
   }
 
   /// Send commands, then read back. CS is asserted and released in here.
   ///
-  /// Switching between the peripheral and bit-banging part way through shifts
-  /// the bits, so once read pins are configured the whole exchange is handled
-  /// consistently (measured).
+  /// Reads the same thing twice and keeps going until two attempts agree.
+  /// About one byte in twenty comes back with a bit flipped, and the clock
+  /// cannot be slowed to fix it: **any delay at all and the panel stops
+  /// driving the line**, so every byte reads FF (all measured).
   void readSequence(const uint8_t* script, uint8_t scriptLen, uint8_t dummy, uint8_t* buf,
                     size_t len) override {
     for (size_t i = 0; i < len; ++i) buf[i] = 0;
     if (_rdSck < 0) return;  // this bus cannot read
 
-    // Commands go out through the peripheral. On ESP32, pinMode(OUTPUT) does
-    // not win the pin back from the GPIO matrix, so bit-banging produces no
-    // waveform at all (measured: everything reads FF). pinMode(INPUT), on the
-    // other hand, reliably stops the output - so only the receive half is
-    // clocked by hand.
-    beginTransaction();
-    uint8_t i = 0;
-    while (i < scriptLen) {
-      const uint8_t cmd = script[i++];
-      const uint8_t n = script[i++];
-      writeCommand(cmd);
-      if (n) writeData(&script[i], n);
-      i = (uint8_t)(i + n);
+    if (!_rdActive) {
+      // Take the pins with pinMode alone. Calling SPI.end() first looks tidier
+      // but kills it - every read then comes back FF (measured).
+      pinMode(_rdSck, OUTPUT);
+      pinMode(_rdSda, OUTPUT);
+      digitalWrite(_rdSck, LOW);
+      _rdActive = true;
     }
-    _spi->endTransaction();
+    bbSequence(script, scriptLen, dummy, buf, len);
 
-    digitalWrite(_rdSck, LOW);
-    pinMode(_rdSck, OUTPUT);
-    digitalWrite(_rdSck, LOW);
-    pinMode(_rdSda, INPUT);  // hand the line to the panel
-    _rdActive = true;
-    for (uint8_t d = 0; d < dummy; ++d) bbRead();
-    for (size_t k = 0; k < len; ++k) buf[k] = bbRead();
-    if (_cs >= 0) digitalWrite(_cs, HIGH);
-    endRead();  // give the line back every time; batching it stops the reads working (measured)
+    if (len <= TINYGFX_READ_AGREE_MAX) {
+      uint8_t again[TINYGFX_READ_AGREE_MAX];
+      for (uint8_t t = 0; t < 4; ++t) {
+        bbSequence(script, scriptLen, dummy, again, len);
+        bool same = true;
+        for (size_t i = 0; i < len; ++i) {
+          if (buf[i] != again[i]) same = false;
+        }
+        if (same) return;
+        for (size_t i = 0; i < len; ++i) buf[i] = again[i];
+      }
+    }
   }
 
   void writeCommand(uint8_t cmd) override {
@@ -211,23 +189,51 @@ class TinyGFXBusSPI : public TinyGFXBus {
   }
 
  private:
-  uint8_t bbRead() {
+  // Hand-clocked, and deliberately tight. Inserting so much as a
+  // delayMicroseconds(1) per edge makes the panel stop answering (measured).
+  void bbOut(uint8_t v, bool isCmd) {
+    digitalWrite(_dc, isCmd ? LOW : HIGH);
+    for (int8_t i = 7; i >= 0; --i) {
+      digitalWrite(_rdSda, (v >> i) & 1);
+      digitalWrite(_rdSck, HIGH);
+      digitalWrite(_rdSck, LOW);
+    }
+    digitalWrite(_dc, HIGH);
+  }
+
+  uint8_t bbIn() {
     uint8_t v = 0;
     for (uint8_t i = 0; i < 8; ++i) {  // mode 0: sample on the rising edge
       digitalWrite(_rdSck, HIGH);
-      if (_rdSettle) delayMicroseconds(_rdSettle);
       v = (uint8_t)((v << 1) | (digitalRead(_rdSda) ? 1 : 0));
       digitalWrite(_rdSck, LOW);
-      if (_rdSettle) delayMicroseconds(_rdSettle);
     }
     return v;
+  }
+
+  void bbSequence(const uint8_t* script, uint8_t scriptLen, uint8_t dummy, uint8_t* buf,
+                  size_t len) {
+    pinMode(_rdSda, OUTPUT);
+    if (_cs >= 0) digitalWrite(_cs, LOW);
+    uint8_t i = 0;
+    while (i < scriptLen) {
+      const uint8_t cmd = script[i++];
+      const uint8_t n = script[i++];
+      bbOut(cmd, true);
+      for (uint8_t k = 0; k < n; ++k) bbOut(script[i + k], false);
+      i = (uint8_t)(i + n);
+    }
+    pinMode(_rdSda, INPUT);  // hand the line to the panel
+    for (uint8_t d = 0; d < dummy; ++d) bbIn();
+    for (size_t k = 0; k < len; ++k) buf[k] = bbIn();
+    if (_cs >= 0) digitalWrite(_cs, HIGH);
+    pinMode(_rdSda, OUTPUT);
   }
 
   SPIClass* _spi;
   uint32_t _freq;
   int8_t _rdSck = -1;
   int8_t _rdSda = -1;
-  uint8_t _rdSettle = 2;
   bool _rdActive = false;
   int8_t _dc;
   int8_t _cs;

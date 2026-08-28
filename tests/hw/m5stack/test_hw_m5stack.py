@@ -15,23 +15,22 @@ PROGMEM。AVR でフォント構造体が PROGMEM に載っていなかった不
 実機の出力からは作らない（実機がおかしくても「一致」してしまうため）。
 シーンの定義は `tests/common_libs/tgfx_test/src/tgfx_scene.h` の 1 箇所だけ。
 
-## パネルの読み戻しについて — **実験扱い**
+## パネルの読み戻しについて
 
 M5Stack の ILI9342C は **SDA が GPIO23 の 1 本きり**（MOSI と MISO の兼用）で、
 SPI 周辺機の MISO（GPIO19）には何も来ていない。読むには線の向きを変えて
-手で叩くしかない（`TinyGFXBusSPI::setReadPins`）。
+手で叩くしかない（`TinyGFXBusSPI::setReadPins`）。2026-08-28 に**動くようになった。**
 
-2026-08-28 の実測で分かったこと:
+効く条件は 4 つとも実測で詰めてある。詳細は
+[docs/MANUAL_TEST.ja.md](../../../docs/MANUAL_TEST.ja.md) の「読み戻し」。
 
-- **読める。** 書いた色が `FC 00 00 / 00 FC 00 / 00 00 FC / FC FC FC` として
-  そのまま返る（RGB666、ダミー 1 バイト）
-- **ID レジスタ（0x04 など）は FF しか返さない。** GRAM は読めるのに、である
-- **繰り返すと不安定。** 線を周辺機に戻すのに `SPI.end()` / `SPI.begin()` が要り、
-  これを何十回も回すとボードが固まる
+- **待ちを入れない。** 1 エッジでも `delayMicroseconds` を挟むとパネルが線を離す
+- **1 画素ごとに窓を張り直す。** 連続読みではカラムが進まず同じ画素が返る
+- **2 回読んで一致するまで繰り返す。** 20 バイトに 1 回ほどビットが化ける
+- **戻すのは `SPI.end()` → `SPI.begin()`。** `begin()` だけだと何も起きず、
+  以降の書き込みが黙って死ぬ
 
-そのため**既定では走らせない。** 試すときだけ明示的に:
-
-    TINYGFX_HW_READBACK=1 uv run --env-file .env pytest hw --profile m5stack
+読めないパネルでは skip する。読めるなら**既定で走る** — 上 8 行で 75ms 程度。
 """
 
 import os
@@ -93,12 +92,6 @@ def test_scene_matches_host_golden(arduino_test):
     assert result.metrics["capture_pixels"][0] == w * h * 2 or True
 
 
-READBACK = os.environ.get("TINYGFX_HW_READBACK") == "1"
-readback_only = pytest.mark.skipif(
-    not READBACK, reason="読み戻しは実験扱い（TINYGFX_HW_READBACK=1 で有効）")
-
-
-@readback_only
 def test_panel_readback_capability(arduino_test):
     """このパネルは GRAM を読み戻せるか。**読めなければ skip**（不具合ではない）。"""
     result = arduino_test.run("test_panel_readable")[0]
@@ -109,7 +102,6 @@ def test_panel_readback_capability(arduino_test):
     print(f"  readback probe: {dump}")
 
 
-@readback_only
 def test_readback_matches_golden(arduino_test):
     """読み戻した絵もゴールデンと一致すること。**線から先まで見える唯一のテスト。**"""
     probe = arduino_test.run("test_panel_readable")[0]
@@ -117,7 +109,7 @@ def test_readback_matches_golden(arduino_test):
         pytest.skip("このパネルは読み戻せない（M5Stack Core は SDO が GPIO19 に来ていない）")
 
     w, h, want = _golden_rgb565()
-    rh = 2  # 実機が読み戻すのは上 2 行だけ（線の張り替えを繰り返すと固まる）
+    rh = 8  # 実機が読み戻すのは上 8 行（1 画素 150us かかるため）
     result = arduino_test.run("test_readback_scene")[0]
     art = {a.filename: a for a in result.artifact_files}
     _compare("readback", Path(art["readback.rgb565"].path).read_bytes(), w, rh, want[: w * rh])
