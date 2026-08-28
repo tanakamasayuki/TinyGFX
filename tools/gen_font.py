@@ -367,7 +367,7 @@ def main():
         "// 実運用のフォントは LGFXFontToolJs で作る（docs/DECISIONS.ja.md D17）。",
         "// TinyGFX 本体はフォントデータを同梱しない。スケッチ側に置くこと。",
         "#pragma once",
-        "#include <TinyGFX/Font.h>",
+        "#include <TinyGFX/FontTiny.h>",
         "#include <stdint.h>",
         "",
         f"static const uint8_t {sym}Bitmaps[{len(bitmap)}] TINYGFX_FONT_PROGMEM = {{",
@@ -397,7 +397,7 @@ def main():
         ]
 
     parts += [
-        f"static const TinyGFXFont {sym} TINYGFX_FONT_PROGMEM = {{",
+        f"static const TinyGFXFontTiny {sym}Data = {{",
         f"    {sym}Bitmaps,",
         f"    {sym}Glyphs," if args.mode == "records" else "    nullptr,  // 固定ピッチ",
         f"    {sym}Codes," if args.sparse else "    nullptr,  // 連続索引",
@@ -410,6 +410,11 @@ def main():
         "    0,  // xOffset",
         "    0,  // yOffset（行の上端からのグリフ上端）",
         f"    {bytes_per_glyph},  // bytesPerGlyph",
+        "};",
+        "",
+        f"static const TinyGFXFontRef {sym} = {{",
+        f"    &{sym}Data,",
+        "    &tinygfxFontTinyOps,",
         (f"    &{args.next_font},  // next" if args.next_font else "    nullptr,  // next"),
         "};",
         "",

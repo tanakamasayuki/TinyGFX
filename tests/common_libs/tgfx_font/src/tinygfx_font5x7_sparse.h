@@ -7,7 +7,7 @@
 // 実運用のフォントは LGFXFontToolJs で作る（docs/DECISIONS.ja.md D17）。
 // TinyGFX 本体はフォントデータを同梱しない。スケッチ側に置くこと。
 #pragma once
-#include <TinyGFX/Font.h>
+#include <TinyGFX/FontTiny.h>
 #include <stdint.h>
 
 static const uint8_t tinygfxFont5x7SparseBitmaps[160] TINYGFX_FONT_PROGMEM = {
@@ -34,7 +34,7 @@ static const uint16_t tinygfxFont5x7SparseCodes[32] TINYGFX_FONT_PROGMEM = {
     0x003E, 0x003F,
 };
 
-static const TinyGFXFont tinygfxFont5x7Sparse TINYGFX_FONT_PROGMEM = {
+static const TinyGFXFontTiny tinygfxFont5x7SparseData = {
     tinygfxFont5x7SparseBitmaps,
     nullptr,  // 固定ピッチ
     tinygfxFont5x7SparseCodes,
@@ -47,5 +47,10 @@ static const TinyGFXFont tinygfxFont5x7Sparse TINYGFX_FONT_PROGMEM = {
     0,  // xOffset
     0,  // yOffset（行の上端からのグリフ上端）
     5,  // bytesPerGlyph
+};
+
+static const TinyGFXFontRef tinygfxFont5x7Sparse = {
+    &tinygfxFont5x7SparseData,
+    &tinygfxFontTinyOps,
     nullptr,  // next
 };

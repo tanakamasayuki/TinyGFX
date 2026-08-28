@@ -7,7 +7,7 @@
 
 | # | 相手 | 内容 | 優先 | ブロックするか |
 | --- | --- | --- | --- | --- |
-| [E1](#e1) | host-arduino-core | バスを覗ける口 → **実装済み。受入条件を通した**（リリース待ち） | 済 | しない |
+| [E1](#e1) | host-arduino-core | バスを覗ける口 → **1.5.0 でリリース済み。取り込み完了** | 済 | — |
 | [E2](#e2) | ch32-riscv-ug/arduino_core_ch32_riscv_arduino | SPI ライブラリが無い。base が 5.9KB → **新コアで解消見込み** | 低 | しない |
 | [E3](#e3) | openwch / YuukiUmeta-UIAP コア | CH32V00x の `PinMap_SPI_*` が無い → **新コアで解消見込み** | 低 | しない |
 | [E7](#e7) | **ArduinoCore-CH32（開発中）** | **リリースを待つ。それまで測定は symlink 運用** | 高 | しない |
@@ -19,8 +19,8 @@
 
 ## E1. host-arduino-core — バスを覗ける口 {#e1}
 
-> **2026-08-27: 実装された。受入条件も通した。** 詳細は §「実装の確認」（末尾）。
-> 残っているのはリリースだけ。以下は依頼時点の記述をそのまま残してある。
+> **2026-08-28: `lang-ship:host` 1.5.0 としてリリースされ、TinyGFX 側の取り込みも終わった。**
+> 詳細は §「実装の確認」（末尾）。以下は依頼時点の記述をそのまま残してある。
 
 
 ### 現状
@@ -224,11 +224,15 @@ TinyGFX → PanelST7789 → 本番の TinyGFXBusSoftSPI / TinyGFXBusSPI → 線
 4. **スレッドの注意書きが効くのは `mode=lgfx` / `display` のとき。** TinyGFX は素の
    `host` で使うので該当しない。この注意書きは残しておくべき。
 
-#### TinyGFX 側に残っている作業
+#### 取り込み完了（2026-08-28、1.5.0）
 
-- **リリースされたら `tests/hostbus/sketch.yaml` の platform をバージョン付きに戻す。**
-  いまはバージョン無し（`- platform: lang-ship:host`）で sketchbook の作業コピーを見ている
-- 観測口の無いコアでは skip する作りにしてあるので、リリース前でも CI は壊れない
+- `tests/hostbus/sketch.yaml` の platform を **`lang-ship:host (1.5.0)`** に固定した。
+  他のテストの sketch.yaml も 1.4.7 → 1.5.0 に上げた
+- 指摘していた `SPISettings` の読み取り専用アクセサ（`clock()` / `bitOrder()` / `dataMode()`）が
+  1.5.0 で入ったので、テストもそちらを使うように直した。
+  `s._clock` と書かずに済むようになった
+- **依頼はこれで完了。** 残っている観測点は「フックが 1 スロットで、
+  2 つのライブラリを同じスケッチでテストするときは共存できない」ことだけ（実害なし）
 
 ## E2. ch32-riscv-arduino コア — SPI が無い、base が大きい {#e2}
 

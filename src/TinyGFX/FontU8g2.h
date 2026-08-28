@@ -1,15 +1,21 @@
-// u8g2 形式のグリフデコーダ（**測定用の試作**）
+// TinyGFX - u8g2 形式のフォント
 //
-// 目的は 1 つだけ: 「TinyGFX が u8g2 形式を食えるようにしたら、コードは何バイト増えるか」
-// を実測すること（docs/FONT_FORMAT.ja.md §7）。ライブラリ本体には入れていない。
+// **高さ 16 画素を超えるフォントはこちらのほうが小さい。**
+// RLE とグリフごとの bbox が効き始めるため（docs/FONT_FORMAT.ja.md §0）。
+// H≤16 のピクセルグリッドフォントなら TinyFont（FontTiny.h）のほうが小さい。
 //
-// 描画は TinyFont の経路と同じく fillRect のランで出すので、比較が公平になる。
+// デコーダのコード量は TinyFont とほぼ同じ（693 B vs 684 B、実測）。
+// **include しなければ 1 バイトもリンクされない。**
+//
+// 正しさは LGFXFontToolJs が描いた絵との一致で確認している（tests/u8g2/）。
 #pragma once
-#include <TinyGFX.h>
 #include <stdint.h>
 
+#include "Font.h"
+#include "Gfx.h"
+
 /// u8g2 のビット列リーダ。LSB 詰め、1 回の読み出しは高々 2 バイトにまたがる。
-struct TgfxU8g2Bits {
+struct TinyGFXU8g2Bits {
   const uint8_t* ptr;
   uint8_t bitPos;
 
@@ -32,7 +38,7 @@ struct TgfxU8g2Bits {
 };
 
 /// u8g2 フォントのヘッダ（23 バイト）のうち、描画に要るものだけ。
-struct TgfxU8g2Font {
+struct TinyGFXFontU8g2 {
   const uint8_t* data;
 
   uint8_t bitsPer0() const { return tinygfx_rd8(data + 2); }
@@ -42,7 +48,8 @@ struct TgfxU8g2Font {
   uint8_t bitsX() const { return tinygfx_rd8(data + 6); }
   uint8_t bitsY() const { return tinygfx_rd8(data + 7); }
   uint8_t bitsD() const { return tinygfx_rd8(data + 8); }
-  int8_t ascent() const { return (int8_t)tinygfx_rd8(data + 13); }
+  int8_t ascentPara() const { return (int8_t)tinygfx_rd8(data + 15); }
+  int8_t descentPara() const { return (int8_t)tinygfx_rd8(data + 16); }
   uint16_t startUpperA() const { return word(17); }
   uint16_t startLowerA() const { return word(19); }
   uint16_t startUnicode() const { return word(21); }
@@ -84,25 +91,54 @@ struct TgfxU8g2Font {
   }
 };
 
-/// 1 文字描く。y は**ベースライン**（u8g2 の流儀）。戻り値は送り幅。
-inline int16_t tgfxU8g2DrawChar(TinyGFX& g, const uint8_t* fontData, uint16_t ch,
-                                int16_t x, int16_t y, uint16_t color) {
-  const TgfxU8g2Font f = {fontData};
-  const uint8_t* gd = f.glyphData(ch);
-  if (gd == nullptr) return 0;
+namespace tinygfx_u8g2 {
 
-  TgfxU8g2Bits bits = {gd, 0};
+/// 行送り。u8g2 の ascent_para - descent_para。
+inline uint8_t lineHeight(const void* font) {
+  const TinyGFXFontU8g2 f = {(const uint8_t*)font};
+  return (uint8_t)(f.ascentPara() - f.descentPara());
+}
+
+/// 描かずに送り幅だけ返す。収録外は -1。
+inline int16_t advance(const void* font, uint16_t ch) {
+  const TinyGFXFontU8g2 f = {(const uint8_t*)font};
+  const uint8_t* gd = f.glyphData(ch);
+  if (gd == nullptr) return -1;
+  TinyGFXU8g2Bits bits = {gd, 0};
+  bits.get(f.bitsW());
+  bits.get(f.bitsH());
+  bits.getSigned(f.bitsX());
+  bits.getSigned(f.bitsY());
+  return (int16_t)bits.getSigned(f.bitsD());
+}
+
+/// 1 文字描く。**y は行の上端**（TinyFont と揃えてある。u8g2 本来のベースライン基準ではない）。
+/// 戻り値は送り幅（倍率をかける前）。収録外は -1。
+inline int16_t draw(TinyGFX& g, const void* font, uint16_t ch, int16_t x, int16_t y) {
+  const TinyGFXFontU8g2 f = {(const uint8_t*)font};
+  const uint8_t* gd = f.glyphData(ch);
+  if (gd == nullptr) return -1;
+
+  TinyGFXU8g2Bits bits = {gd, 0};
   const uint8_t gw = bits.get(f.bitsW());
   const uint8_t gh = bits.get(f.bitsH());
   const int8_t gx = bits.getSigned(f.bitsX());
   const int8_t gy = bits.getSigned(f.bitsY());
   const int8_t adv = bits.getSigned(f.bitsD());
-  if (gw == 0 || gh == 0) return adv;
 
-  const int16_t left = (int16_t)(x + gx);
-  const int16_t top = (int16_t)(y - gh - gy);
+  const uint8_t sz = g.getTextSize();
+  if (g.hasTextBg()) {
+    g.fillRect(x, y, (int16_t)((int16_t)adv * sz),
+               (int16_t)((uint16_t)lineHeight(font) * sz), g.getTextBgColor());
+  }
+  if (gw == 0 || gh == 0) return (int16_t)adv;
+
+  const int16_t baseline = (int16_t)(y + (int16_t)(f.ascentPara() * sz));
+  const int16_t left = (int16_t)(x + (int16_t)(gx * sz));
+  const int16_t top = (int16_t)(baseline - (int16_t)((gh + gy) * sz));
   const uint8_t b0 = f.bitsPer0();
   const uint8_t b1 = f.bitsPer1();
+  const uint16_t fg = g.getTextColor();
 
   uint8_t cx = 0, cy = 0;
   g.startWrite();
@@ -110,8 +146,7 @@ inline int16_t tgfxU8g2DrawChar(TinyGFX& g, const uint8_t* fontData, uint16_t ch
     const uint8_t zeros = bits.get(b0);
     const uint8_t ones = bits.get(b1);
     do {
-      // 0 のラン: 進めるだけ
-      uint8_t cnt = zeros;
+      uint8_t cnt = zeros;  // 0 のラン: 進めるだけ
       while (cnt > 0) {
         const uint8_t rem = (uint8_t)(gw - cx);
         const uint8_t run = rem < cnt ? rem : cnt;
@@ -119,12 +154,12 @@ inline int16_t tgfxU8g2DrawChar(TinyGFX& g, const uint8_t* fontData, uint16_t ch
         if (cx >= gw) { cx = 0; ++cy; }
         cnt = (uint8_t)(cnt - run);
       }
-      // 1 のラン: 行ごとに水平線で描く
-      cnt = ones;
+      cnt = ones;  // 1 のラン: 行ごとに矩形で描く
       while (cnt > 0) {
         const uint8_t rem = (uint8_t)(gw - cx);
         const uint8_t run = rem < cnt ? rem : cnt;
-        g.drawFastHLine((int16_t)(left + cx), (int16_t)(top + cy), (int16_t)run, color);
+        g.fillRect((int16_t)(left + (int16_t)(cx * sz)), (int16_t)(top + (int16_t)(cy * sz)),
+                   (int16_t)((uint16_t)run * sz), sz, fg);
         cx = (uint8_t)(cx + run);
         if (cx >= gw) { cx = 0; ++cy; }
         cnt = (uint8_t)(cnt - run);
@@ -132,24 +167,14 @@ inline int16_t tgfxU8g2DrawChar(TinyGFX& g, const uint8_t* fontData, uint16_t ch
     } while (bits.get(1) != 0);
   } while (cy < gh);
   g.endWrite();
-  return adv;
+  return (int16_t)adv;
 }
 
-/// UTF-8 の文字列を描く。y はベースライン。戻り値は描いた幅。
-inline int16_t tgfxU8g2DrawString(TinyGFX& g, const uint8_t* fontData, const char* str,
-                                  int16_t x, int16_t y, uint16_t color) {
-  const int16_t x0 = x;
-  while (*str) {
-    uint16_t ch = (uint8_t)*str++;
-    if (ch >= 0xF0) { ch = 0xFFFD; str += 3; }
-    else if (ch >= 0xE0) {
-      ch = (uint16_t)(((ch & 0x0F) << 12) | ((uint16_t)(str[0] & 0x3F) << 6) | (str[1] & 0x3F));
-      str += 2;
-    } else if (ch >= 0xC0) {
-      ch = (uint16_t)(((ch & 0x1F) << 6) | (str[0] & 0x3F));
-      str += 1;
-    }
-    x = (int16_t)(x + tgfxU8g2DrawChar(g, fontData, ch, x, y, color));
-  }
-  return (int16_t)(x - x0);
-}
+}  // namespace tinygfx_u8g2
+
+/// この形式の入口。生成したフォントヘッダが TinyGFXFontRef からここを指す。
+static const TinyGFXFontOps tinygfxFontU8g2Ops = {
+    &tinygfx_u8g2::draw,
+    &tinygfx_u8g2::advance,
+    &tinygfx_u8g2::lineHeight,
+};

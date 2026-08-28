@@ -38,10 +38,24 @@ COMMON_FORBIDDEN = [
 ]
 
 
+# フォント形式ごとのデコーダのシンボル。使っていない形式は 1 つも出てはいけない。
+FORMAT_SYMBOLS = {
+    "tiny": "tinygfx_tiny",
+    "u8g2": "tinygfx_u8g2",
+}
+
+# 構成 -> 使っている形式
+FORMAT_USED = {
+    "d": {"tiny"},
+    "d_u8g2": {"u8g2"},
+    "d_both": {"tiny", "u8g2"},
+}
+
+
 @pytest.fixture(scope="module")
 def syms():
     out = {}
-    for name in ["base"] + list(FORBIDDEN):
+    for name in ["base"] + list(FORBIDDEN) + list(FORMAT_USED):
         build = tb.compile_construct(name)
         out[name] = tb.symbols(build)
     return out
@@ -76,3 +90,24 @@ def test_no_float_no_division(syms, construct):
         if tb.contains(names, f) and not tb.contains(base, f)
     ]
     assert not leaked, f"構成 {construct} に載ってはいけないシンボル: {leaked}"
+
+
+@pytest.mark.parametrize("construct", list(FORMAT_USED))
+def test_unused_font_formats_are_not_linked(syms, construct):
+    """**使っていないフォント形式のデコーダはリンクされないこと。**
+
+    コアはフォント形式を知らず、フォント側が自分のデコーダを指す
+    （docs/CORE_DESIGN.ja.md §9）。include していない形式はどこからも
+    参照されないので落ちる。形式を増やしてもフットプリントは増えない、
+    という設計の実効的な担保。
+    """
+    names = syms[construct]
+    used = FORMAT_USED[construct]
+    problems = []
+    for key, sym in FORMAT_SYMBOLS.items():
+        present = tb.contains(names, sym)
+        if key in used and not present:
+            problems.append(f"{key} を使っているのにシンボルが無い（判定方法がおかしい）")
+        if key not in used and present:
+            problems.append(f"{key} を使っていないのにリンクされている")
+    assert not problems, f"構成 {construct}: " + "; ".join(problems)

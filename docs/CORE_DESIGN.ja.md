@@ -342,95 +342,115 @@ void TinyGFXBusSPI::writeColor(uint16_t color, uint32_t count) {
 
 ## 9. 文字とフォント
 
-### 9.1 形式は TinyFont
+### 9.1 コアはフォント形式を 1 つも知らない
+
+**形式ごとのデコーダはフォント側が指す。** コアがするのは連鎖をたどって呼ぶことだけ。
 
 ```cpp
-struct TinyGFXGlyph {   // 可変ピッチのときだけ。4 バイト固定
-  uint8_t offsetLo, offsetHi, width, xAdvance;
+struct TinyGFXFontOps {          // 形式ごとの入口。収録外は -1 で統一
+  int16_t (*draw)(TinyGFX&, const void* font, uint16_t ch, int16_t x, int16_t y);
+  int16_t (*advance)(const void* font, uint16_t ch);
+  uint8_t (*lineHeight)(const void* font);
 };
 
-struct TinyGFXFont {
-  const uint8_t*      bitmap;
-  const TinyGFXGlyph* glyphs;  // nullptr = 固定ピッチ（表を持たない）
-  const uint16_t*     codes;   // nullptr = 連続索引。非 nullptr = 昇順のコード表
-  uint16_t first, count;
-  uint8_t  width, height, xAdvance, yAdvance;
-  int8_t   xOffset, yOffset;
-  uint8_t  bytesPerGlyph;
+struct TinyGFXFontRef {          // setFont に渡すもの
+  const void* data;
+  const TinyGFXFontOps* ops;
+  const TinyGFXFontRef* next;    // 持っていない字を探しに行く先。形式が違ってもよい
 };
 ```
 
-**選択は実行時ではなく生成時。** 索引（連続 / 疎）とグリフ表（無し / 有り）は
-ポインタが `nullptr` かどうかで表す。4 通りを 1 つのデコーダが扱い、
-**両対応のコストは 76 バイト**。
+コア側はこれだけ:
 
-ビットマップは「行を連結した MSB first のビット列、グリフ間はバイト境界揃え」で
-GFXfont と同じ並び。既存の Adafruit 資産はツール側で変換できる。
+```cpp
+int16_t drawChar(uint16_t ch, int16_t x, int16_t y) {
+  for (const TinyGFXFontRef* f = _font; f != nullptr; f = f->next) {
+    const int16_t a = f->ops->draw(*this, f->data, ch, x, y);
+    if (a >= 0) return (int16_t)(a * _textSize);
+  }
+  return 0;
+}
+```
 
-形式の定義・実測・採らなかった案は [FONT_FORMAT.ja.md](FONT_FORMAT.ja.md)。
-決定の経緯は [DECISIONS.ja.md](DECISIONS.ja.md) D17。
+**include していない形式のデコーダはどこからも参照されないので落ちる。**
+形式を増やしてもフットプリントは増えない。`tests/linkprune/` がこれを検査している。
 
-### 9.2 フォントデータはライブラリに同梱しない
+> §7.4 の R2 は「関数ポインタの表を持つな」だが、ここは逆の働きをする。
+> R2 が禁じているのは**全機能を並べた表**（1 つ使うと全部載る）。ここの表は
+> **形式ごとに 1 枚**で、その形式のフォントを include した人だけが参照する。
+
+### 9.2 使い方
+
+```cpp
+#include <TinyGFX/FontTiny.h>   // 使う形式だけ include する
+#include "myfont.h"             // 生成されたフォント（中で FontRef を定義している）
+
+lcd.setFont(&myFont);
+lcd.drawString("12:34", 4, 4);
+```
+
+生成されたヘッダはこうなっている:
+
+```cpp
+static const TinyGFXFontTiny myFontData = { ... };
+static const TinyGFXFontRef  myFont = { &myFontData, &tinygfxFontTinyOps, nullptr };
+```
+
+### 9.3 いま用意している形式
+
+| ヘッダ | 形式 | 向き |
+| --- | --- | --- |
+| `TinyGFX/FontTiny.h` | **TinyFont** | **高さ 16 画素以下**のピクセルグリッドフォント |
+| `TinyGFX/FontU8g2.h` | u8g2 | 16 画素超。RLE と bbox が効き始める帯 |
+
+境界が H≈16 なのは実測上の変曲点だから（[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md) §0）。
+**デコーダの大きさはほぼ同じ**（TinyFont 828 B / u8g2 1,105 B）なので、
+選択はデータ量だけで決まる。
+
+### 9.4 連鎖は形式をまたげる
+
+`next` で繋いだ先は別形式でよい。半角を TinyFont、全角を u8g2、も書ける。
+
+### 9.5 座標はベースラインでなく行の上端
+
+`drawChar(ch, x, y)` の `y` は**行の上端**（LovyanGFX 流）。u8g2 形式のデコーダは
+内部で `ascent` を足してベースラインに直している。**形式が違っても同じ位置に出る。**
+
+### 9.6 フォントデータはライブラリに同梱しない
 
 **`src/` に .h のフォントは 1 つも置かない。** スケッチ側に置く。
 生成は [LGFXFontToolJs](https://www.npmjs.com/package/lgfx-font-tool) を使い、
-最終的には**プロジェクトで使う文字だけ**をサブセット化して埋め込む
-（[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E4）。
+最終的には**プロジェクトで使う文字だけ**をサブセット化して埋め込む。
 
-いまは `tools/gen_font.py` が出す 5x7（0x20-0x3F、32 文字）が測定用のつなぎ。
-出力先は `tests/fonts/` で、ライブラリには入らない。
+いまは `tools/gen_font.py` が出す 5x7（0x20-0x3F、32 字）が測定用のつなぎ。
 
-### 9.3 座標はベースラインでなく行の上端
-
-GFXfont は本来ベースライン基準だが、TinyGFX の `drawChar(ch, x, y)` の `y` は
-**行の上端**（LovyanGFX 流）。`setFont()` のときに全グリフの `yOffset` を 1 回走査して
-ascent を求め、以降はそれを足すだけにしている。描画のたびに走査しない。
-
-### 9.4 描画方法
-
-グリフの行ごとに、連続する前景画素を**ラン単位で `fillRect`** して描く。
-背景色を指定した場合は、先に送り幅 × 行送りのセルを塗ってから前景を描く。
-
-ウィンドウを張って全画素を流し込むほうが速いが、クリップとの相性が悪くコードも増える。
-**速度は二番手**なのでランで済ませている。
-
-実測値: 文字機能全体で Flash +844 B（うちフォントデータ 184 B、コード 660 B）。
-
-### 9.5 Print / printf / float は拡張ヘッダで提供する
+### 9.7 Print / printf / float は拡張ヘッダで提供する
 
 **禁止はしない。分けるだけ。** コアの `TinyGFX` は `Print` を継承せず、浮動小数点も出さない。
 
 ```cpp
 #include <TinyGFX/Print.h>
-
 TinyGFXPrint lcd(panel);
-lcd.setCursor(0, 0);
-lcd.println("hello");
-lcd.println(1234);
 lcd.println(3.14f);           // ここまで来ると浮動小数点書式化がリンクされる
-lcd.setTextSize(1.5f);        // float 版オーバーロードもこちら側
 ```
 
-**実測した値札**（CH32V003。[FOOTPRINT.ja.md](FOOTPRINT.ja.md) §5）:
+**実測した値札**（CH32V003）:
 
 | 取り込むもの | 増分 |
 | --- | --- |
-| `TinyGFX.h` のみ（構成 D） | 基準 |
-| `+ TinyGFX/Print.h` の整数・文字列版 | **+260 B** |
-| `+ println(float)` | **約 +8,652 B → CH32V003 には載らない**（4,280 B 溢れる） |
+| `+ TinyGFX/Print.h` の整数・文字列版 | +260 B |
+| `+ println(float)` | **約 +8,650 B → CH32V003 には載らない** |
 
-「float は重い」ではなく「**基準機には載らない**」と数字で言える状態にしてある。
-これを GUIDE にそのまま載せる。
-
-### 9.6 拡張ヘッダに置く予定のもの（暫定）
+### 9.8 拡張ヘッダに置く予定のもの（暫定）
 
 | ヘッダ | 内容 | 状況 |
 | --- | --- | --- |
-| `TinyGFX/Print.h` | `Print` 継承、`printf`、float オーバーロード | 実装済み |
+| `TinyGFX/FontTiny.h` | TinyFont のデコーダ | 実装済み |
+| `TinyGFX/FontU8g2.h` | u8g2 のデコーダ | 実装済み |
+| `TinyGFX/Print.h` | `Print` 継承、`printf`、float | 実装済み |
 | `TinyGFX/TileCanvas.h` | 帯レンダリング（§12） | 実装済み |
+| `TinyGFX/Utf8.h` | UTF-8 の入口（CJK に要る。+153 B 実測） | 未（Q12） |
 | `TinyGFX/TextDatum.h` | `setTextDatum` / `drawCenterString` | 未 |
-| `TinyGFX/Color888.h` | RGB888 変換、HSV | 未 |
-| `TinyGFX/FontU8g2.h` | u8g2 形式のデコーダ | 未（要るか未定） |
 
 いずれも **コアからは参照されない**。取り込んだ人だけが払う。
 
