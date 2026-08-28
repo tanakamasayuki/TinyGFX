@@ -121,6 +121,8 @@ TINYGFX_FQBN='ch32-riscv-ug:ch32v:CH32V003:pnum=CH32V003F4P6' uv run pytest foot
 | --- | --- | --- |
 | `capture/` | **土台。** `TinyGFXBusCapture` が ST7789 のコマンド列から画を復元できること。転送画素数がちょうど一致すること、ウィンドウの値、原点オフセット、`startWrite`/`endWrite` の釣り合い | 通過 |
 | `window/` | 回転 0..3 の MADCTL・幅高さの入れ替え・オフセットの導出（135x240 / GRAM 240x320 を模す）。オフセット無しなら全回転で 0 のままであること | 通過 |
+| `clifont/` | **本番の生成器（LGFXFontToolJs の CLI）が出した CellFont を描けること。** つなぎの `gen_font.py` ではなく配布される形のヘッダをそのまま食わせる。可変ピッチ・頭ブロック・**`first` より小さいコードがしっぽに居る**（仕様 §7.1 の落とし穴）を 1 本で踏む | 通過 |
+| `scene/` | 実機と突き合わせるゴールデンをホストで作って凍結する。**飽和した色しか使っていないこと**も検査する（読み戻しの往復でずれないため） | 通過 |
 | `fillchunk/` | **`TINYGFX_FILL_CHUNK` は速さだけを変える。** まとめ書きを持たないソフト SPI を基準に、有効にした `TinyGFXBusSPI` と絵・転送画素数・線に出たバイト数が完全一致すること。M3 の「FILL_CHUNK を付けても絵が変わらない」を実機を待たずに押さえる。**詰め直しを外すと 885 画素壊れて落ちることを確認済み** | 通過 |
 | `fontchain/` | **CellFont の連鎖と U+FFFD 退避。** 手で組んだ小さな CellFont で、生成フォントでは踏めない道を通す — 前段に豆腐があっても後段の字に到達すること、ベースラインが連鎖先頭の ascent で決まること、`first` より小さいコードがしっぽに居る疎索引（仕様 §7.1 / §7.2 / §8 / §15.2）。**わざと壊すと両方落ちることを確認済み** | 通過 |
 | `ili9342/` | ILI9342C の MADCTL・色順（BGR ビット）・`setMirror` の XOR。両軸ミラーが回転 2 と一致すること。オフセットが素通しであること。**表が実機で正しいかは M0 で確かめる**（D22） | 通過 |
@@ -153,6 +155,34 @@ TINYGFX_FQBN='ch32-riscv-ug:ch32v:CH32V003:pnum=CH32V003F4P6' uv run pytest foot
 
 **値はシリアルではなくファイルで受け渡す。** `dut.expect` の取りこぼしでテストが
 不安定になるため。シリアルには `TEST start` / `TEST done` / `SCENE <name>` の進行だけ流す。
+
+## 4.5 Tier 3 — 実機【**通っている**】
+
+`tests/hw/m5stack/` が **M5Stack Core / BASIC を標準の検証機**として使う。
+
+**実機の上で描いた絵を、ホストで作ったゴールデンと 1 画素も違わないか見る。**
+ホストのテストが原理的に守れないのはここ — 実機のコンパイラ、実機の `int` 幅、
+実機の PROGMEM。**AVR でフォント構造体が PROGMEM に載っていなかった不具合
+（D19）はまさにこの類**で、ホストでは絶対に出なかった。
+
+| | |
+| --- | --- |
+| 絵の取り方 | 実機の上で `TinyGFXBusCapture` に描いて artifact で送る |
+| ゴールデン | `tests/scene/golden/scene.ppm`。**ホストで作ったものが正** |
+| シーンの定義 | `tests/common_libs/tgfx_test/src/tgfx_scene.h` の 1 箇所だけ |
+| 同期 | ArduTest の HELLO。**シリアルの頭は取りこぼす**ので握手が要る |
+| 入口 | `.env` を渡したときだけ走る。素の `uv run pytest` は実機を焼かない |
+
+```sh
+cp .env.example .env     # 自分のポートを書く
+uv run --env-file .env pytest hw --profile m5stack
+```
+
+**ゴールデンを実機の出力から作らない。** 実機がおかしくても「一致」してしまう。
+ホストで描いたものを正とし、実機がそれに合わせる。
+
+**線から先は範囲外。** パネルの GRAM 読み戻しができれば線の先まで見えるが、
+M5Stack では再現できていない（[MANUAL_TEST.ja.md](MANUAL_TEST.ja.md) の「読み戻し」）。
 
 ## 5. Tier 2 — 移植性【**実装済み・通っている**】
 

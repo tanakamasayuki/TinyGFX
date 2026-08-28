@@ -10,13 +10,16 @@ Anything you do not call costs nothing at all.
 > ### Only one setup has run on real hardware
 >
 > **On 2026-08-28 this drove a physical display for the first time**: an M5Stack BASIC
-> (ILI9342C). 43 host tests also pass. But that is **the only configuration confirmed on
+> (ILI9342C). 45 host tests and 1 hardware test also pass. But that is **the only configuration confirmed on
 > real glass.**
 >
 > | | |
 > | --- | --- |
-> | Confirmed | ILI9342C over hardware SPI (ESP32), primitives, text, rotation 0 |
+> | Confirmed | ILI9342C over hardware SPI (ESP32), primitives, text, rotation 0, **on-target output matches the host** |
 > | **Unconfirmed** | **ST7789 / SSD1306 / software SPI / I2C / CH32V003 / rotations 1-3 / tiled rendering** |
+>
+> **The hardware tests pass too** - what the library draws on a real M5Stack matches, pixel
+> for pixel, a golden image produced on the host ([tests/hw/m5stack/](tests/hw/m5stack/)).
 >
 > The surest way to try it is **[examples/M5StackBasic](examples/M5StackBasic)** - **no wiring
 > at all**. It puts the border, colour order, text orientation and primitives on one screen
@@ -214,13 +217,15 @@ cd tests && uv sync && uv run pytest -v -s
 No hardware needed: everything either runs on the host core or just builds and inspects
 size and symbols. Details in [tests/README.md](tests/README.md).
 
-Of the 43, the characteristic ones:
+Of the 45, the characteristic ones:
 
 - **`linkprune/`** — `nm` proves that unused features and unused font formats are absent from the final binary
 - **`footprint/`** — per-configuration increments stay within budget, and **the numbers are always printed**
 - **`tile/`** — changing the band height must not change a single pixel
 - **`hostbus/`** — captures what the real SPI bus actually put on the wire and turns it back into an image
 - **`i2c/`** — the same, over I2C to an SSD1306
+- **`hw/m5stack/`** — **real hardware (Tier 3).** What a real M5Stack draws is compared to a host-made golden
+- **`clifont/`** — a CellFont header **from the real generator** renders correctly
 - **`fillchunk/`** — block-writing must not change a single byte on the wire
 - **`fontchain/`** — a font later in the chain is still reachable past an earlier notdef (**verified by deliberately breaking it**)
 - **`ili9342/`** — MADCTL, colour order and mirroring (**whether the table is right on real

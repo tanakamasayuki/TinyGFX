@@ -37,8 +37,25 @@ class TinyGFXBusSPI : public TinyGFXBus {
   }
 
   void beginTransaction() override {
+    if (_rdActive) endRead();  // 読み出しの途中なら線を周辺機に戻してから
     _spi->beginTransaction(SPISettings(_freq, MSBFIRST, SPI_MODE0));
     if (_cs >= 0) digitalWrite(_cs, LOW);
+  }
+
+  /// 読み出しで手叩きに移した線を、SPI 周辺機に戻す。
+  /// **明示的に呼ばなくてよい**（次の描画が beginTransaction() で自動的に戻す）。
+  void endRead() {
+    if (!_rdActive) return;
+    _rdActive = false;
+    digitalWrite(_rdSck, LOW);
+    pinMode(_rdSda, OUTPUT);
+    // **end() を挟む**（ESP32 の begin() は開始済みなら何もしない）。
+    // 前後に間を置くのは安全側に倒すため。読み出しは速度を求める場面ではない。
+    delayMicroseconds(50);
+    _spi->end();
+    delayMicroseconds(50);
+    _spi->begin();
+    delayMicroseconds(50);
   }
 
   void endTransaction() override {
@@ -46,18 +63,71 @@ class TinyGFXBusSPI : public TinyGFXBus {
     _spi->endTransaction();
   }
 
-  /// 読み出し用のクロック。**書き込みより落とさないと化ける。**
-  /// ILI934x は書き込み 15MHz 級に対し読み出しは 6〜16MHz。
-  void setReadFreq(uint32_t freq) { _readFreq = freq; }
+  /// **データ線が 1 本のパネル用**（M5Stack の ILI9342C など）。
+  ///
+  /// SDA が MOSI と MISO の兼用で、SPI 周辺機の MISO には何も来ていない基板がある。
+  /// このとき標準の `transfer()` では読めない（実測: 全ビット 1 が返る）。
+  /// SCK と SDA を渡すと、**読み出しのあいだだけ線を入力に向けて手で叩く。**
+  /// 書き込みは今までどおり周辺機に任せるので、速度は落ちない。
+  ///
+  /// 例（M5Stack Core / BASIC）: `bus.setReadPins(18, 23);`
+  ///
+  /// **制約**: 読み出しのたびに `SPI.end()` / `SPI.begin()` で線を張り直すので、
+  /// **既定以外のピンで `SPI.begin(...)` している構成では使えない**（既定に戻る）。
+  /// **【実験中。まだ当てにしないこと】**
+  ///
+  /// 生のプローブ（コマンドの送出も含めて全部を手で叩く）では**確実に読めた** —
+  /// 書いた色が `FC 00 00 / 00 FC 00 / 00 00 FC / FC FC FC` としてそのまま返る
+  /// （RGB666、ダミー 1 バイト）。ところが**このクラス経由だと再現しない。**
+  /// ESP32 の GPIO マトリクスと `SPI` の取り合いが絡んでいて、まだ詰め切れていない。
+  /// 詳細と実測は docs/MANUAL_TEST.ja.md の「読み戻し」。
+  ///
+  /// **`startWrite()` / `endWrite()` の外で読むこと。** 読み出しは描画の
+  /// トランザクションとは別に線を取る。
+  ///
+  /// 読み出しは**デバッグと検証のためのもの**で、通常の描画では使わない。
+  /// なので**速さより確実さに全振りしてある。**
+  ///
+  /// `settleUs` は 1 エッジあたりの待ち。既定の 2µs でおよそ 125kHz。
+  /// 速くすると拾い損ねる（実測: 1µs 相当で 3,072 画素中 51 画素が 1 ビット化けた）。
+  void setReadPins(int8_t sck, int8_t sda, uint8_t settleUs = 2) {
+    _rdSck = sck;
+    _rdSda = sda;
+    _rdSettle = settleUs;
+  }
 
-  /// パネルから読み戻す。CS は落としたまま、クロックだけ張り替える。
-  /// **呼び出し側が beginTransaction() の中で使うこと**（writeCommand の直後など）。
-  void readData(uint8_t* buf, size_t len) override {
+  /// コマンドを送ってから読み戻す。**CS はここで落として、ここで上げる。**
+  ///
+  /// 読み出しピンを設定してあれば**全部を手で叩く**。周辺機と手叩きを途中で
+  /// 切り替えるとビットがずれるので、コマンドの送出も手で行う（実測で確認）。
+  void readSequence(const uint8_t* script, uint8_t scriptLen, uint8_t dummy, uint8_t* buf,
+                    size_t len) override {
+    for (size_t i = 0; i < len; ++i) buf[i] = 0;
+    if (_rdSck < 0) return;  // 読めないバス
+
+    // **コマンドは周辺機で送る。** ESP32 では pinMode(OUTPUT) では GPIO マトリクスから
+    // 線を取り戻せず、手で叩いても波形が出ない（実測。全部 FF が返る）。
+    // 一方 pinMode(INPUT) は確実に出力を止められるので、**受信だけ手で叩く。**
+    beginTransaction();
+    uint8_t i = 0;
+    while (i < scriptLen) {
+      const uint8_t cmd = script[i++];
+      const uint8_t n = script[i++];
+      writeCommand(cmd);
+      if (n) writeData(&script[i], n);
+      i = (uint8_t)(i + n);
+    }
     _spi->endTransaction();
-    _spi->beginTransaction(SPISettings(_readFreq, MSBFIRST, SPI_MODE0));
-    while (len--) *buf++ = _spi->transfer(0xFF);
-    _spi->endTransaction();
-    _spi->beginTransaction(SPISettings(_freq, MSBFIRST, SPI_MODE0));
+
+    digitalWrite(_rdSck, LOW);
+    pinMode(_rdSck, OUTPUT);
+    digitalWrite(_rdSck, LOW);
+    pinMode(_rdSda, INPUT);  // 線を相手に渡す
+    _rdActive = true;
+    for (uint8_t d = 0; d < dummy; ++d) bbRead();
+    for (size_t k = 0; k < len; ++k) buf[k] = bbRead();
+    if (_cs >= 0) digitalWrite(_cs, HIGH);
+    endRead();  // 1 回ごとに線を戻す。**まとめて戻す作りにすると読めなくなる**（実測）
   }
 
   void writeCommand(uint8_t cmd) override {
@@ -116,9 +186,24 @@ class TinyGFXBusSPI : public TinyGFXBus {
   }
 
  private:
+  uint8_t bbRead() {
+    uint8_t v = 0;
+    for (uint8_t i = 0; i < 8; ++i) {  // モード 0: 立ち上がりで拾う
+      digitalWrite(_rdSck, HIGH);
+      if (_rdSettle) delayMicroseconds(_rdSettle);
+      v = (uint8_t)((v << 1) | (digitalRead(_rdSda) ? 1 : 0));
+      digitalWrite(_rdSck, LOW);
+      if (_rdSettle) delayMicroseconds(_rdSettle);
+    }
+    return v;
+  }
+
   SPIClass* _spi;
   uint32_t _freq;
-  uint32_t _readFreq = 8000000UL;
+  int8_t _rdSck = -1;
+  int8_t _rdSda = -1;
+  uint8_t _rdSettle = 2;
+  bool _rdActive = false;
   int8_t _dc;
   int8_t _cs;
   bool _initSpi;

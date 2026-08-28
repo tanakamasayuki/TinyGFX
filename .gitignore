@@ -15,4 +15,8 @@ arduino_secrets.h
 #*.txt
 #sketch.yaml
 temp
+tmp/
+# 実機テストの成果物（ArduTest の artifact 置き場）
+tests/ardutest/
+node_modules/
 build/

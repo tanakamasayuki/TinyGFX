@@ -15,6 +15,7 @@ dependencies = [
 pythonpath = ["."]
 markers = [
     "slow: arduino-cli のビルドを伴うテスト（Tier 0）",
+    "hardware: 実機が要るテスト（Tier 3）。.env を渡さなければ skip される",
 ]
 filterwarnings = [
     "ignore:record_xml_attribute is an experimental feature:pytest.PytestExperimentalApiWarning",

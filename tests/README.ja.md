@@ -5,7 +5,7 @@ TinyGFX のテスト一式。方針とケース一覧は [../docs/TEST_PLAN.ja.m
 - [pytest-embedded](https://docs.espressif.com/projects/pytest-embedded/en/latest/) + Arduino CLI バックエンド、`uv` で依存管理
 - **Tier 0（`footprint/` / `linkprune/`）はスケッチを実行しない。** ビルドしてサイズと
   シンボル表を見るだけなので `dut` を使わない。実機も要らない
-- **Tier 1（`capture/` ほか 13 本）は `lang-ship:host` 上でホスト実行**し、描いた結果を
+- **Tier 1（`capture/` ほか 15 本）は `lang-ship:host` 上でホスト実行**し、描いた結果を
   画素で検証する。SDL2 も LovyanGFX も要らない
 
 ## 動かす
@@ -60,6 +60,9 @@ tests/
   image/              pushImage の配置・切り取り・透過
   hostbus/            本番の SPI バスが実際に流したバイトを拾って画に戻す
   fillchunk/          まとめ書きを有効にしても線に出るバイトが変わらないこと
+  clifont/            **本番の生成器が出した CellFont** を描けること
+  scene/              実機と突き合わせるゴールデンをホストで作る
+  hw/m5stack/         **実機（Tier 3）。** .env を渡したときだけ走る
   u8g2/               u8g2 形式フォントのデコード
   i2c/                I2C + SSD1306（モノクロ・ページ転送・dirty ページ）
   build_matrix/       examples が ch32v003 / uno / esp32 / m5stack でビルドできるか（実行はしない）
