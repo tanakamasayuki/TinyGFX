@@ -171,11 +171,8 @@ ASCII 95 字 + 記号 6 字で −190 B（仕様 §7）。
 
 **実運用のフォントは LGFXFontToolJs の CLI が出す**（`lgfx-font-tool` 2.0.0 で公開済み）。
 
-**パッケージ名は `lgfx-font-tool`、コマンド名は `lgfx-font`** と食い違うので、
-`npx lgfx-font` では解決しない。`-p` でパッケージを指定する。
-
 ```sh
-npx -p lgfx-font-tool lgfx-font build --google "Noto Sans JP" --em 12 \
+npx lgfx-font build --google "Noto Sans JP" --em 12 \
     --chars "温度設定完了 23.5℃" --format cellfont --out src/font.h
 ```
 

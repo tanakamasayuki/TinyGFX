@@ -175,11 +175,12 @@ Generation is expected to go through
 The CLI bakes in **only the characters your project uses**.
 
 ```sh
-npx -p lgfx-font-tool lgfx-font build --google "Noto Sans JP" --em 12 \
+npx lgfx-font build --google "Noto Sans JP" --em 12 \
     --chars "温度設定完了 23.5℃" --format cellfont --out font.h
 ```
 
-> The package is `lgfx-font-tool` but the command is `lgfx-font`, so the `-p` is required.
+> Inside a directory that has its own `node_modules`, npx answers 404;
+> use `npx -p lgfx-font-tool lgfx-font ...` there.
 
 Those twelve characters come to **245 bytes**. It grows with what you add.
 
