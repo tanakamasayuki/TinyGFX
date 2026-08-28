@@ -32,12 +32,39 @@
 #error "TinyGFX implements CellFont spec version 1"
 #endif
 
-// When the variants in use are known, the unused branches can be dropped.
+// Everything the decoder can be told to leave out. All default to on, so the
+// decoder handles any conforming font; switch off only what your font and your
+// sketch demonstrably do not use. Bytes saved, measured on the same glyphs:
+//
+//                            AVR   CH32V003
+//   TINYGFX_FONT_SPARSE      ---   ---        depends on the font, see below
+//   TINYGFX_FONT_RECORDS     ---   ---
+//   TINYGFX_FONT_BG          130   108
+//   TINYGFX_FONT_SCALE        74   116
+//   TINYGFX_FONT_CHAIN        34    16
+//
+// SPARSE and RECORDS must match the font. A generated header says which it is
+// on its "Format :" line - "fixed/sparse", "variable/contiguous" and so on.
+// Getting these wrong draws the wrong glyphs rather than failing to build,
+// because the encoding is data, not something the compiler can see.
+//
+// BG and SCALE drop a feature of the *sketch*, not of the font: with them off
+// the second argument of setTextColor() and any setTextSize() above 1 stop
+// having an effect.
 #ifndef TINYGFX_FONT_SPARSE
 #define TINYGFX_FONT_SPARSE 1  // 0 drops the sparse index (code table, head block)
 #endif
 #ifndef TINYGFX_FONT_RECORDS
 #define TINYGFX_FONT_RECORDS 1  // 0 drops variable pitch (the glyph table)
+#endif
+#ifndef TINYGFX_FONT_CHAIN
+#define TINYGFX_FONT_CHAIN 1  // 0 drops CellFont::next (a font that is one link)
+#endif
+#ifndef TINYGFX_FONT_BG
+#define TINYGFX_FONT_BG 1  // 0 drops the background cell behind each glyph
+#endif
+#ifndef TINYGFX_FONT_SCALE
+#define TINYGFX_FONT_SCALE 1  // 0 drops the setTextSize() multiplier (fixes it at 1)
 #endif
 
 namespace tinygfx_cell {
@@ -86,11 +113,16 @@ inline bool indexIn(const CellFont* f, uint16_t ch, uint16_t* outIndex) {
 /// Walk the chain within this format. Returns the font that has the glyph,
 /// or nullptr.
 inline const CellFont* findIn(const CellFont* f, uint16_t ch, uint16_t* outIndex) {
+#if TINYGFX_FONT_CHAIN
   while (f != nullptr) {
     if (indexIn(f, ch, outIndex)) return f;
     f = (const CellFont*)CELLFONT_READ_PTR(&f->next);
   }
   return nullptr;
+#else
+  if (f != nullptr && indexIn(f, ch, outIndex)) return f;
+  return nullptr;
+#endif
 }
 
 inline int16_t advance(const void* font, uint16_t ch) {
@@ -122,7 +154,11 @@ inline int16_t draw(TinyGFX& g, const void* font, uint16_t ch, int16_t x, int16_
   const CellFont* f = findIn((const CellFont*)font, ch, &idx);
   if (f == nullptr) return -1;
 
+#if TINYGFX_FONT_SCALE
   const uint8_t sz = g.getTextSize();
+#else
+  const uint8_t sz = 1;
+#endif
   uint32_t bmOffset;
   uint8_t gw, adv;
 #if TINYGFX_FONT_RECORDS
@@ -140,6 +176,7 @@ inline int16_t draw(TinyGFX& g, const void* font, uint16_t ch, int16_t x, int16_
   }
 
   g.startWrite();
+#if TINYGFX_FONT_BG
   if (g.hasTextBg()) {
     // The line box comes from the chain head's metrics. Using each font's own
     // height would make the rows drift apart.
@@ -147,6 +184,7 @@ inline int16_t draw(TinyGFX& g, const void* font, uint16_t ch, int16_t x, int16_
     g.fillRect(x, top, (int16_t)((uint16_t)adv * sz),
                (int16_t)((uint16_t)g.getTextLineHeight() * sz), g.getTextBgColor());
   }
+#endif
   const uint8_t gh = CELLFONT_READ_U8(&f->height);
   const uint8_t* bm = (const uint8_t*)CELLFONT_READ_PTR(&f->bitmap);
   if (gw != 0 && gh != 0 && bm != nullptr) {

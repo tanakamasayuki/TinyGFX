@@ -45,12 +45,12 @@ def have_core(fqbn: str) -> bool:
     return any(line.split()[0] == pkg for line in out.splitlines()[1:] if line.strip())
 
 
-def compile_construct(name: str, fqbn: str = CH32V003) -> dict:
+def compile_construct(name: str, fqbn: str = CH32V003, defines=None) -> dict:
     """1 構成をビルドして {flash, ram, max_flash, max_ram, elf, properties} を返す。"""
     sketch = CONSTRUCTS / name
     if not sketch.is_dir():
         raise BuildError(f"no such construct: {sketch}")
-    return compile_sketch(sketch, fqbn, extra_include=FONTS)
+    return compile_sketch(sketch, fqbn, extra_include=FONTS, defines=defines)
 
 
 def compile_profile(sketch, profile: str) -> dict:
@@ -64,8 +64,12 @@ def compile_profile(sketch, profile: str) -> dict:
                 sketch.name)
 
 
-def compile_sketch(sketch, fqbn: str, extra_include=None) -> dict:
-    """任意のスケッチをビルドする。ライブラリはこのリポジトリを使う。"""
+def compile_sketch(sketch, fqbn: str, extra_include=None, defines=None) -> dict:
+    """任意のスケッチをビルドする。ライブラリはこのリポジトリを使う。
+
+    `defines` は {"TINYGFX_FONT_BG": 0} の形。`extra_include` と同じ
+    extra_flags に載るので、両方渡しても片方が消えない。
+    """
     sketch = Path(sketch)
     name = sketch.name
     cmd = [
@@ -73,10 +77,14 @@ def compile_sketch(sketch, fqbn: str, extra_include=None) -> dict:
         "--fqbn", fqbn,
         "--library", str(REPO),
     ]
+    flags = []
     if extra_include is not None:
         dirs = extra_include if isinstance(extra_include, list) else [extra_include]
-        flags = " ".join(f"-I{d}" for d in dirs)
-        cmd += ["--build-property", f"compiler.cpp.extra_flags={flags}"]
+        flags += [f"-I{d}" for d in dirs]
+    if defines:
+        flags += [f"-D{k}={v}" for k, v in defines.items()]
+    if flags:
+        cmd += ["--build-property", f"compiler.cpp.extra_flags={' '.join(flags)}"]
     cmd += ["--json", str(sketch)]
     return _run(cmd, name)
 
