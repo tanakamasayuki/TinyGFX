@@ -78,3 +78,26 @@ def test_hardware_spi_still_fails_on_ch32():
         assert "SPI.h" in str(exc), f"想定と違う失敗: {exc}"
         return
     pytest.skip("CH32 コアで SPI が使えるようになった。CASES に足してこのテストを消すこと")
+
+
+# フォントデコーダの切り落としマクロ（src/TinyGFX/FontCell.h）。
+# 既定は全部 on。off の経路はスケッチが使わないとビルドされないので、
+# ここで実際にコンパイルしておかないと静かに腐る。
+FONT_MACROS = ["TINYGFX_FONT_BG", "TINYGFX_FONT_SCALE", "TINYGFX_FONT_CHAIN"]
+
+
+@pytest.mark.parametrize("off", [[m] for m in FONT_MACROS] + [FONT_MACROS],
+                         ids=lambda v: "+".join(m.split("_")[-1].lower() for m in v))
+def test_font_macros_build(off):
+    """フォントの切り落としマクロを 1 つずつと全部 off でビルドする。
+
+    ついでに削減量を出す。**基準機（CH32V003）で測る**こと。AVR で効く
+    最適化が RISC-V で逆効果になる例が出ている（docs/OPTIMIZE.ja.md J）。
+    """
+    if not tb.have_core(tb.CH32V003):
+        pytest.skip("CH32V003 のコアが入っていない")
+    base = tb.compile_construct("t")
+    got = tb.compile_construct("t", defines={m: 0 for m in off})
+    saved = base["flash"] - got["flash"]
+    print(f"  {'+'.join(off):<58} -{saved} B")
+    assert saved >= 0, f"{off} を off にして {-saved} B 増えている"
