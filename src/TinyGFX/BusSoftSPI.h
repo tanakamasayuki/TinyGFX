@@ -35,7 +35,11 @@ class TinyGFXBusSoftSPI : public TinyGFXBus {
   /// **読めない。** このバスは MISO のピンを受け取っていないので線が無い。
   /// 読み戻しが要る用途では TinyGFXBusSPI を使う。
   /// 空のまま置いてあるのは、`__cxa_pure_virtual` を呼ばないため（Bus.h と同じ理由）。
-  void readData(uint8_t* buf, size_t len) override {
+  void readSequence(const uint8_t* script, uint8_t scriptLen, uint8_t dummy, uint8_t* buf,
+                    size_t len) override {
+    (void)script;
+    (void)scriptLen;
+    (void)dummy;
     (void)buf;
     (void)len;
   }

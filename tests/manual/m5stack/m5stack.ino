@@ -264,10 +264,7 @@ static void pageBench() {
 static void dump(const char* label, uint8_t cmd, uint8_t n) {
   uint8_t buf[16];
   for (uint8_t i = 0; i < n && i < 16; ++i) buf[i] = 0;
-  bus.beginTransaction();
-  bus.writeCommand(cmd);
-  bus.readData(buf, n);
-  bus.endTransaction();
+  panel.readRegister(cmd, buf, n);
   Serial.print("  ");
   Serial.print(label);
   Serial.print(" (0x");
@@ -285,7 +282,8 @@ static void dump(const char* label, uint8_t cmd, uint8_t n) {
 static void pageReadback() {
   lcd.setRotation(0);
   header(10);
-  bus.setReadFreq(8000000UL);
+  // **M5Stack はデータ線が 1 本**（SDA=GPIO23）。SPI の MISO(19) には何も来ていない
+  bus.setReadPins(/*sck*/ 18, /*sda*/ 23);
 
   // 読み戻す先に、見分けのつく色を置く
   lcd.fillRect(0, 100, 2, 1, TFT_RED);      // (0,100) 赤
@@ -314,7 +312,7 @@ static void pageReadback() {
   lcd.setTextSize(2);
   lcd.drawString("0123456789", 12, 140);     // 画面側は「見に行った」目印だけ
   lcd.setTextSize(1);
-  Serial.println(F("  all-zero or all-FF => MISO not usable; read-back is off the table"));
+  Serial.println(F("  NOTE: this panel returns FF for ID registers but the GRAM reads fine"));
 }
 
 static const char* PAGE_HINT[PAGES] = {

@@ -1,0 +1,13 @@
+profiles:
+  m5stack:
+    fqbn: esp32:esp32:m5stack_core
+    platforms:
+      - platform: esp32:esp32 (3.3.11)
+        platform_index_url: https://espressif.github.io/arduino-esp32/package_esp32_index.json
+    libraries:
+      - dir: ../../../
+      - dir: ../../common_libs/tgfx_test
+      - dir: ../../common_libs/tgfx_font
+      - ArduTest (0.2.2)
+
+default_profile: m5stack

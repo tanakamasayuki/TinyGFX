@@ -17,6 +17,7 @@
 /// この実装が従う仕様の版。生成ヘッダが #error で照合する。
 #define CELLFONT_SPEC_VERSION 1
 
+#include <stddef.h>
 #include <stdint.h>
 
 #if defined(__AVR__)
