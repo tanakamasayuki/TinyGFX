@@ -21,6 +21,7 @@ static const int W = 128, H = 64;
 static const uint8_t ADDR = 0x3C;
 
 static uint8_t fb[W * H / 8];
+static uint8_t fast[W * H / 8];
 TinyGFXBusI2C bus(Wire, ADDR);
 TinyGFXPanelSSD1306 panel(bus, fb, W, H);
 TinyGFX lcd(panel);
@@ -129,6 +130,45 @@ void setup() {
   panel.display();
   shot("rot1");
   lcd.setRotation(0);
+
+  // --- fillRect の速い経路が、1 画素ずつ描いた結果と一致すること ------------
+  //
+  // モノクロパネルは 8 画素を 1 バイトに詰めるので、窓が丸ごと 1 色なら
+  // バイト単位で塗る。**速いだけで、絵は 1 画素も変わってはいけない。**
+  // ページの境界をまたぐ / またがない、回転あり / なしを混ぜて確かめる。
+  {
+    static const int16_t R[6][4] = {
+        {0, 0, W, H},            // 全面
+        {8, 8, 32, 8},           // ページ 1 枚にちょうど収まる
+        {3, 5, 17, 11},          // ページ境界をまたぐ、幅も高さも半端
+        {0, 62, 5, 2},           // 最終ページの端
+        {W - 3, 0, 3, 1},        // 右上の 1 行
+        {60, 30, 1, 1},          // 1 画素
+    };
+    long diff = 0;
+    for (uint8_t rot = 0; rot < 4; ++rot) {
+      lcd.setRotation(rot);
+      for (uint8_t i = 0; i < 6; ++i) {
+        int16_t x = R[i][0], y = R[i][1], w = R[i][2], h = R[i][3];
+        if (x + w > lcd.width() || y + h > lcd.height()) continue;
+        panel.clearBuffer();
+        lcd.fillRect(x, y, w, h, TFT_WHITE);
+        for (int32_t k = 0; k < (int32_t)sizeof(fb); ++k) fast[k] = fb[k];
+        panel.clearBuffer();
+        lcd.startWrite();
+        for (int16_t py = y; py < y + h; ++py) {
+          for (int16_t px = x; px < x + w; ++px) lcd.drawPixel(px, py, TFT_WHITE);
+        }
+        lcd.endWrite();
+        for (int32_t k = 0; k < (int32_t)sizeof(fb); ++k) {
+          if (fast[k] != fb[k]) ++diff;
+        }
+      }
+    }
+    lcd.setRotation(0);
+    panel.clearBuffer();
+    tgfxReport("fillrect_fastpath_diff", diff);
+  }
 
   tgfxTestDone();
 }
