@@ -92,10 +92,9 @@ class TinyGFX {
     if (x1 > _clipX1) x1 = _clipX1;
     if (y1 > _clipY1) y1 = _clipY1;
     if (x > x1 || y > y1) return;
-    const uint32_t n = (uint32_t)(uint16_t)(x1 - x + 1) * (uint32_t)(uint16_t)(y1 - y + 1);
     startWrite();
-    _panel->setWindow((uint16_t)x, (uint16_t)y, (uint16_t)x1, (uint16_t)y1);
-    _panel->writeColor(color, n);
+    _panel->fillRect((uint16_t)x, (uint16_t)y, (uint16_t)(uint16_t)(x1 - x + 1),
+                     (uint16_t)(uint16_t)(y1 - y + 1), color);
     endWrite();
   }
 
