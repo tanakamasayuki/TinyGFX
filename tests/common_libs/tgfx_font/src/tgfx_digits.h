@@ -18,8 +18,8 @@
 // Data     : 58 bytes
 // Coverage : U+0030-U+0039
 // 
-// Rebuild with (add --out for wherever this file goes):
-//   npx -p lgfx-font-tool lgfx-font build --font lgfxJapanGothic_8 --sets digits --format cellfont --name tgfxDigits
+// Rebuild with:
+//   npx lgfx-font-tool build --font lgfxJapanGothic_8 --sets digits --format cellfont --out tgfx_digits.h --name tgfxDigits
 
 #pragma once
 #include <stdint.h>

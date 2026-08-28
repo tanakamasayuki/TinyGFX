@@ -18,8 +18,8 @@
 // Data     : 71 bytes
 // Coverage : U+0020, U+002E, U+0030-U+003A
 // 
-// Rebuild with (add --out for wherever this file goes):
-//   npx -p lgfx-font-tool lgfx-font build --font lgfxJapanGothic_8 --chars ':. ' --sets digits --format cellfont --name tgfxClock
+// Rebuild with:
+//   npx lgfx-font-tool build --font lgfxJapanGothic_8 --chars ':. ' --sets digits --format cellfont --out tgfx_clock.h --name tgfxClock
 
 #pragma once
 #include <stdint.h>
