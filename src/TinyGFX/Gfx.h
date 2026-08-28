@@ -75,13 +75,9 @@ class TinyGFX {
   void writePixels(const uint16_t* data, uint32_t count) { _panel->writePixels(data, count); }
 
   // ---- primitives ------------------------------------------------------
-  void drawPixel(int16_t x, int16_t y, uint16_t color) {
-    if (x < _clipX0 || x > _clipX1 || y < _clipY0 || y > _clipY1) return;
-    startWrite();
-    _panel->setWindow((uint16_t)x, (uint16_t)y, (uint16_t)x, (uint16_t)y);
-    _panel->writeColor(color, 1);
-    endWrite();
-  }
+  /// A pixel is a 1x1 rectangle. Going through fillRect means clipping is
+  /// written once and a panel that took over fillRect gets to serve this too.
+  void drawPixel(int16_t x, int16_t y, uint16_t color) { fillRect(x, y, 1, 1, color); }
 
   void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) {
     if (w <= 0 || h <= 0) return;
@@ -93,8 +89,8 @@ class TinyGFX {
     if (y1 > _clipY1) y1 = _clipY1;
     if (x > x1 || y > y1) return;
     startWrite();
-    _panel->fillRect((uint16_t)x, (uint16_t)y, (uint16_t)(uint16_t)(x1 - x + 1),
-                     (uint16_t)(uint16_t)(y1 - y + 1), color);
+    _panel->fillRect((uint16_t)x, (uint16_t)y, (uint16_t)(x1 - x + 1),
+                     (uint16_t)(y1 - y + 1), color);
     endWrite();
   }
 
