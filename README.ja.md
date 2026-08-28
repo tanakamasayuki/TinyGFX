@@ -61,6 +61,11 @@ void loop() {}
 無いためです。ハードウェア SPI が使える環境では `<TinyGFX/BusSPI.h>` に差し替えるだけで、
 描画側は 1 行も変わりません。
 
+> **SPI / Wire は自分で `begin()` してから渡します。** TinyGFX がバスを初期化することは
+> ありません。SD カードのように同じ線を使う相手がいても、**そのまま共存できます**
+> （共有は Arduino 標準の `beginTransaction` / `endTransaction` で行います）。
+> TinyGFX が自分で握るのは DC と CS だけです。
+
 ### I2C のモノクロ OLED（SSD1306）
 
 ```cpp

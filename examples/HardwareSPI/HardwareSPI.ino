@@ -3,10 +3,10 @@
 // The hardware SPI version. Only the bus declaration changes; the drawing
 // code is identical.
 //
-// Note that SCK and MOSI are not given here - they are left to the core's SPI
-// library, because some cores have an SPI.begin() that takes no pins. To
-// choose them yourself, call SPI.begin(...) before lcd.begin() and pass false
-// for the constructor's initSpi.
+// The bus belongs to the sketch. Call SPI.begin() yourself - with whatever
+// pins your board needs - before lcd.begin(). TinyGFX never begins or ends the
+// SPI bus, which is what lets an SD card share the same wires: both sides just
+// use beginTransaction / endTransaction around their own bursts.
 //
 // Some CH32V003 cores cannot use hardware SPI at all today; use BusSoftSPI
 // there instead, as in the HelloWorld example.
@@ -14,11 +14,12 @@
 #include <TinyGFX/BusSPI.h>
 #include <TinyGFX/PanelST7789.h>
 
-TinyGFXBusSPI bus(/*dc*/3, /*cs*/4, /*freq*/24000000UL);
+TinyGFXBusSPI bus(SPI, /*dc*/3, /*cs*/4, /*freq*/24000000UL);
 TinyGFXPanelST7789 panel(bus, 240, 240, /*rst*/2);
 TinyGFX lcd(panel);
 
 void setup() {
+  SPI.begin();  // the sketch owns the bus; TinyGFX never begins it
   lcd.begin();
   lcd.fillScreen(TFT_BLACK);
 

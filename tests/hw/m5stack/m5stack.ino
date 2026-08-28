@@ -28,7 +28,7 @@
 
 static const int8_t PIN_DC = 27, PIN_CS = 14, PIN_RST = 33, PIN_BL = 32, PIN_SD_CS = 4;
 
-TinyGFXBusSPI bus(PIN_DC, PIN_CS, /*freq*/ 24000000UL);
+TinyGFXBusSPI bus(SPI, PIN_DC, PIN_CS, /*freq*/ 24000000UL);
 TinyGFXPanelILI9342 panel(bus, 320, 240, PIN_RST);
 TinyGFX lcd(panel);
 
@@ -136,6 +136,7 @@ void setup() {
   pinMode(PIN_BL, OUTPUT);
   digitalWrite(PIN_BL, HIGH);
 
+  SPI.begin();  // the sketch owns the bus; TinyGFX never begins it
   lcd.begin();
   // **M5Stack はデータ線が 1 本**（SDA=GPIO23）。SPI の MISO(19) には何も来ていない
   bus.setReadPins(/*sck*/ 18, /*sda*/ 23);

@@ -21,7 +21,7 @@ static const int W = 128, H = 64;
 static const uint8_t ADDR = 0x3C;
 
 static uint8_t fb[W * H / 8];
-TinyGFXBusI2C bus(ADDR);
+TinyGFXBusI2C bus(Wire, ADDR);
 TinyGFXPanelSSD1306 panel(bus, fb, W, H);
 TinyGFX lcd(panel);
 
@@ -82,6 +82,7 @@ void setup() {
   tgfxTestBegin("i2c");
   Wire.setWriteHook(onWire, nullptr);
 
+  Wire.begin();  // the sketch owns the bus; TinyGFX never begins it
   lcd.begin();
   tgfxReport("init_transactions", (long)txCount);
 

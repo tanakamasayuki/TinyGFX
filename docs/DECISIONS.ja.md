@@ -449,6 +449,52 @@ MADCTL のベース値・色順・回転 0 の向きは**既定のまま正し�
 **2026-08-28 に `src/` 19 ファイルと `examples/` 6 本を英語化した。**
 `tests/` と `tools/` は開発中のコードなので日本語のまま残してある（次にやる）。
 
+### D24. SPI / Wire は**初期化済みのインスタンスを受け取る**（2026-08-28）
+
+`TinyGFXBusSPI` と `TinyGFXBusI2C` は、**すでに `begin()` されたバスを受け取る。**
+TinyGFX がバスを初期化することはない。
+
+```cpp
+TinyGFXBusSPI bus(SPI, /*dc*/27, /*cs*/14);   // 第 1 引数がバス
+...
+SPI.begin();      // スケッチの責任
+lcd.begin();
+```
+
+**理由: 同じ線に別のデバイスが居るのが普通だから。** M5Stack では LCD と SD カードが
+SPI を共有している。ライブラリが `SPI.begin()` をピン付きで呼ぶと、**先に居た相手の
+設定を上書きしてしまう。** どちらが先に `begin()` するかで結果が変わる作りは、
+利用者から見て理由の分からない不具合になる。
+
+**共有の仕組みは Arduino 標準のトランザクションに任せる。** `beginTransaction` /
+`endTransaction` で囲むのは今までどおりで、これが speed / mode / bit order の
+調停をしてくれる。ライブラリが足すべきものは何もない。
+
+**TinyGFX が自分で握るのは DC と CS だけ。** これはこのパネル専用の線なので、
+`init()` で `pinMode` する。
+
+**変えた点**:
+
+| | 前 | 後 |
+| --- | --- | --- |
+| SPI | `TinyGFXBusSPI(dc, cs, freq, SPI, initSpi=true)` | `TinyGFXBusSPI(SPI, dc, cs, freq)` |
+| I2C | `TinyGFXBusI2C(addr, chunk, Wire, initWire=true)` | `TinyGFXBusI2C(Wire, addr, chunk)` |
+
+**バスを第 1 引数にした**のは、既定値を持てなくして「渡し忘れ」をコンパイルエラーに
+するため。`initSpi` のようなフラグは消した。**フラグで切り替えられると、
+どちらの設定が効いているのか読んで分からなくなる。**
+
+**フットプリントは変わらない**（`Wire.begin()` の呼び出しがライブラリから
+スケッチへ移っただけ）。
+
+**残っている例外**: `TinyGFXBusSPI::setReadPins()` を使ったときだけ、読み戻しの
+ために `SPI.end()` / `SPI.begin()` を呼ぶ（線の向きを変えるのに必要）。
+**明示的に呼んだ人だけが踏む**うえ、ヘッダに「他のデバイスと共有している線では
+使うな」と書いてある。この経路は実験扱い（D22 の追記）。
+
+**ソフト SPI（`TinyGFXBusSoftSPI`）はこの話の外。** SCK / MOSI / DC / CS を
+すべて自分で握る作りで、周辺機を共有していない。
+
 ## 2. 未決の論点（要相談）
 
 | # | 論点 | 選択肢 | 決める時期 |
