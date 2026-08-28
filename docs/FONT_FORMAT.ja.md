@@ -214,6 +214,7 @@ static const TinyGFXFontRef myFont = {&Name, &tinygfxFontCellOps, nullptr};
 | 〃 `tgfx_ascii.h` | `--sets ascii` | ASCII 95 字 |
 | `examples/*/tgfx_clock.h` | `--sets digits --chars ":. "` | 疎索引。**しっぽに `first` より小さいコード**（0x20 / 0x2E） |
 | `tests/clifont/cli_font.h` | `--google "Noto Sans JP" --em 12 --chars ...` | 可変ピッチ + 頭ブロック + 全角 |
+| `tests/u8g2/u8g2_ascii.h` / `u8g2_cjk.h` | `--format u8g2 --no-wrapper` | u8g2 のデコーダ |
 
 いずれも書体は `lgfxJapanGothic_8`（`--google` のものを除く）。
 
@@ -221,12 +222,18 @@ static const TinyGFXFontRef myFont = {&Name, &tinygfxFontCellOps, nullptr};
 「どれで描いても絵が一致すること」を検査している。どの符号化を選ぶかは
 生成器の裁量であって、**スケッチから見えてはいけない。**
 
-### u8g2 だけ CLI から取れない
+### u8g2 も CLI から
 
-`--format u8g2` の C 出力は `lgfx::U8g2font` を宣言するので、LovyanGFX が無いと
-コンパイルできない。**バイト列は CLI と完全に一致している**ことを確認したうえで、
-`tools/gen_u8g2_ref.mjs` が同じ形（`<name>_data` のバイト列だけ）を出している。
-[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E8 が通ったら CLI に寄せる。
+`--format u8g2 --no-wrapper` でデータ配列だけが出る（`lgfx-font-tool` 2.2.2 で入った。
+[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E8）。cellfont と同じ手数で、
+包む 1 行もほぼ同じ。
+
+```cpp
+static const TinyGFXFontRef myFont = {u8g2Cjk, &tinygfxFontU8g2Ops};
+```
+
+`tools/gen_u8g2_ref.mjs` が残っているのは**参照画像（`.ref.txt`）のため**だけ。
+これは「LGFXFontToolJs が描いた絵」で、`tests/u8g2/` がデコーダの出力と突き合わせる。
 
 ## 7. 経緯
 

@@ -13,13 +13,13 @@
 // built from it.
 // 
 // Format   : CellFont v1 — fixed/sparse 4x6
-// Line box : 9px (ascent 7, descent 2)
+// Line box : 9px (ascent 7, descent 2) — typeface metrics, for line spacing
 // Glyphs   : 13
 // Data     : 71 bytes
 // Coverage : U+0020, U+002E, U+0030-U+003A
 // 
-// Rebuild with:
-//   npx lgfx-font build --font lgfxJapanGothic_8 --chars ':. ' --sets digits --format cellfont --name tgfxClock --out tests/manual/m5stack/tgfx_clock.h
+// Rebuild with (add --out for wherever this file goes):
+//   npx -p lgfx-font-tool lgfx-font build --font lgfxJapanGothic_8 --chars ':. ' --sets digits --format cellfont --name tgfxClock
 
 #pragma once
 #include <stdint.h>

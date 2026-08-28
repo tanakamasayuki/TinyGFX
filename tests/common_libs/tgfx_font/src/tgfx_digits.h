@@ -13,13 +13,13 @@
 // built from it.
 // 
 // Format   : CellFont v1 — fixed/contiguous 4x6
-// Line box : 9px (ascent 7, descent 2)
+// Line box : 9px (ascent 7, descent 2) — typeface metrics, for line spacing
 // Glyphs   : 10
 // Data     : 58 bytes
 // Coverage : U+0030-U+0039
 // 
-// Rebuild with:
-//   npx lgfx-font build --font lgfxJapanGothic_8 --sets digits --format cellfont --name tgfxDigits --out tests/common_libs/tgfx_font/src/tgfx_digits.h
+// Rebuild with (add --out for wherever this file goes):
+//   npx -p lgfx-font-tool lgfx-font build --font lgfxJapanGothic_8 --sets digits --format cellfont --name tgfxDigits
 
 #pragma once
 #include <stdint.h>

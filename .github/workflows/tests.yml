@@ -71,6 +71,7 @@ jobs:
       #
       # 使うのは同梱ビットマップフォントだけなので、npm 以外の外部取得は無い。
       # tests/clifont/ は --google（Google Fonts の取得）なので CI からは外してある。
+      # 参照画像（tests/u8g2/*.ref.txt）は tools/gen_u8g2_ref.mjs 側。
       # 中身はテストが毎回描いて検査しているが、「いま CLI が同じものを出すか」までは見ない。
       - name: Check the generated fonts are current
         shell: bash
@@ -88,6 +89,13 @@ jobs:
           for d in examples/HelloWorld examples/OledI2C examples/M5StackBasic tests/manual/m5stack; do
             chk --sets digits --chars ":. " --name tgfxClock --out "$d/tgfx_clock.h"
           done
+          # u8g2 も同じ書体から。--no-wrapper でデータ配列だけ出す
+          u8g2() {
+            npx --yes -p lgfx-font-tool lgfx-font build \
+              --font lgfxJapanGothic_8 --format u8g2 --no-wrapper --check "$@"
+          }
+          u8g2 --chars "0123456789ABCabc" --name u8g2Ascii --out tests/u8g2/u8g2_ascii.h
+          u8g2 --chars "日本語表示"        --name u8g2Cjk   --out tests/u8g2/u8g2_cjk.h
 
       - name: Run pytest
         working-directory: tests
