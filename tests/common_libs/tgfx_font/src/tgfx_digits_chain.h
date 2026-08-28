@@ -13,13 +13,13 @@
 // built from it.
 // 
 // Format   : CellFont v1 — fixed/contiguous 4x6 + fixed/contiguous 6x6 (chain of 2)
-// Line box : 9px (ascent 7, descent 2)
+// Line box : 9px (ascent 7, descent 2) — typeface metrics, for line spacing
 // Glyphs   : 11
 // Data     : 91 bytes
 // Coverage : U+0030-U+0039, U+2103
 // 
-// Rebuild with:
-//   npx lgfx-font build --font lgfxJapanGothic_8 --chars ℃ --sets digits --format cellfont --name tgfxDigitsChain --out tests/common_libs/tgfx_font/src/tgfx_digits_chain.h
+// Rebuild with (add --out for wherever this file goes):
+//   npx -p lgfx-font-tool lgfx-font build --font lgfxJapanGothic_8 --chars '℃' --sets digits --format cellfont --name tgfxDigitsChain
 
 #pragma once
 #include <stdint.h>

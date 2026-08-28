@@ -12,7 +12,7 @@
 | [E3](#e3) | openwch / YuukiUmeta-UIAP コア | CH32V00x の `PinMap_SPI_*` が無い → **新コアで解消見込み** | 低 | しない |
 | [E7](#e7) | **ArduinoCore-CH32（開発中）** | **リリースを待つ。それまで測定は symlink 運用** | 高 | しない |
 | [E4](#e4) | LGFXFontToolJs | **CellFont の CLI。** 公開済み（`lgfx-font-tool` 2.0.0）。**閉じてよい** | 中 | しない |
-| [E8](#e8) | LGFXFontToolJs | **`--format u8g2` の C 出力が LovyanGFX 依存。** cellfont と揃えてほしい | 中 | しない |
+| [E8](#e8) | LGFXFontToolJs | ~~`--format u8g2` の C 出力が LovyanGFX 依存~~ **解決（2.2.2 の `--no-wrapper`）** | — | しない |
 | [E5](#e5) | arduino-library-release-toolkit | リリース資産の同期（既に取り込み済み） | 低 | しない |
 | [E6](#e6) | 外部レジストリ | ライブラリ名 `TinyGFX` の重複確認 → **確認済み・問題なし** | 済 | 解消 |
 
@@ -456,61 +456,38 @@ TINYGFX_FQBN='ch32-riscv-ug:ch32v:CH32V003:pnum=CH32V003F4P6' uv run pytest foot
 - CH32V003 の `SPI.begin()` はピン引数を取らない形か（`TinyGFXBusSPI` の前提）
 - `SPISettings` のクロック上限（ST7789 は 40MHz 級まで受けるので、どこまで出せるか）
 
-## E8. LGFXFontToolJs — `--format u8g2` の C 出力を描画器に依存しない形に {#e8}
+## E8. LGFXFontToolJs — `--format u8g2` の C 出力（**解決済み**） {#e8}
 
-**優先度: 中。** これが無いと TinyGFX は u8g2 のフォントを CLI から受け取れない。
+**2026-08-28 に `lgfx-font-tool` 2.2.2 で `--no-wrapper` が入り、解決した。**
 
-### 何が起きているか
+### 何が問題だったか
 
-`--format u8g2` の C 出力は、バイト列に加えて **LovyanGFX の型を宣言する。**
+`--format u8g2` の C 出力が、バイト列に加えて `lgfx::U8g2font` を宣言していた。
+**LovyanGFX が無いとコンパイルが通らない**ので、u8g2 のデコーダを持つ TinyGFX でも
+ヘッダをそのまま置けなかった。
 
-```c
-// Include LovyanGFX (or M5GFX / M5Unified) before this header so lgfx::U8g2font is available.
-static const uint8_t u8g2Cjk_data[103] LGFXFT_PROGMEM = { ... };
-static const lgfx::U8g2font u8g2Cjk(u8g2Cjk_data);   // <- ここ
+### どう解決したか
+
+```sh
+npx -p lgfx-font-tool lgfx-font build --font lgfxJapanGothic_8 \
+    --chars "日本語表示" --format u8g2 --no-wrapper --name u8g2Cjk --out u8g2_cjk.h
 ```
 
-**LovyanGFX が無いとコンパイルが通らない。** TinyGFX には u8g2 のデコーダがあるので
-バイト列だけあれば使えるのだが、この 1 行のためにヘッダをそのまま置けない。
-
-### 依頼
-
-**`--format cellfont` と揃えてほしい。** cellfont の出力は
-「バイト列と `CellFont` 構造体だけ、描画器の型は 1 つも出さない」形になっていて、
-利用者が 1 行包む。u8g2 だけ流儀が違う。
+`--no-wrapper` でデータ配列だけが出る。シンボルは `<name>`（ラッパーが無いので
+`_data` の接尾辞も付かない）。**TinyGFX 側は 1 行包むだけ**で、cellfont と同じ手数になった。
 
 ```cpp
-// TinyGFX ならこう包む。cellfont と同じ手数
-static const TinyGFXFontRef myFont = {u8g2Cjk_data, &tinygfxFontU8g2Ops, nullptr};
+static const TinyGFXFontRef u8g2CjkFont = {u8g2Cjk, &tinygfxFontU8g2Ops};
 ```
 
-LovyanGFX の利用者も 1 行増えるだけなので、**同じツールの中で形式ごとに
-流儀が違うことのほうが分かりにくい**と思う。
+**バイト列は以前と完全に一致**（ascii 163 B / cjk 103 B）。`tests/u8g2/` のヘッダは
+CLI の出力に差し替え、`tools/gen_u8g2_ref.mjs` からヘッダ出力を外した。
+**同じ生成器が残っているのは参照画像（`.ref.txt`）のためだけ** — これは
+「LGFXFontToolJs が描いた絵」であって、フォントデータではない。
 
-外し方はいくつかある。判断はそちらで:
-
-| 案 | |
-| --- | --- |
-| **常に出さない**（cellfont と同じ） | 一番きれい。LovyanGFX 利用者に 1 行増える |
-| `#if __has_include(<LovyanGFX.hpp>)` で包む | 既存の利用者は無変更。ただし include 順に依存する |
-| フラグで選ぶ（`--no-helper` など） | 確実だが、既定をどちらにするかの問題が残る |
-
-### バイト列そのものは一致している
-
-`lgfxJapanGothic_8` の `"0123456789ABCabc"` を CLI と手元の生成器の両方で出して、
-**163 バイトが完全一致**することを確認した（2026-08-28）。形式の実装に問題は無い。
-
-### それまでどうしているか
-
-`tools/gen_u8g2_ref.mjs` が**CLI と同じ形**（`<name>_data` のバイト列だけ）で
-`tests/u8g2/` のヘッダを出している。**これはつなぎ**で、E8 が通ったら
-CLI の出力に差し替えて生成器からヘッダ出力を消す。
-参照画像（`.ref.txt`）だけは引き続きこの生成器が要る。
-
-### ついでに 1 点 — `CELLFONT_PROGMEM` を使ってほしい
+### 残っている小さな話 — `CELLFONT_PROGMEM` を使ってほしい
 
 cellfont の出力は `LGFXFT_PROGMEM` を自前で定義して（`PROGMEM` から）使っている。
 仕様 §12.1 は **`CELLFONT_PROGMEM` を描画器が提供する**と決めていて、
 描画器がそこにセクション属性などを入れたときに効かなくなる。
-いまは AVR で `PROGMEM` に展開されるので動いているが、**仕様どおりなら
-`CELLFONT_PROGMEM` を使うほうが安全。** 優先度は低い。
+いまは AVR で `PROGMEM` に展開されるので動いている。**優先度は低い。**

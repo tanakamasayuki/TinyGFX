@@ -11,8 +11,8 @@
 #include "u8g2_ascii.h"
 #include "u8g2_cjk.h"
 
-static const TinyGFXFontRef u8g2AsciiFont = {u8g2Ascii_data, &tinygfxFontU8g2Ops};
-static const TinyGFXFontRef u8g2CjkFont = {u8g2Cjk_data, &tinygfxFontU8g2Ops};
+static const TinyGFXFontRef u8g2AsciiFont = {u8g2Ascii, &tinygfxFontU8g2Ops};
+static const TinyGFXFontRef u8g2CjkFont = {u8g2Cjk, &tinygfxFontU8g2Ops};
 
 static const int W = 80, H = 24;
 static uint16_t gram[W * H];
