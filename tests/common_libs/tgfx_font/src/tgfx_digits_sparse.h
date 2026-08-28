@@ -18,8 +18,8 @@
 // Data     : 109 bytes
 // Coverage : U+0030-U+0039, U+2103
 // 
-// Rebuild with (add --out for wherever this file goes):
-//   npx -p lgfx-font-tool lgfx-font build --font lgfxJapanGothic_8 --chars '℃' --sets digits --format cellfont --name tgfxDigitsSparse --max-chain 1
+// Rebuild with:
+//   npx lgfx-font-tool build --font lgfxJapanGothic_8 --chars '℃' --sets digits --format cellfont --out tgfx_digits_sparse.h --name tgfxDigitsSparse --max-chain 1
 
 #pragma once
 #include <stdint.h>

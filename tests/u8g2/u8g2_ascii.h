@@ -18,8 +18,8 @@
 // Data     : 163 bytes
 // Coverage : U+0030-U+0039, U+0041-U+0043, U+0061-U+0063
 // 
-// Rebuild with (add --out for wherever this file goes):
-//   npx -p lgfx-font-tool lgfx-font build --font lgfxJapanGothic_8 --chars '0123456789ABCabc' --format u8g2 --name u8g2Ascii --no-wrapper
+// Rebuild with:
+//   npx lgfx-font-tool build --font lgfxJapanGothic_8 --chars '0123456789ABCabc' --format u8g2 --out u8g2_ascii.h --name u8g2Ascii --no-wrapper
 
 #ifndef LGFXFT_FONT_U8G2ASCII_H
 #define LGFXFT_FONT_U8G2ASCII_H

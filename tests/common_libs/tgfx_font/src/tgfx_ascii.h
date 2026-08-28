@@ -18,8 +18,8 @@
 // Data     : 408 bytes
 // Coverage : U+0020-U+007E
 // 
-// Rebuild with (add --out for wherever this file goes):
-//   npx -p lgfx-font-tool lgfx-font build --font lgfxJapanGothic_8 --sets ascii --format cellfont --name tgfxAscii
+// Rebuild with:
+//   npx lgfx-font-tool build --font lgfxJapanGothic_8 --sets ascii --format cellfont --out tgfx_ascii.h --name tgfxAscii
 
 #pragma once
 #include <stdint.h>

@@ -66,8 +66,8 @@ jobs:
       # フォントは LGFXFontToolJs の CLI が出したものをそのままコミットしている。
       # ここでは書き換えず --check で照合するだけ（不一致なら終了コード 2）。
       #
-      # **`npx -p lgfx-font-tool lgfx-font` と書くこと。** パッケージ名とコマンド名が
-      # 違うので、素の `npx lgfx-font` は環境によって 404 になる。
+      # コマンド名はパッケージ名と同じ `lgfx-font-tool`（CLI 3.0.0 から）。
+      # それ以前は `npx -p lgfx-font-tool lgfx-font` と書く必要があった。
       #
       # 使うのは同梱ビットマップフォントだけなので、npm 以外の外部取得は無い。
       # tests/clifont/ は --google（Google Fonts の取得）なので CI からは外してある。
@@ -78,7 +78,7 @@ jobs:
         run: |
           set -euo pipefail
           chk() {
-            npx --yes -p lgfx-font-tool lgfx-font build \
+            npx --yes lgfx-font-tool build \
               --font lgfxJapanGothic_8 --format cellfont --check "$@"
           }
           F=tests/common_libs/tgfx_font/src
@@ -91,7 +91,7 @@ jobs:
           done
           # u8g2 も同じ書体から。--no-wrapper でデータ配列だけ出す
           u8g2() {
-            npx --yes -p lgfx-font-tool lgfx-font build \
+            npx --yes lgfx-font-tool build \
               --font lgfxJapanGothic_8 --format u8g2 --no-wrapper --check "$@"
           }
           u8g2 --chars "0123456789ABCabc" --name u8g2Ascii --out tests/u8g2/u8g2_ascii.h
