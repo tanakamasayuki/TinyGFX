@@ -308,7 +308,7 @@ public:
 | R8 | **`switch` / テーブルで全機能を列挙する入口を作らない** | 1 つの入口から全部が辿れる |
 | R9 | **関数内 `static` を使わない** | ガード変数と初期化コードが載り、落ちなくなる |
 
-規則は**テストで守る**。構成ごとに「載っていてはいけないシンボル」を最終バイナリで検査する（[FOOTPRINT.ja.md](FOOTPRINT.ja.md) §8、[TEST_PLAN.ja.md](TEST_PLAN.ja.md) Tier 0 `linkprune`）。**「たぶん落ちているはず」で済ませない。**
+規則は**テストで守る**。構成ごとに「載っていてはいけないシンボル」を最終バイナリで検査する（[FOOTPRINT.ja.md](FOOTPRINT.ja.md) §9、[TEST_PLAN.ja.md](TEST_PLAN.ja.md) Tier 0 `linkprune`）。**「たぶん落ちているはず」で済ませない。**
 
 前提とするビルドオプションは `-ffunction-sections -fdata-sections -Wl,--gc-sections`。**要確認（Phase 0）**: 対象コアが既定でこれを付けているか。付いていなければ、付いていない環境での数字も併記する。
 

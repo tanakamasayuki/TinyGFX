@@ -77,7 +77,7 @@ sketchbook の作業コピーを見ており、観測口の無いコアでは sk
 ### `linkprune/` — 「まわりまわって載る」の検出【通過: 11 件】
 
 構成ごとに「載っていてはいけない名前」が最終バイナリに無いことを `nm` で見る。
-表は [FOOTPRINT.ja.md](FOOTPRINT.ja.md) §8。
+表は [FOOTPRINT.ja.md](FOOTPRINT.ja.md) §9。
 
 例: 構成 A（`fillScreen` のみ）に `drawCircle` / `drawChar` / フォントデータ /
 `TileCanvas` / `TinyGFXPrint` のいずれかが出たら fail。
@@ -121,6 +121,7 @@ TINYGFX_FQBN='ch32-riscv-ug:ch32v:CH32V003:pnum=CH32V003F4P6' uv run pytest foot
 | --- | --- | --- |
 | `capture/` | **土台。** `TinyGFXBusCapture` が ST7789 のコマンド列から画を復元できること。転送画素数がちょうど一致すること、ウィンドウの値、原点オフセット、`startWrite`/`endWrite` の釣り合い | 通過 |
 | `window/` | 回転 0..3 の MADCTL・幅高さの入れ替え・オフセットの導出（135x240 / GRAM 240x320 を模す）。オフセット無しなら全回転で 0 のままであること | 通過 |
+| `fillchunk/` | **`TINYGFX_FILL_CHUNK` は速さだけを変える。** まとめ書きを持たないソフト SPI を基準に、有効にした `TinyGFXBusSPI` と絵・転送画素数・線に出たバイト数が完全一致すること。M3 の「FILL_CHUNK を付けても絵が変わらない」を実機を待たずに押さえる。**詰め直しを外すと 885 画素壊れて落ちることを確認済み** | 通過 |
 | `fontchain/` | **CellFont の連鎖と U+FFFD 退避。** 手で組んだ小さな CellFont で、生成フォントでは踏めない道を通す — 前段に豆腐があっても後段の字に到達すること、ベースラインが連鎖先頭の ascent で決まること、`first` より小さいコードがしっぽに居る疎索引（仕様 §7.1 / §7.2 / §8 / §15.2）。**わざと壊すと両方落ちることを確認済み** | 通過 |
 | `ili9342/` | ILI9342C の MADCTL・色順（BGR ビット）・`setMirror` の XOR。両軸ミラーが回転 2 と一致すること。オフセットが素通しであること。**表が実機で正しいかは M0 で確かめる**（D22） | 通過 |
 | `primitive/` | 全プリミティブ。端の 1 画素、枠と塗りの違い、**縮退ケース 10 通りが 1 画素も送らないこと** | 通過 |

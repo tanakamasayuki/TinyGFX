@@ -46,6 +46,12 @@ class TinyGFXBusSPI : public TinyGFXBus {
     _spi->endTransaction();
   }
 
+  /// 読み出し用のクロック。**書き込みより落とさないと化ける。**
+  /// ILI934x は書き込み 15MHz 級に対し読み出しは 6〜16MHz。
+  void setReadFreq(uint32_t freq) { _readFreq = freq; }
+
+  /// パネルから読み戻す。CS は落としたまま、クロックだけ張り替える。
+  /// **呼び出し側が beginTransaction() の中で使うこと**（writeCommand の直後など）。
   void readData(uint8_t* buf, size_t len) override {
     _spi->endTransaction();
     _spi->beginTransaction(SPISettings(_readFreq, MSBFIRST, SPI_MODE0));
