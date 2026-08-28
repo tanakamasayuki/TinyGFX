@@ -16,13 +16,6 @@
 #pragma once
 #include <stdint.h>
 
-// Pixels handled by one read. Larger is faster, because the data line is
-// handed back and forth less often. Costs 3 stack bytes per pixel, so the
-// default of 64 uses 192 bytes.
-#ifndef TINYGFX_READ_CHUNK
-#define TINYGFX_READ_CHUNK 64
-#endif
-
 #include "Color.h"
 #include "Panel.h"
 
@@ -87,6 +80,9 @@ class TinyGFXPanelILI9342 : public TinyGFXPanel {
   void readId4(uint8_t* out4) { readRegister(0xD3, out4, 4); }
 
   /// Read the GRAM back. Returns the number of pixels read.
+  ///
+  /// Slow - roughly 150us per pixel, because each one needs its own window and
+  /// RAMRD. This is a debugging and verification tool, not a drawing path.
   ///
   /// Even though pixels are written at 16bpp, they read back 3 bytes each
   /// (RGB666, in the high bits of each byte), and a dummy byte comes first.
@@ -180,48 +176,25 @@ inline void TinyGFXPanelILI9342::setRotation(uint8_t r) {
 inline uint32_t TinyGFXPanelILI9342::readPixels(uint16_t x, uint16_t y, uint16_t w, uint16_t h,
                                                 uint16_t* out) {
   if (w == 0 || h == 0 || out == nullptr) return 0;
-  const uint16_t xe = (uint16_t)(x + w - 1), ye = (uint16_t)(y + h - 1);
-  // Hand {CASET,4,args, RASET,4,args, RAMRD,0} over as a single script, so
-  // that nothing switches between the SPI peripheral and bit-banging half way
-  // through - that shifts the bits.
-  const uint8_t script[16] = {
-      0x2A, 4, (uint8_t)(x >> 8), (uint8_t)x, (uint8_t)(xe >> 8), (uint8_t)xe,
-      0x2B, 4, (uint8_t)(y >> 8), (uint8_t)y, (uint8_t)(ye >> 8), (uint8_t)ye,
-      0x2E, 0, 0, 0,
-  };
-  uint8_t buf[3 * TINYGFX_READ_CHUNK];
-  uint32_t left = (uint32_t)w * (uint32_t)h;
-  const uint32_t total = left;
-  // Read it in one go; splitting means more hand-overs and less stability
-  const uint16_t k = (left > TINYGFX_READ_CHUNK) ? TINYGFX_READ_CHUNK : (uint16_t)left;
-  _bus->readSequence(script, 14, 1, buf, (size_t)k * 3);
   uint32_t i = 0;
-  for (uint16_t j = 0; j < k; ++j) {
-    out[i++] = tinygfx_color565(buf[j * 3], buf[j * 3 + 1], buf[j * 3 + 2]);
-  }
-  left -= k;
-  // Read the rest by moving the window: handing the line back mid-stream
-  // loses the continuation
-  while (left != 0) {
-    const uint32_t doneRows = i / w;
-    const uint16_t ry = (uint16_t)(y + doneRows);
-    const uint16_t rx = (uint16_t)(x + (i - doneRows * w));
-    uint32_t n2 = (uint32_t)(w - (rx - x));
-    if (n2 > TINYGFX_READ_CHUNK) n2 = TINYGFX_READ_CHUNK;
-    if (n2 > left) n2 = left;
-    const uint16_t rxe = (uint16_t)(rx + n2 - 1);
-    const uint8_t s2[16] = {
-        0x2A, 4, (uint8_t)(rx >> 8), (uint8_t)rx, (uint8_t)(rxe >> 8), (uint8_t)rxe,
-        0x2B, 4, (uint8_t)(ry >> 8), (uint8_t)ry, (uint8_t)(ye >> 8), (uint8_t)ye,
-        0x2E, 0, 0, 0,
-    };
-    _bus->readSequence(s2, 14, 1, buf, (size_t)n2 * 3);
-    for (uint16_t j = 0; j < (uint16_t)n2; ++j) {
-      out[i++] = tinygfx_color565(buf[j * 3], buf[j * 3 + 1], buf[j * 3 + 2]);
+  for (uint16_t row = 0; row < h; ++row) {
+    const uint16_t cy = (uint16_t)(y + row);
+    for (uint16_t col = 0; col < w; ++col) {
+      const uint16_t cx = (uint16_t)(x + col);
+      // One window and one RAMRD per pixel. A single RAMRD over a run does not
+      // advance the column address on this controller - every pixel comes back
+      // as the first one (measured).
+      const uint8_t script[14] = {
+          0x2A, 4, (uint8_t)(cx >> 8), (uint8_t)cx, (uint8_t)(cx >> 8), (uint8_t)cx,
+          0x2B, 4, (uint8_t)(cy >> 8), (uint8_t)cy, (uint8_t)(cy >> 8), (uint8_t)cy,
+          0x2E, 0,
+      };
+      uint8_t px[3] = {0, 0, 0};
+      _bus->readSequence(script, 14, 1, px, 3);
+      out[i++] = tinygfx_color565(px[0], px[1], px[2]);
     }
-    left -= n2;
   }
-  return total;
+  return i;
 }
 
 inline void TinyGFXPanelILI9342::setWindow(uint16_t xs, uint16_t ys, uint16_t xe, uint16_t ye) {

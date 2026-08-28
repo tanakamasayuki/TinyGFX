@@ -35,7 +35,10 @@ TinyGFX lcd(panel);
 static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps};
 // **読み戻すのは上 2 行だけ。** 読み出しは 1 回ごとに線を張り替えるので、
 // 何十回も回すとボードが固まる（実測）。デバッグ用途なので小さく取る。
-static const int16_t TGFX_READBACK_H = 2;
+// Read-back costs about 150us a pixel, so the golden comparison takes the
+// top strip rather than the whole scene. 64x8 is ~75ms and still covers the
+// border, the three colour blocks and the circle.
+static const int16_t TGFX_READBACK_H = 8;
 static uint16_t readBuf[TGFX_SCENE_W * TGFX_SCENE_H];
 static uint16_t capBuf[TGFX_SCENE_W * TGFX_SCENE_H];
 
@@ -46,12 +49,12 @@ static void hex2(char* out, uint8_t v) {
 }
 
 /// 読み戻しの線が繋がっているか。**ここが落ちたら以下は全部意味がない。**
-/// このパネルは GRAM を読み戻せるか。**判定はしない。報告するだけ。**
-/// 読めないパネルでテストを赤くしても意味がないので、pytest 側で skip に落とす。
+/// Can this panel be read back at all? Reports, never judges - a panel that
+/// cannot read is not a failure, so pytest turns this into a skip.
 ///
-/// ID レジスタ（0x04 など）ではなく **RAMRD で判定する。** 実測では、この
-/// パネルは ID レジスタが FF しか返さないのに GRAM は正しく読めた。
-/// 使いたいのは GRAM のほうなので、そちらで判定するのが正しい。
+/// Judged on RAMRD rather than an ID register: this panel answers FF to
+/// 0x04 and friends while reading its GRAM perfectly well, and the GRAM is
+/// what we actually want.
 TEST_CASE(test_panel_readable) {
   static const uint16_t probe[3] = {TFT_RED, TFT_GREEN, TFT_BLUE};
   lcd.startWrite();
@@ -74,7 +77,8 @@ TEST_CASE(test_panel_readable) {
   ArduTest.reportMetric("readable", ok ? 1 : 0);
 }
 
-/// 書いた色がそのまま読み戻せるか。読めないパネルでは pytest 側が skip する。
+/// Do written colours come back unchanged? Skipped by pytest when the panel
+/// cannot read.
 TEST_CASE(test_readback_solid) {
   static const uint16_t want[4] = {TFT_RED, TFT_GREEN, TFT_BLUE, TFT_WHITE};
   lcd.startWrite();
@@ -114,13 +118,13 @@ TEST_CASE(test_capture_scene) {
   tgfxGoldenScene(lcd);
 }
 
-/// 読み戻しで同じシーンを取る。読めるパネルでだけ意味がある。
+/// The same scene, this time read back out of the panel's own GRAM.
+/// **This is the only test that sees past the wire.**
 TEST_CASE(test_readback_scene) {
   lcd.setFont(&digitsFont);
   lcd.setTextColor(TFT_WHITE);
   tgfxGoldenScene(lcd);
-  // 全面だと線の張り替えが 48 回入って protocol の待ち時間を超える。
-  // **上 1/3 だけ読む。** 枠・3 色のブロック・円が入るので十分。
+  // The top strip only - see TGFX_READBACK_H.
   for (int i = 0; i < TGFX_SCENE_W * TGFX_READBACK_H; ++i) readBuf[i] = 0;
   const uint32_t n = panel.readPixels(0, 0, TGFX_SCENE_W, TGFX_READBACK_H, readBuf);
   ArduTest.reportMetric("scene_pixels", (long)n);
