@@ -14,9 +14,9 @@
 //
 // 違っていたときの直し方（どれも 1 行）:
 //   - 真っ暗            -> バックライト（GPIO32）が HIGH になっているか
-//   - 白地に黒          -> panel.invertDisplay(false);
+//   - 白地に黒          -> panel.invertDisplay(false); **lcd.begin() の後で**
 //   - 帯が青・緑・赤    -> panel.setRgbOrder(false);
-//   - 数字が鏡像/逆さま -> panel.setMirror(true, false) など。lcd.begin() より前に
+//   - 数字が鏡像/逆さま -> panel.setMirror(true, false) など。**lcd.begin() より前に**
 //   - 端が欠ける/ずれる -> 320x240 になっているか（コンストラクタの引数）
 #include <TinyGFX.h>
 #include <TinyGFX/BusSPI.h>
@@ -47,6 +47,15 @@ void setup()
   digitalWrite(PIN_BL, HIGH);
 
   lcd.begin();
+
+  // 古い世代の M5Stack BASIC は色が反転する（**実機で確認済み**）。
+  // そのときはこの 1 行を外す。
+  //
+  // **必ず lcd.begin() の後に置くこと。** 前に置くと 2 つの理由で効かない:
+  //   1. バスがまだ初期化されていない（SPI.begin() も pinMode もまだ）
+  //   2. 効いたとしても init() が最後に INVON を送って上書きする
+  //
+  // panel.invertDisplay(false);
 
   const int16_t w = lcd.width();
   const int16_t h = lcd.height();
@@ -88,7 +97,7 @@ void setup()
   Serial.println(h);
   Serial.println(F("  expect : white border / R-G-B bars / 0123456789 / circle+triangle+lines"));
   Serial.println(F("  dark      -> backlight GPIO32"));
-  Serial.println(F("  inverted  -> panel.invertDisplay(false)"));
+  Serial.println(F("  inverted  -> panel.invertDisplay(false) AFTER lcd.begin()"));
   Serial.println(F("  B-G-R     -> panel.setRgbOrder(false)"));
   Serial.println(F("  mirrored  -> panel.setMirror(x, y) before lcd.begin()"));
 }

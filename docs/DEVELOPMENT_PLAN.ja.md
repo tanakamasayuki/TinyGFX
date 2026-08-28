@@ -27,7 +27,7 @@
 | AVR（Uno R3）対応 | **実測で全構成が載る。** フォントを PROGMEM から読むようにした（D19） |
 | 開発中の新コアでの確認 | **ハードウェア SPI がリンクでき、base が 624 B**（[FOOTPRINT.ja.md](FOOTPRINT.ja.md) §6.1） |
 | ライブラリ名の確認 | **完了。3 レジストリとも競合なし**（E6） |
-| 実機確認 | **未。** まだ 1 度も実機に出していない。**M0（M5Stack Core / BASIC）の道具は用意した** — `TinyGFXPanelILI9342` + `examples/M5StackBasic`（D22） |
+| 実機確認 | **M0 通過（2026-08-28、M5Stack BASIC）。初めて実機に絵が出た。** 既定の MADCTL / 色順が正しかった。反転は世代差あり（D22）。**M0b / M1〜M4 は未** |
 | examples | **完了。6 本**（HelloWorld / Shapes / FlickerFree / HardwareSPI / OledI2C / M5StackBasic）。日英 README つき |
 | 利用者向けドキュメント | `README.md` / `README.ja.md` は**あり**。`docs/GUIDE` / `docs/API` は未着手（実機の後） |
 
@@ -52,8 +52,8 @@
    ハードウェア SPI もリンク可。E2 / E3 は「直してもらう」より「リリースを待つ」が正解になった（E7）
 5. **Uno R3 でも全部載る。** 効くのは RAM だけで、フォントを PROGMEM に置けば実用になる（D19）
 
-> フェーズ 1〜4 の**実装と Tier 1 検証は済んでいる**。各フェーズに残っているのは
-> 実機確認だけ（M0 → M1 / M2）。**最初の 1 台は配線の要らない M5Stack**（D22）。
+> フェーズ 1〜4 の**実装と Tier 1 検証は済んでいる**。**M0（M5Stack）は 2026-08-28 に通過**。
+> 各フェーズに残っているのは回転（M0b / M2）と ST7789 実機（M1）。
 
 ### フェーズ 1 — 出力の芯
 

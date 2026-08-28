@@ -6,7 +6,7 @@
 // ST7789 との実質的な差は次の 3 点だけ。どれも実機でしか合っているか
 // 分からないので、**1 行で直せる**ようにしてある。
 //   1. 色順が BGR（既定）           -> setRgbOrder(false) で RGB
-//   2. 反転が要る（既定 INVON）      -> invertDisplay(false)
+//   2. 反転が要る（既定 INVON）      -> invertDisplay(false)（**begin() の後で**）
 //   3. ガラスの貼り付き向き          -> setMirror(mx, my)
 //
 // ガンマ・電源の長い初期化列は**わざと入れていない**。ILI934x は電源投入時の
@@ -43,6 +43,9 @@ class TinyGFXPanelILI9342 : public TinyGFXPanel {
   void endTransaction() override { _bus->endTransaction(); }
 
   // 仮想にしない（全員が払うほどではない。docs/DECISIONS.ja.md Q7）
+  //
+  // **どれも init()（= lcd.begin()）の後に呼ぶこと。** 前に呼ぶとバスがまだ
+  // 初期化されておらず、通っても init() の初期化列に上書きされる。
   void invertDisplay(bool invert) { cmd(invert ? 0x21 : 0x20); }
   void setSleep(bool sleep) { cmd(sleep ? 0x10 : 0x11); }
   void displayOn(bool on) { cmd(on ? 0x29 : 0x28); }
