@@ -7,6 +7,8 @@
 // How this differs from SPI:
 //   - I2C starts and stops on every transfer, so beginTransaction and
 //     endTransaction are empty here
+//   - the Wire instance must already be begun; TinyGFX never calls Wire.begin(),
+//     so other devices on the same bus are left alone
 //   - Wire has a bounded transmit buffer (32 bytes on AVR), so long payloads
 //     are split into chunks
 //   - writeColor and writePixels go unused; a monochrome panel only needs
@@ -19,18 +21,19 @@
 
 class TinyGFXBusI2C : public TinyGFXBus {
  public:
+  /// `wire` must already be begun. Call Wire.begin() - with whatever pins your
+  /// board needs - before lcd.begin().
+  ///
   /// `chunk` is how many payload bytes go into one transmission.
   /// AVR's Wire buffer is 32 bytes in total, so the default is kept modest.
-  TinyGFXBusI2C(uint8_t address = 0x3C, uint8_t chunk = 16, TwoWire& wire = Wire,
-                bool initWire = true)
-      : _wire(&wire), _addr(address), _chunk(chunk), _initWire(initWire) {}
+  TinyGFXBusI2C(TwoWire& wire, uint8_t address = 0x3C, uint8_t chunk = 16)
+      : _wire(&wire), _addr(address), _chunk(chunk) {}
 
   /// Control bytes. Defaults are the SSD1306 family (command 0x00, data 0x40).
   void setControlBytes(uint8_t cmd, uint8_t data) { _cmdCtrl = cmd; _dataCtrl = data; }
 
-  void init() override {
-    if (_initWire) _wire->begin();
-  }
+  /// Nothing to do: the Wire instance is yours, already begun.
+  void init() override {}
 
   void writeCommand(uint8_t cmd) override {
     _wire->beginTransmission(_addr);
@@ -57,5 +60,4 @@ class TinyGFXBusI2C : public TinyGFXBus {
   uint8_t _chunk;
   uint8_t _cmdCtrl = 0x00;
   uint8_t _dataCtrl = 0x40;
-  bool _initWire;
 };

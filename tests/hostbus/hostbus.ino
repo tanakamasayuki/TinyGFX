@@ -28,6 +28,7 @@ void setup() {
   return;
 #else
   tgfxTestBegin("hostbus");
+  SPI.begin();  // the sketch owns the bus; TinyGFX never begins it
 
   // ---- ソフト SPI（CH32V003 の既定バス） --------------------------------
   {
@@ -51,7 +52,7 @@ void setup() {
 
   // ---- ハードウェア SPI ---------------------------------------------------
   {
-    TinyGFXBusSPI bus(PIN_DC, PIN_CS, 24000000UL);
+    TinyGFXBusSPI bus(SPI, PIN_DC, PIN_CS, 24000000UL);
     TinyGFXPanelST7789 panel(bus, W, H);
     TinyGFX lcd(panel);
     TgfxSpiProbe probe(sink, PIN_DC);

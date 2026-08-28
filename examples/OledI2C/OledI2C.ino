@@ -24,11 +24,12 @@ static const int16_t HEIGHT = 64;
 // The framebuffer. A 128x32 panel needs half of this (512 bytes).
 static uint8_t framebuffer[WIDTH * HEIGHT / 8];
 
-TinyGFXBusI2C bus(/*address*/ 0x3C);
+TinyGFXBusI2C bus(Wire, /*address*/ 0x3C);
 TinyGFXPanelSSD1306 panel(bus, framebuffer, WIDTH, HEIGHT);
 TinyGFX lcd(panel);
 
 void setup() {
+  Wire.begin();  // the sketch owns the bus; TinyGFX never begins it
   lcd.begin();
 
   lcd.drawRect(0, 0, WIDTH, HEIGHT, TFT_WHITE);

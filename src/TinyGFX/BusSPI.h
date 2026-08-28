@@ -1,7 +1,13 @@
 // TinyGFX - Arduino SPI bus (default, portable)
 //
-// SCK and MOSI are left to the core's SPI library. To choose the pins
-// yourself, call SPI.begin(...) before lcd.begin() and pass initSpi=false.
+// Hand it an SPI bus you have already begun. TinyGFX never calls SPI.begin()
+// and never picks the SCK / MOSI pins: owning the bus is the sketch's job, so
+// an SD card or anything else on the same wires keeps working. Sharing is done
+// the standard Arduino way, with beginTransaction / endTransaction around
+// every burst.
+//
+// DC and CS are different - those belong to this panel, so this class does
+// drive them.
 #pragma once
 #include <Arduino.h>
 #include <SPI.h>
@@ -24,10 +30,12 @@
 
 class TinyGFXBusSPI : public TinyGFXBus {
  public:
-  TinyGFXBusSPI(int8_t dc, int8_t cs = -1, uint32_t freq = 24000000UL, SPIClass& spi = SPI,
-                bool initSpi = true)
-      : _spi(&spi), _freq(freq), _dc(dc), _cs(cs), _initSpi(initSpi) {}
+  /// `spi` must already be begun. Call SPI.begin() - with whatever pins your
+  /// board needs - before lcd.begin().
+  TinyGFXBusSPI(SPIClass& spi, int8_t dc, int8_t cs = -1, uint32_t freq = 24000000UL)
+      : _spi(&spi), _freq(freq), _dc(dc), _cs(cs) {}
 
+  /// Only DC and CS are set up here. The SPI bus is yours.
   void init() override {
     pinMode(_dc, OUTPUT);
     digitalWrite(_dc, HIGH);
@@ -35,7 +43,6 @@ class TinyGFXBusSPI : public TinyGFXBus {
       pinMode(_cs, OUTPUT);
       digitalWrite(_cs, HIGH);
     }
-    if (_initSpi) _spi->begin();
   }
 
   void beginTransaction() override {
@@ -68,6 +75,11 @@ class TinyGFXBusSPI : public TinyGFXBus {
   }
 
   /// For panels with a single shared data line (the ILI9342C on an M5Stack).
+  ///
+  /// WARNING: this is the one path that touches the bus lifecycle. Turning the
+  /// line around needs SPI.end() and SPI.begin(), which re-establishes the bus
+  /// on its default pins. Do not use it when another device shares the wires.
+  /// Nothing happens unless you call this, so the normal path is unaffected.
   ///
   /// On some boards SDA doubles as MOSI and MISO, and the SPI peripheral's
   /// MISO pin is connected to nothing. A plain transfer() cannot read there -
@@ -219,5 +231,4 @@ class TinyGFXBusSPI : public TinyGFXBus {
   bool _rdActive = false;
   int8_t _dc;
   int8_t _cs;
-  bool _initSpi;
 };

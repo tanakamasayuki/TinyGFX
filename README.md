@@ -62,6 +62,11 @@ The default bus is **bit-banged SPI**, because the CH32V003 Arduino core ships n
 library at all. Where hardware SPI is available, swap in `<TinyGFX/BusSPI.h>` — the
 drawing code does not change by a single line.
 
+> **You begin SPI and Wire yourself and hand the instance over.** TinyGFX never
+> initialises a bus, so an SD card - or anything else on the same wires - keeps
+> working. Sharing happens the standard Arduino way, with beginTransaction and
+> endTransaction around each burst. The only pins TinyGFX drives are DC and CS.
+
 ### A monochrome OLED over I2C (SSD1306)
 
 ```cpp

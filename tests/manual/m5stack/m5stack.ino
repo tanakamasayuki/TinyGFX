@@ -27,7 +27,7 @@ static const int8_t PIN_DC = 27, PIN_CS = 14, PIN_RST = 33, PIN_BL = 32, PIN_SD_
 // ボタン A / B / C（active LOW、外部プルアップあり）
 static const int8_t BTN_A = 39, BTN_C = 37;
 
-TinyGFXBusSPI bus(PIN_DC, PIN_CS, /*freq*/ 24000000UL);
+TinyGFXBusSPI bus(SPI, PIN_DC, PIN_CS, /*freq*/ 24000000UL);
 TinyGFXPanelILI9342 panel(bus, 320, 240, PIN_RST);
 TinyGFX lcd(panel);
 
@@ -355,6 +355,7 @@ void setup() {
   pinMode(BTN_A, INPUT);
   pinMode(BTN_C, INPUT);
 
+  SPI.begin();  // the sketch owns the bus; TinyGFX never begins it
   lcd.begin();
   canvas.begin();  // 帯レンダリング側。パネルの init が 2 回走るが害はない
 

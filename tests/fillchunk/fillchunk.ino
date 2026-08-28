@@ -41,6 +41,7 @@ void setup() {
   return;
 #else
   tgfxTestBegin("fillchunk");
+  SPI.begin();  // the sketch owns the bus; TinyGFX never begins it
   for (int i = 0; i < 7 * 5; ++i) image[i] = (uint16_t)(i * 1493 + 7);
 
   // ---- ソフト SPI（まとめ書きを持たない。これが基準） --------------------
@@ -63,7 +64,7 @@ void setup() {
 
   // ---- ハードウェア SPI + まとめ書き ------------------------------------
   {
-    TinyGFXBusSPI bus(PIN_DC, PIN_CS, 24000000UL);
+    TinyGFXBusSPI bus(SPI, PIN_DC, PIN_CS, 24000000UL);
     TinyGFXPanelST7789 panel(bus, W, H);
     TinyGFX lcd(panel);
     TgfxSpiProbe probe(sink, PIN_DC);
