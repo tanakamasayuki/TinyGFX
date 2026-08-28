@@ -143,8 +143,9 @@ class TinyGFXPanelSSD1306 : public TinyGFXPanel {
       const int16_t lo = (int16_t)(y - pageTop);
       int16_t hi = (int16_t)(by - pageTop);
       if (hi > 7) hi = 7;
-      uint8_t mask = 0;
-      for (int16_t b = lo; b <= hi; ++b) mask = (uint8_t)(mask | (uint8_t)(1u << b));
+      // Bits lo..hi set, without looping over them: keep the low end, drop
+      // everything above hi.
+      const uint8_t mask = (uint8_t)((uint8_t)(0xFFu << lo) & (uint8_t)(0xFFu >> (7 - hi)));
       int16_t slot = page;
       if (_bandPages != 0) {
         slot = (int16_t)(page - _pageFirst);
@@ -179,19 +180,22 @@ class TinyGFXPanelSSD1306 : public TinyGFXPanel {
 
   /// Logical coordinates to a bit in the buffer. Out-of-range writes are dropped.
   void put(bool on) {
-    int16_t x = (int16_t)_cx, y = (int16_t)_cy;
+    const uint16_t x = _cx, y = _cy;
     // Advance to the next pixel up front, so an early return cannot desync it
     if (_cx >= _xe) { _cx = _xs; ++_cy; } else { ++_cx; }
-    if (x < 0 || y < 0 || x >= _width || y >= _height) return;
+    // Unsigned, so "below zero" and "past the edge" are the same comparison.
+    if (x >= (uint16_t)_width || y >= (uint16_t)_height) return;
 
     int16_t fx, fy;
-    toBuffer(x, y, &fx, &fy);
+    toBuffer((int16_t)x, (int16_t)y, &fx, &fy);
     int16_t page = (int16_t)(fy >> 3);
     if (_bandPages != 0) {
       page = (int16_t)(page - _pageFirst);
       if (page < 0 || page >= _bandPages) return;  // outside the band
     }
-    uint8_t* slot = &_buf[(int32_t)page * _natW + fx];
+    // 16 bits is enough: a page-addressed panel is at most a few hundred
+    // pixels wide and eight pages tall, so the index cannot overflow.
+    uint8_t* slot = &_buf[(int16_t)(page * _natW + fx)];
     const uint8_t mask = (uint8_t)(1u << (fy & 7));
     if (on) *slot = (uint8_t)(*slot | mask);
     else    *slot = (uint8_t)(*slot & (uint8_t)~mask);
