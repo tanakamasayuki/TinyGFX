@@ -9,9 +9,21 @@
 | [FlickerFree](FlickerFree) | Tiled rendering, no flicker, no framebuffer | ~7.6 KB / ~2.0 KB RAM |
 | [HardwareSPI](HardwareSPI) | The same drawing over hardware SPI | about the same as Shapes |
 | [OledI2C](OledI2C) | **A monochrome I2C OLED** (SSD1306) | ~5.6 KB / **~1.1 KB RAM** |
+| [M5StackBasic](M5StackBasic) | **Hardware bring-up.** M5Stack Core / BASIC only | — (ESP32, not measured) |
 
 Numbers come from [../docs/FOOTPRINT.ja.md](../docs/FOOTPRINT.ja.md) (Japanese).
 **Features you do not call are not linked in**, so call only what you need.
+
+## Trying it on real hardware? Start with M5StackBasic
+
+[M5StackBasic](M5StackBasic) is the only example that needs **no wiring**. The pins are
+fixed and the power is solid, so a blank screen means the library, not a loose jumper.
+It puts the border, colour order, text orientation and primitives on one screen, and
+prints how to fix each one if it comes out wrong.
+
+```
+arduino-cli compile --profile m5stack -u -p /dev/ttyUSB0 examples/M5StackBasic
+```
 
 ## Monochrome OLEDs work differently
 
@@ -40,8 +52,10 @@ Every example declares its pins at the top. Change them to match your board.
 stopgap 5x7 face covering only `0x20`-`0x3F`. Real fonts are generated with
 [LGFXFontToolJs](https://www.npmjs.com/package/lgfx-font-tool).
 
-The format is GFXfont (Adafruit GFX compatible), so existing Adafruit font headers can be
-handed to `setFont()` unchanged.
+The formats are TinyGFX's own **TinyFont** and **u8g2**
+([../docs/FONT_FORMAT.ja.md](../docs/FONT_FORMAT.ja.md), Japanese). The bitmap layout matches
+GFXfont, so existing Adafruit faces can be **converted** by the tool - but the struct itself
+cannot be handed to `setFont()` as is. Decoders for formats you do not use are not linked in.
 
 **On AVR the font must be in PROGMEM**, otherwise it eats RAM and renders as garbage.
 

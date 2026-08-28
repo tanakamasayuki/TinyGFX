@@ -12,6 +12,8 @@ import tinygfx_build as tb
 
 EXAMPLES = tb.REPO / "examples"
 ALL = ["HelloWorld", "Shapes", "FlickerFree", "HardwareSPI", "OledI2C"]
+# ボード専用の例。他のコアではビルドできない（ピンが決め打ち）
+BOARD_ONLY = [("m5stack", "M5StackBasic")]
 
 # プロファイル名 -> それが要求するコア。入っていなければ skip する
 # （プロファイルは宣言したプラットフォームを勝手に入れないので、
@@ -20,6 +22,7 @@ PROFILE_CORE = {
     "ch32v003": "ch32-riscv-arduino:ch32riscv:CH32V003_EVT",
     "uno": "arduino:avr:uno",
     "esp32": "esp32:esp32:esp32",
+    "m5stack": "esp32:esp32:m5stack_core",
 }
 
 # CH32V003 のコアには SPI ライブラリが無いので HardwareSPI は外す
@@ -29,6 +32,8 @@ CASES = (
     + [("uno", e) for e in ALL]
     # esp32 はビルドが重いわりに他のコアで拾えない問題が少ないので 1 本だけ。
     + [("esp32", "HelloWorld")]
+    # 実機立ち上げ用（docs/MANUAL_TEST.ja.md M0）。ILI9342 を通すのはここだけ。
+    + BOARD_ONLY
 )
 
 pytestmark = [

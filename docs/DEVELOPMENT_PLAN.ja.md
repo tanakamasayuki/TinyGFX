@@ -23,12 +23,12 @@
 | Tier 1（描画の正しさ） | **完了。9 本すべて通っている**（`capture` `window` `primitive` `clip` `fill` `tile` `text` `image` `hostbus`） |
 | 本番の Bus 実装の検証 | **完了。** ホストコアのバス観測口（E1）で `BusSoftSPI` / `BusSPI` を通しで検証できるようになった |
 | 回転オフセットの導出 | `setGramSize()` を追加。135x240 のような GRAM より小さいパネルで回転 2/3 がずれる問題を修正 |
-| Tier 2（移植性のコンパイル）| **完了。`build_matrix/` 9 件通過**（ch32v003 / uno / esp32 × examples） |
+| Tier 2（移植性のコンパイル）| **完了。`build_matrix/` の 11 ビルドが通過**（ch32v003 / uno / esp32 / m5stack × examples） |
 | AVR（Uno R3）対応 | **実測で全構成が載る。** フォントを PROGMEM から読むようにした（D19） |
 | 開発中の新コアでの確認 | **ハードウェア SPI がリンクでき、base が 624 B**（[FOOTPRINT.ja.md](FOOTPRINT.ja.md) §6.1） |
 | ライブラリ名の確認 | **完了。3 レジストリとも競合なし**（E6） |
-| 実機確認 | **未。** まだ 1 度も実機に出していない |
-| examples | **完了。4 本**（HelloWorld / Shapes / FlickerFree / HardwareSPI）。日英 README つき |
+| 実機確認 | **未。** まだ 1 度も実機に出していない。**M0（M5Stack Core / BASIC）の道具は用意した** — `TinyGFXPanelILI9342` + `examples/M5StackBasic`（D22） |
+| examples | **完了。6 本**（HelloWorld / Shapes / FlickerFree / HardwareSPI / OledI2C / M5StackBasic）。日英 README つき |
 | 利用者向けドキュメント | `README.md` / `README.ja.md` は**あり**。`docs/GUIDE` / `docs/API` は未着手（実機の後） |
 
 ## 2. 実装順序
@@ -53,7 +53,7 @@
 5. **Uno R3 でも全部載る。** 効くのは RAM だけで、フォントを PROGMEM に置けば実用になる（D19）
 
 > フェーズ 1〜4 の**実装と Tier 1 検証は済んでいる**。各フェーズに残っているのは
-> 実機確認だけ（M1 / M2）。
+> 実機確認だけ（M0 → M1 / M2）。**最初の 1 台は配線の要らない M5Stack**（D22）。
 
 ### フェーズ 1 — 出力の芯
 
@@ -92,11 +92,11 @@ ST7735 / ILI9341。パネル初期化テーブルの整理。CH32V 向け Fast B
 
 ### フェーズ 6 — 仕上げ（**examples のみ完了**）
 
-- examples — **完了。4 本**
+- examples — **完了。6 本**
 - README / GUIDE / API（日英）— **未着手。次にやる**
 - API 安定化、ベンチ — 未
 
-**実機（M1 / M2）が終わるまで利用者向けドキュメントは書かない。**
+**実機（M0 / M1 / M2）が終わるまで利用者向けドキュメントは書かない。**
 配線とオフセットの説明を、動いていないうちに書くと嘘になる。
 
 ## 3. リリース方針

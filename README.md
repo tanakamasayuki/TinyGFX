@@ -9,10 +9,13 @@ Anything you do not call costs nothing at all.
 
 > ### Not yet run on real hardware
 >
-> 38 host tests pass, but **this has never driven a physical display.**
-> Init-sequence timing, SPI mode and panel origin offsets can only be confirmed on
-> hardware, so if you are about to wire one up, read
-> [docs/MANUAL_TEST.ja.md](docs/MANUAL_TEST.ja.md) (Japanese) first.
+> 40 host tests pass, but **this has never driven a physical display.**
+> Init-sequence timing, SPI mode and panel origin offsets can only be confirmed on hardware.
+>
+> The surest way to try it is **[examples/M5StackBasic](examples/M5StackBasic)** on an
+> M5Stack Core / BASIC - **no wiring at all**. It puts the border, colour order, text
+> orientation and primitives on one screen and prints how to fix each one if it comes out
+> wrong. The procedure is M0 in [docs/MANUAL_TEST.ja.md](docs/MANUAL_TEST.ja.md) (Japanese).
 > The API may still move.
 
 ## What makes it different
@@ -87,6 +90,7 @@ More in [examples/](examples/).
 | | I2C (Wire) | `TinyGFX/BusI2C.h` |
 | | Command-stream capture (for verification) | `TinyGFX/BusCapture.h` |
 | Panel | ST7789 (colour TFT) | `TinyGFX/PanelST7789.h` |
+| | ILI9342C (M5Stack Core / BASIC) | `TinyGFX/PanelILI9342.h` |
 | | SSD1306 (monochrome OLED) | `TinyGFX/PanelSSD1306.h` |
 | | RAM buffer (tests, tiled rendering) | `TinyGFX/PanelMemory.h` |
 | Font | TinyFont (own format, for H≤16) | `TinyGFX/FontTiny.h` |
@@ -203,13 +207,15 @@ cd tests && uv sync && uv run pytest -v -s
 No hardware needed: everything either runs on the host core or just builds and inspects
 size and symbols. Details in [tests/README.md](tests/README.md).
 
-Of the 38, the characteristic ones:
+Of the 40, the characteristic ones:
 
 - **`linkprune/`** — `nm` proves that unused features and unused font formats are absent from the final binary
 - **`footprint/`** — per-configuration increments stay within budget, and **the numbers are always printed**
 - **`tile/`** — changing the band height must not change a single pixel
 - **`hostbus/`** — captures what the real SPI bus actually put on the wire and turns it back into an image
 - **`i2c/`** — the same, over I2C to an SSD1306
+- **`ili9342/`** — MADCTL, colour order and mirroring (**whether the table is right on real
+  glass is what M0 checks**)
 
 ## License
 
