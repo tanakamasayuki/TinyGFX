@@ -38,30 +38,34 @@ TinyFont はこの帯のためだけの形式。**外に出たら u8g2 か GFXfo
 
 ```cpp
 struct TinyGFXGlyph {   // 可変ピッチのときだけ。4 バイト固定
-  uint8_t offsetLo, offsetHi;  // bitmap 先頭からのバイトオフセット
-  uint8_t width;               // グリフの幅（画素）
-  uint8_t xAdvance;            // 送り幅
+  uint8_t offsetLo, offsetHi, width, xAdvance;
 };
 
-struct TinyGFXFont {
+struct TinyGFXFontTiny {
   const uint8_t*      bitmap;
-  const TinyGFXGlyph* glyphs;  // nullptr = 固定ピッチ
+  const TinyGFXGlyph* glyphs;  // nullptr = 固定ピッチ（表を持たない）
   const uint16_t*     codes;   // nullptr = 連続索引
   uint16_t first, count;
-  uint8_t  width, height, xAdvance, yAdvance;  // 固定ピッチ用 / 全グリフ共通
-  int8_t   xOffset, yOffset;                   // 全グリフ共通
-  uint8_t  bytesPerGlyph;                      // 固定ピッチ用。実行時に除算しないため
+  uint8_t  width, height, xAdvance, yAdvance;
+  int8_t   xOffset, yOffset;   // yOffset = 行の上端からのグリフ上端
+  uint8_t  bytesPerGlyph;
 };
 ```
 
-ヘッダは **24 バイト**（RV32 / 32bit ポインタ）。
+**24 バイト。** 高さ・xOffset・yOffset をグリフごとに持たないのが GFXfont との一番の差。
 
-**高さ・xOffset・yOffset をグリフごとに持たない**のが GFXfont との一番の差。
-`yOffset` が共通なので ascent が定数になり、`setFont()` で全グリフを走査する必要もない。
+スケッチが `setFont()` に渡すのはこれではなく、形式に依らない `TinyGFXFontRef`:
 
-ビットマップは「**行を連結した MSB first のビット列、グリフ間はバイト境界揃え**」。
-GFXfont と同じ並びなので、既存の Adafruit 資産はツール側で変換できる
-（ビットマップはそのまま、メタデータだけ組み替える）。
+```cpp
+static const TinyGFXFontTiny myFontData = { ... };
+static const TinyGFXFontRef  myFont = { &myFontData, &tinygfxFontTinyOps, nullptr };
+```
+
+`ops` が形式ごとのデコーダを指し、`next` が連鎖の次を指す（**形式が違ってよい**）。
+仕組みは §8、コアから見た形は [CORE_DESIGN.ja.md](CORE_DESIGN.ja.md) §9。
+
+ビットマップは「行を連結した MSB first のビット列、グリフ間はバイト境界揃え」で
+GFXfont と同じ並び。既存の Adafruit 資産はツール側で変換できる。
 
 固定ピッチのときグリフ n の先頭は `bitmap + n * bytesPerGlyph`。表を引かない。
 
@@ -290,7 +294,73 @@ u8g2 形式にも対応するかは未決（そちらのツール側の議論待
 対応するなら、この試作をそのまま `src/TinyGFX/FontU8g2.h` に移せばよい。
 ただし**コアが 2 つのフォント型を知ることになる**ので、そこの作り方は別途決める。
 
-## 8. LGFXFontToolJs への依頼
+## 8. 複数のフォント形式に対応する — **未使用分は 1 バイトも載らない**
+
+### 仕組み
+
+**コアはフォント形式を 1 つも知らない。** フォント側が自分のデコーダ（`TinyGFXFontOps`）を
+指していて、コアは連鎖をたどって呼ぶだけ。**include していない形式のデコーダは
+どこからも参照されないので落ちる。**
+
+### 実測（CH32V003 / -Os）
+
+| 構成 | flash | 文字機能ぶん | データ | **コード** |
+| --- | --- | --- | --- | --- |
+| C（文字なし） | 10,772 | — | — | — |
+| **d（TinyFont だけ）** | 11,808 | +1,036 | 208 | **828** |
+| d_u8g2（u8g2 だけ） | 12,064 | +1,292 | 187 | **1,105** |
+| d_both（両方） | 12,988 | +2,216 | 395 | 1,821 |
+
+**TinyFont のスケッチに u8g2 を足すと +1,180 B。使わなければ +0 B。**
+
+### 落ちていることの証拠
+
+`nm` で最終バイナリのシンボルを数えたもの。`tests/linkprune/` が毎回検査する。
+
+| 構成 | TinyFont のシンボル | u8g2 のシンボル |
+| --- | --- | --- |
+| d（TinyFont だけ） | 3 | **0** |
+| d_u8g2（u8g2 だけ） | **0** | 3 |
+| d_both | 4 | 3 |
+
+### 仕組みそのものの代金 — +144 B
+
+形式を差し替えられるようにした代わりに、**単一形式の利用者も 144 バイト払う**。
+
+| | flash | データ | コード |
+| --- | --- | --- | --- |
+| 直結（形式 1 つ固定・旧実装） | 11,644 | 188 | 684 |
+| **差し替え可能（現在）** | 11,808 | 208 | **828** |
+
+内訳:
+
+- **+20 B はデータ**（`TinyGFXFontRef` 12 B + ops 表 12 B − 構造体から抜いた `next` 4 B）
+- **+124 B はコード。** 大半は「定数畳み込みが効かなくなったぶん」。
+  以前はフォント構造体がリテラルとして見えていたので、コンパイラが
+  `glyphs == nullptr` / `codes == nullptr` を**コンパイル時に解決して分岐ごと消していた**。
+  関数ポインタ越しになると `const void*` が不透明になり、畳めなくなる。
+
+**取り戻せる。** 変種が決まっているなら分岐を落とせる:
+
+| | flash | 差 |
+| --- | --- | --- |
+| 既定（両方あり） | 11,808 | — |
+| `-DTINYGFX_FONT_SPARSE=0` | 11,744 | −64 B |
+| `-DTINYGFX_FONT_RECORDS=0` | 11,764 | −44 B |
+| 両方なし | **11,692** | **−116 B** |
+
+つまり **純粋な間接呼び出しの代金は約 28 B**（11,692 − 11,644 − 20）で、
+残りは「畳めなくなった分岐」。固定ピッチ・連続索引しか使わないと分かっている
+プロジェクトはスイッチで元に戻せる。
+
+### 判断
+
+**144 B（スイッチで 28 B まで縮む）を払って、形式を自由に増やせるようにする。**
+
+TinyFont は H≤16 の帯でしか勝てない（§0）ので、**その外を扱う道は要る**。
+形式を足すたびにコアが太る作りだと、その道は塞がる。
+
+## 9. LGFXFontToolJs への依頼
 
 [EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E4 にまとめてある。要点:
 
@@ -300,7 +370,7 @@ u8g2 形式にも対応するかは未決（そちらのツール側の議論待
 3. **PROGMEM 属性**をビットマップ・グリフ表・コード表・`TinyGFXFont` の 4 つすべてに付ける
 4. **決定的な出力**（同じ入力 → バイト一致）。CI で `git diff --exit-code` して守るため
 
-## 9. つなぎの実装
+## 10. つなぎの実装
 
 `tools/gen_font.py` が測定用に 5x7（0x20-0x3F の 32 字）を 3 変種で吐く。
 

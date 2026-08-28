@@ -14,7 +14,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 CONSTRUCTS = REPO / "tests" / "constructs"
-FONTS = REPO / "tests" / "common_libs" / "tgfx_font" / "src"
+FONTS = [REPO / "tests" / "common_libs" / "tgfx_font" / "src",
+         REPO / "tests" / "u8g2"]
 
 # 基準機。docs/FOOTPRINT.ja.md §2
 #
@@ -73,7 +74,9 @@ def compile_sketch(sketch, fqbn: str, extra_include=None) -> dict:
         "--library", str(REPO),
     ]
     if extra_include is not None:
-        cmd += ["--build-property", f"compiler.cpp.extra_flags=-I{extra_include}"]
+        dirs = extra_include if isinstance(extra_include, list) else [extra_include]
+        flags = " ".join(f"-I{d}" for d in dirs)
+        cmd += ["--build-property", f"compiler.cpp.extra_flags={flags}"]
     cmd += ["--json", str(sketch)]
     return _run(cmd, name)
 

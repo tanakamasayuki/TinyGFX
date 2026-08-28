@@ -1,11 +1,11 @@
 profiles:
   host:
-    # バージョンを書かない = <sketchbook>/hardware/lang-ship/host を使う。
-    # バス観測口（HostBus.h）はまだ未リリースなので、リリース版では skip される。
+    # バス観測口（HostBus.h / SPI.setTransferHook）は 1.5.0 から。
     fqbn: lang-ship:host:host
     port: socket://localhost
     platforms:
-      - platform: lang-ship:host
+      - platform: lang-ship:host (1.5.0)
+        platform_index_url: https://tanakamasayuki.github.io/lang-ship-arduino-core/package_lang-ship_index.json
     libraries:
       - dir: ../../
       - dir: ../common_libs/tgfx_test

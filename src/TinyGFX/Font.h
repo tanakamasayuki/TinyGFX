@@ -1,60 +1,38 @@
-// TinyGFX - TinyFont: 組込み向けの最小ビットマップフォント形式
+// TinyGFX - フォントの受け口（形式に依らない部分）
 //
-// **対象は高さ 16 画素以下のピクセルグリッドフォント。** それより大きいと
-// bbox / RLE / u8g2 の 3 つが同時に有利へ反転するので、素直に u8g2 を使うほうがよい。
-// 根拠は docs/FONT_FORMAT.ja.md §6。
+// **コアはフォント形式を 1 つも知らない。** 知っているのはフォント側で、
+// データと一緒に「自分をどう描くか」（TinyGFXFontOps）を指している。
 //
-// 設計の要点は「選択を実行時ではなく**生成時**に済ませ、結果をデータで表す」こと。
+//   スケッチ ── #include <TinyGFX/FontTiny.h> ──▶ TinyFont のデコーダ
+//            └─ #include <TinyGFX/FontU8g2.h> ──▶ u8g2 のデコーダ
 //
-//   索引     連続（first からの通し）か、疎（昇順のコード表）か
-//   レコード 持つ（可変ピッチ）か、持たない（固定ピッチ）か
-//   連鎖     半角と全角を別フォントに割り、next で繋ぐか
+// include していない形式のデコーダは**どこからも参照されないのでリンクされない。**
+// 形式を増やしてもフットプリントは増えない（使わなければ 0 バイト）。
 //
-// どちらもポインタが nullptr かどうかで決まる。デコーダ側の分岐は
-// それぞれ 1 か所だけで、使わない側もリンクされるが数十バイトに収まる。
-// 詳しくは docs/FONT_FORMAT.ja.md。
-//
-// ビットマップは「行を連結した MSB first のビット列、グリフ間はバイト境界揃え」。
-// GFXfont（Adafruit）と同じ並びなので、既存資産はツール側で変換できる。
-//
-// TinyGFX 自身はフォントデータを 1 つも同梱しない（docs/DECISIONS.ja.md D17）。
+// 連鎖（next）は形式をまたげる。半角を TinyFont、全角を別形式、も書ける。
 #pragma once
+#include <stddef.h>
 #include <stdint.h>
 
-/// 可変ピッチのときのグリフ 1 件。**4 バイト固定。**
-/// 高さ・xOffset・yOffset はフォント全体で共通なので持たない。
-struct TinyGFXGlyph {
-  uint8_t offsetLo;   // bitmap 先頭からのバイトオフセット（16bit）
-  uint8_t offsetHi;
-  uint8_t width;      // グリフの幅（画素）
-  uint8_t xAdvance;   // 送り幅
+class TinyGFX;
+
+/// 形式ごとの入口。値は「収録外なら -1」で統一する。
+struct TinyGFXFontOps {
+  /// 1 文字描いて送り幅を返す。収録外なら -1（何も描かない）。
+  int16_t (*draw)(TinyGFX& gfx, const void* font, uint16_t ch, int16_t x, int16_t y);
+  /// 描かずに送り幅だけ返す。収録外なら -1。
+  int16_t (*advance)(const void* font, uint16_t ch);
+  /// 行送り（倍率をかける前）。
+  uint8_t (*lineHeight)(const void* font);
 };
 
-struct TinyGFXFont {
-  const uint8_t* bitmap;
-
-  /// nullptr なら**固定ピッチ**（全グリフが width / xAdvance / bytesPerGlyph 共通）。
-  const TinyGFXGlyph* glyphs;
-
-  /// nullptr なら**連続索引**（first から count 個）。
-  /// 非 nullptr なら**疎索引**（昇順に並んだコード表。count 個）。
-  const uint16_t* codes;
-
-  uint16_t first;         // 連続索引のときの開始コード
-  uint16_t count;         // 収録グリフ数
-  uint8_t width;          // 固定ピッチのときのグリフ幅
-  uint8_t height;         // 全グリフ共通
-  uint8_t xAdvance;       // 固定ピッチのときの送り幅
-  uint8_t yAdvance;       // 行送り
-  int8_t xOffset;         // 全グリフ共通
-  int8_t yOffset;         // **行の上端からのグリフ上端**（下が正）。全グリフ共通
-  uint8_t bytesPerGlyph;  // 固定ピッチのとき。実行時に除算しないため持っておく
-
+/// スケッチが `setFont()` に渡すもの。フォントデータと入口の組。
+struct TinyGFXFontRef {
+  const void* data;
+  const TinyGFXFontOps* ops;
   /// この字を持っていないとき次に探すフォント。nullptr で終端。
-  ///
-  /// 半角と全角を別フォントに割ると**両方が固定ピッチになり、グリフ表が丸ごと消える**。
-  /// 割った 2 つをこれで繋ぐ（日本語混在 190 字・8px で 2,349 → 1,471 B の実測あり）。
-  const TinyGFXFont* next;
+  /// **形式が違っていてもよい。**
+  const TinyGFXFontRef* next;
 };
 
 // ---------------------------------------------------------------------------
@@ -64,7 +42,9 @@ struct TinyGFXFont {
 // pgm_read_* でしか読めない。それ以外のアーキテクチャでは素の参照に展開され、
 // 1 命令も増えない。
 //
-// **AVR ではフォントを PROGMEM に置くこと。** 置かないと化ける。
+// **PROGMEM に置くのはビットマップ・グリフ表・コード表だけ。**
+// `TinyGFXFontRef` と `TinyGFXFontOps` は素の const（AVR では RAM）に置く。
+// 合わせて 1 フォントあたり 24 バイト程度で、そのぶん分岐経路が素の参照で済む。
 // ---------------------------------------------------------------------------
 #if defined(__AVR__)
 #include <avr/pgmspace.h>

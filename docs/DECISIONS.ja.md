@@ -260,6 +260,37 @@ LGFXFontToolJs 側も付くはず（[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.
 **まだやっていないこと**: `pushImage` の画像データは RAM 上のもののみ。AVR で PROGMEM の
 画像を渡す道は用意していない（Q6）。
 
+### D20. フォント形式はフォント側がデコーダを指す（コアは形式を知らない）
+
+`setFont()` に渡すのは `TinyGFXFontRef`（データ + `TinyGFXFontOps` + `next`）。
+コアは連鎖をたどって `ops->draw` を呼ぶだけで、**形式を 1 つも知らない。**
+
+**理由**: 複数の形式に対応しつつ、**使っていない形式のデコーダを 1 バイトも載せない**
+ための唯一の形だった。コアが形式ごとの `setFont` オーバーロードを持つと、
+コアがすべてのデコーダを参照することになり R3 を破る（[CORE_DESIGN.ja.md](CORE_DESIGN.ja.md) §7.4）。
+
+**実測で確かめたこと**（[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md) §8）:
+
+- TinyFont だけのスケッチに u8g2 のシンボルは **0 個**（`nm` で確認、`tests/linkprune/` が常時検査）
+- TinyFont のスケッチに u8g2 を足すと +1,180 B。**使わなければ +0 B**
+- 仕組みそのものの代金は **+144 B**。うち 124 B は「定数畳み込みが効かなくなったぶん」で、
+  `-DTINYGFX_FONT_SPARSE=0 -DTINYGFX_FONT_RECORDS=0` で 116 B 取り戻せる。
+  **純粋な間接呼び出しは約 28 B**
+
+**採らなかった案**:
+- *形式ごとの `setFont` オーバーロード* — 素直だが、コアが全形式を参照する。R3 違反。
+- *テンプレートで形式を静的に結ぶ* — サイズが読めなくなる（D2 と同じ理由）。
+  連鎖で形式を混ぜられなくもなる。
+- *形式を 1 つに絞る（TinyFont だけ）* — 一番小さいが、TinyFont が勝てるのは
+  **H≤16 の帯だけ**（[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md) §0）。その外を扱う道を塞ぐ。
+
+**副産物**: `next` の連鎖が**形式をまたげる**ようになった。半角を TinyFont、
+全角を u8g2、という組み方ができる。
+
+**R2 との関係**: 「関数ポインタの表を持つな」は**全機能を並べた表**（1 つ使うと全部載る）を
+禁じたもの。ここの表は形式ごとに 1 枚で、その形式を include した人だけが参照する。
+**むしろ R2 の目的を達成するための道具になっている。**
+
 ## 2. 未決の論点（要相談）
 
 | # | 論点 | 選択肢 | 決める時期 |
@@ -276,7 +307,7 @@ LGFXFontToolJs 側も付くはず（[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.
 | Q10 | `TinyGFXTileCanvas` の描画コールバックの形 | 関数ポインタ + `void*`（現状）/ テンプレートで任意の callable | Phase 2 |
 | Q11 | 自動テストの基準機を新コア（ArduinoCore-CH32）へ移す時期 | リリース後すぐ / v1.0 前 | [EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E7 |
 | Q12 | `drawString` の UTF-8 対応 | コアに入れる（+153 B 実測）/ 拡張ヘッダに分ける | CJK を実際に出す段で。**形式に依らず必要**（[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md) §7） |
-| Q13 | u8g2 形式にも対応するか | TinyFont 一本 / 第 2 デコーダを opt-in で足す（試作は測定済み・693 B） | ツール側の議論待ち |
+| ~~Q13~~ | ~~u8g2 形式にも対応するか~~ | **決着。対応する。** 形式差し替えの仕組み（D20）を入れ、`TinyGFX/FontU8g2.h` として実装済み。使わなければ 0 バイト | — |
 
 ## 3. memo から変えた点
 

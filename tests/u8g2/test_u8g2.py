@@ -48,6 +48,10 @@ def test_u8g2(dut):
     dut.expect("TEST done", timeout=60)
 
     r = tc.report(SKETCH)
+    assert r["line_height"] == 9, f"行送りが {r['line_height']}"
+    assert r["ascii_width"] == 64, f"描いた幅が {r['ascii_width']}"
+    assert r["ascii_measured"] == r["ascii_width"], "textWidth と drawString の戻り値が違う"
+    assert r["cjk_width"] == 40, f"CJK の幅が {r['cjk_width']}"
     assert r["missing_adv"] == 0, "収録外の文字が送り幅を返している"
     assert r["missing_pixels"] == 0, "収録外の文字が画素を描いている"
 

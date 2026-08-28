@@ -1,7 +1,8 @@
 #include <TinyGFX.h>
 #include <TinyGFX/BusSoftSPI.h>
 #include <TinyGFX/PanelST7789.h>
-#include <tgfx_u8g2.h>
+#include <tinygfx_font5x7.h>
+#include <TinyGFX/FontU8g2.h>
 #include <u8g2_ascii.h>
 
 TinyGFXBusSoftSPI bus(/*sck*/5, /*mosi*/6, /*dc*/3, /*cs*/4);
@@ -23,6 +24,10 @@ void setup() {
   lcd.fillRoundRect(50, 40, 30, 20, 4, TFT_YELLOW);
   lcd.drawTriangle(0, 60, 20, 90, 40, 60, TFT_WHITE);
   lcd.fillTriangle(50, 60, 70, 90, 90, 60, TFT_WHITE);
-  tgfxU8g2DrawChar(lcd, u8g2_ascii, '7', 0, 100, TFT_WHITE);
+  lcd.setTextColor(TFT_WHITE);
+  lcd.setFont(&tinygfxFont5x7);
+  lcd.drawString("0123456789", 0, 100);
+  lcd.setFont(&u8g2_ascii);
+  lcd.drawString("0123456789", 0, 110);
 }
 void loop() {}

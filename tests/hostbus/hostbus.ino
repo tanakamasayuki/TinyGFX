@@ -68,10 +68,11 @@ void setup() {
     tgfxShot("hw", gram, W, H);
 
     // SPISettings が意図どおりか（ST7789 は MODE0 / MSB first）
+    // 1.5.0 で読み取り専用アクセサが入ったので、そちらを使う
     const SPISettings s = SPI.settings();
-    tgfxReport("spi_clock", (long)s._clock);
-    tgfxReport("spi_bitorder", (long)s._bitOrder);
-    tgfxReport("spi_mode", (long)s._dataMode);
+    tgfxReport("spi_clock", (long)s.clock());
+    tgfxReport("spi_bitorder", (long)s.bitOrder());
+    tgfxReport("spi_mode", (long)s.dataMode());
     tgfxReport("spi_in_transaction", SPI.inTransaction() ? 1 : 0);
     probe.detach();
   }

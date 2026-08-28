@@ -75,3 +75,24 @@ inline void tgfxShot(const char* name, const uint16_t* px, int w, int h) {
   Serial.print("SCENE ");
   Serial.println(name);
 }
+
+/// UTF-8 の文字列を 1 コードポイントずつ描く。
+///
+/// コアの drawString はバイトをそのままコードとして扱うので、CJK にはこれが要る。
+/// TinyGFX 側に入れるかは未決（docs/DECISIONS.ja.md Q12）。ここはテスト用。
+inline int16_t tgfxDrawUtf8(TinyGFX& g, const char* str, int16_t x, int16_t y) {
+  const int16_t x0 = x;
+  while (*str) {
+    uint16_t ch = (uint8_t)*str++;
+    if (ch >= 0xF0) { ch = 0xFFFD; str += 3; }
+    else if (ch >= 0xE0) {
+      ch = (uint16_t)(((ch & 0x0F) << 12) | ((uint16_t)(str[0] & 0x3F) << 6) | (str[1] & 0x3F));
+      str += 2;
+    } else if (ch >= 0xC0) {
+      ch = (uint16_t)(((ch & 0x1F) << 6) | (str[0] & 0x3F));
+      str += 1;
+    }
+    x = (int16_t)(x + g.drawChar(ch, x, y));
+  }
+  return (int16_t)(x - x0);
+}
