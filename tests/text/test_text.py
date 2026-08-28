@@ -1,7 +1,10 @@
 """文字描画。
 
-フォントは 5x7（送り幅 6 / 行送り 8 / 収録 0x20-0x3F）。
-ライブラリはフォントを同梱しないので、これはテスト側の tgfx_font から来ている。
+フォントは **本番の生成器（LGFXFontToolJs CLI）が出したもの**を tgfx_font に
+置いてある。`lgfxJapanGothic_8` の数字 10 字で、墨面 4x6・送り幅 4・行送り 9。
+
+同じ 10 字を 3 通りに符号化したものを並べてあり、**どれで描いても絵が一致すること**
+を最後に見る（どの符号化を選ぶかは生成器の裁量で、スケッチから見えてはいけない）。
 """
 
 from pathlib import Path
@@ -12,7 +15,7 @@ import tgfx_check as tc
 
 SKETCH = Path(__file__).parent
 BLACK, BLUE = tc.BLACK, tc.BLUE
-ADV, LINE = 6, 8
+ADV, LINE = 4, 9
 
 
 def test_text(dut):
@@ -22,7 +25,7 @@ def test_text(dut):
     r = tc.report(SKETCH)
 
     assert r["font_height"] == LINE, f"fontHeight={r['font_height']}"
-    assert r["text_width"] == 5 * ADV, f"textWidth('12:34')={r['text_width']}"
+    assert r["text_width"] == 5 * ADV, f"textWidth('12345')={r['text_width']}"
     assert r["draw_width"] == r["text_width"], (
         f"drawString の戻り値 {r['draw_width']} が textWidth {r['text_width']} と違う")
     assert r["width_x2"] == 2 * 5 * ADV, f"倍角の幅が {r['width_x2']}"

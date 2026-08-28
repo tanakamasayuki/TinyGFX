@@ -12,9 +12,9 @@
 #include <TinyGFX/PanelST7789.h>
 
 #include <TinyGFX/FontCell.h>
-#include "tinygfx_font5x7.h"
+#include "tgfx_clock.h"
 
-static const TinyGFXFontRef font5x7 = {&tinygfxFont5x7, &tinygfxFontCellOps, nullptr};
+static const TinyGFXFontRef clockFont = {&tgfxClock, &tinygfxFontCellOps, nullptr};
 
 // Change these to match your wiring
 static const int8_t PIN_SCK = 5;
@@ -35,7 +35,7 @@ void setup() {
   lcd.fillRect(8, 8, 100, 24, TFT_NAVY);
   lcd.drawRect(8, 8, 100, 24, TFT_WHITE);
 
-  lcd.setFont(&font5x7);
+  lcd.setFont(&clockFont);
   lcd.setTextColor(TFT_WHITE);
   lcd.setTextSize(2);
   lcd.drawString("12:34", 16, 14);

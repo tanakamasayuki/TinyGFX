@@ -24,9 +24,9 @@
 #include <TinyGFX/PanelILI9342.h>
 
 #include <TinyGFX/FontCell.h>
-#include "tinygfx_font5x7.h"
+#include "tgfx_clock.h"
 
-static const TinyGFXFontRef font5x7 = {&tinygfxFont5x7, &tinygfxFontCellOps, nullptr};
+static const TinyGFXFontRef clockFont = {&tgfxClock, &tinygfxFontCellOps, nullptr};
 
 // The built-in LCD of an M5Stack Core / BASIC
 static const int8_t PIN_DC = 27;
@@ -79,7 +79,7 @@ void setup()
   lcd.fillRect((int16_t)(4 + bar * 2), 12, bar, 40, TFT_BLUE);
 
   // 3. Orientation. Mirrored or upside down shows instantly in the digits
-  lcd.setFont(&font5x7);
+  lcd.setFont(&clockFont);
   lcd.setTextColor(TFT_WHITE);
   lcd.setTextSize(3);
   const char *digits = "0123456789";

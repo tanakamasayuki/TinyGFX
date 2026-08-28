@@ -48,9 +48,15 @@ Every example declares its pins at the top. Change them to match your board.
 
 ## Fonts live in your sketch
 
-**TinyGFX ships no font data.** `HelloWorld` bundles `tinygfx_font5x7.h`, but that is a
-stopgap 5x7 face covering only `0x20`-`0x3F`. Real fonts are generated with
-[LGFXFontToolJs](https://www.npmjs.com/package/lgfx-font-tool).
+**TinyGFX ships no font data.** The `tgfx_clock.h` each example bundles came out
+of the [LGFXFontToolJs](https://www.npmjs.com/package/lgfx-font-tool) CLI: thirteen
+characters - the digits plus `:`, `.` and space - taken from `lgfxJapanGothic_8`,
+**1,743 bytes**.
+
+```sh
+npx lgfx-font build --font lgfxJapanGothic_8 --sets digits --chars ":. " \
+    --format cellfont --name tgfxClock --out tgfx_clock.h
+```
 
 The formats are **CellFont** (an external spec, v1) and **u8g2**. Decoders for formats you do
 not use are not linked in.

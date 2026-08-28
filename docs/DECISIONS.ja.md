@@ -232,8 +232,8 @@ GFXfont 版より 24 バイト小さい**（ascent の走査が消え、レコ�
 サブセット化の運用（プロジェクトで使う文字だけ）と自然に噛み合う。
 
 **残っている作業**: [EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E4（LGFXFontToolJs の
-CLI）。いまは `tools/gen_font.py` の 5x7（32 字）をつなぎに使っている。
-**出力は仕様 §12.2 の形そのまま**なので、CLI が揃ったらファイルを差し替えるだけで済む。
+CLI）。**2026-08-28 に公開され、テストと examples のフォントはすべて CLI の出力に
+差し替えた。** つなぎだった `tools/gen_font.py` は削除。
 
 ### D18. 既定の Bus はハードウェア SPI ではなくソフト SPI にする
 
@@ -283,7 +283,7 @@ CLI）。いまは `tools/gen_font.py` の 5x7（32 字）をつなぎに使っ�
 ビットマップ・グリフ表・コード表・**フォント構造体そのもの**。
 逆に `TinyGFXFontRef` / `TinyGFXFontOps` は素の const（RAM）に置き、素の参照で読む。
 
-**2026-08-28 に不具合を 1 件直した。** `tools/gen_font.py` が
+**2026-08-28 に不具合を 1 件直した**（当時のつなぎ生成器 `tools/gen_font.py`。現在は削除）。それが
 `TinyGFXFontTiny` **構造体だけ** `TINYGFX_FONT_PROGMEM` を付けずに出していた。
 デコーダは `tinygfx_rd16(&f->count)` のように**全フィールドを PROGMEM 経由で読む**ので、
 AVR では `pgm_read_word` が RAM のアドレスをプログラム空間として読み、**文字が化ける。**

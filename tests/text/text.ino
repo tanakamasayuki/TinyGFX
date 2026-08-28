@@ -1,16 +1,20 @@
-// 文字描画。フォントはスケッチ側（tgfx_font）に置いてある。
+// Text drawing. The fonts come from the sketch side (tgfx_font), which is
+// where they belong - the library ships none.
+//
+// The three fonts are the real generator's output for the same ten digits,
+// encoded three different ways. See the equivalence check at the bottom.
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
 #include <TinyGFX/PanelST7789.h>
 #include <tgfx_test.h>
 #include <TinyGFX/FontCell.h>
-#include <tinygfx_font5x7.h>
-#include <tinygfx_font5x7_rec.h>
-#include <tinygfx_font5x7_sparse.h>
+#include <tgfx_digits.h>
+#include <tgfx_digits_sparse.h>
+#include <tgfx_digits_chain.h>
 
-static const TinyGFXFontRef font5x7 = {&tinygfxFont5x7, &tinygfxFontCellOps, nullptr};
-static const TinyGFXFontRef font5x7Rec = {&tinygfxFont5x7Rec, &tinygfxFontCellOps, nullptr};
-static const TinyGFXFontRef font5x7Sparse = {&tinygfxFont5x7Sparse, &tinygfxFontCellOps, nullptr};
+static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps, nullptr};
+static const TinyGFXFontRef sparseFont = {&tgfxDigitsSparse, &tinygfxFontCellOps, nullptr};
+static const TinyGFXFontRef chainFont = {&tgfxDigitsChain, &tinygfxFontCellOps, nullptr};
 
 static const int W = 64, H = 32;
 static uint16_t gram[W * H];
@@ -26,54 +30,58 @@ void setup() {
   Serial.begin(115200);
   tgfxTestBegin("text");
   lcd.begin();
-  lcd.setFont(&font5x7);
+  lcd.setFont(&digitsFont);
   lcd.setTextColor(FG);
 
   tgfxReport("font_height", (long)lcd.fontHeight());
-  tgfxReport("text_width", (long)lcd.textWidth("12:34"));
+  tgfxReport("text_width", (long)lcd.textWidth("12345"));
 
   reset();
-  tgfxReport("draw_width", (long)lcd.drawString("12:34", 2, 3));
+  tgfxReport("draw_width", (long)lcd.drawString("12345", 2, 3));
   tgfxShot("plain", gram, W, H);
 
-  // 倍角
+  // double size
   lcd.setTextSize(2);
-  tgfxReport("width_x2", (long)lcd.textWidth("12:34"));
+  tgfxReport("width_x2", (long)lcd.textWidth("12345"));
   tgfxReport("height_x2", (long)lcd.fontHeight());
   reset();
   lcd.drawString("012", 1, 1);
   tgfxShot("double", gram, W, H);
   lcd.setTextSize(1);
 
-  // 収録されていない文字は何も描かず 0 を返す
+  // An uncovered code draws nothing and returns 0
   reset();
   tgfxReport("oor_advance", (long)lcd.drawChar('A', 2, 2));
   tgfxReport("oor_pixels", (long)bus.pixelCount());
 
-  // 背景色つき: セル全体が塗られる
+  // With a background colour the whole cell is painted
   reset();
   lcd.setTextColor(FG, BGC);
-  lcd.drawString("12:34", 2, 3);
+  lcd.drawString("12345", 2, 3);
   tgfxShot("opaque", gram, W, H);
   lcd.setTextColor(FG);
 
-  // 透過: グリフの画素以外は触らない
+  // Transparent: nothing outside the glyph pixels is touched
   reset();
   lcd.drawString("88888", 2, 3);
   tgfxReport("transparent_pixels", (long)bus.pixelCount());
   tgfxShot("transparent", gram, W, H);
 
-  // --- 変種の等価性 -------------------------------------------------------
-  // 同じ字を、固定ピッチ / グリフ表あり / 疎索引 で描いた結果は一致すること。
-  // 生成時にどれを選んでも絵が変わらない、が CellFont の前提。
+  // --- One glyph set, three encodings -------------------------------------
+  // The same digits, encoded three ways by the generator:
+  //   digitsFont  fixed pitch, contiguous index, one font
+  //   sparseFont  variable pitch, sparse index with a head block
+  //   chainFont   fixed pitch, split by cell width class into a next chain
+  // All three must draw exactly the same pixels. Which encoding the generator
+  // picks is its business, not something a sketch should be able to see.
   lcd.setTextColor(FG);
-  reset(); lcd.setFont(&font5x7);       lcd.drawString("0123456789", 1, 1);
+  reset(); lcd.setFont(&digitsFont);       lcd.drawString("0123456789", 1, 1);
   tgfxShot("var_fixed", gram, W, H);
-  reset(); lcd.setFont(&font5x7Rec);    lcd.drawString("0123456789", 1, 1);
+  reset(); lcd.setFont(&sparseFont);    lcd.drawString("0123456789", 1, 1);
   tgfxShot("var_records", gram, W, H);
-  reset(); lcd.setFont(&font5x7Sparse); lcd.drawString("0123456789", 1, 1);
+  reset(); lcd.setFont(&chainFont); lcd.drawString("0123456789", 1, 1);
   tgfxShot("var_sparse", gram, W, H);
-  lcd.setFont(&font5x7);
+  lcd.setFont(&digitsFont);
 
   tgfxTestDone();
 }
