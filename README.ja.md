@@ -73,14 +73,16 @@ void loop() {}
 #include <TinyGFX.h>
 #include <TinyGFX/BusI2C.h>
 #include <TinyGFX/PanelSSD1306.h>
+#include <Wire.h>
 
 static uint8_t fb[128 * 64 / 8];        // 1,024 バイト。利用者が用意する
 
-TinyGFXBusI2C       bus(/*address*/0x3C);
+TinyGFXBusI2C       bus(Wire, /*address*/0x3C);
 TinyGFXPanelSSD1306 panel(bus, fb, 128, 64);
 TinyGFX             lcd(panel);
 
 void setup() {
+  Wire.begin();                         // バスはスケッチが持つ
   lcd.begin();
   lcd.fillRect(8, 8, 40, 16, TFT_WHITE);
   panel.display();                      // ここで初めて転送される
@@ -101,15 +103,43 @@ void loop() {}
 | バス | ソフト SPI（既定・可搬） | `TinyGFX/BusSoftSPI.h` |
 | | ハードウェア SPI | `TinyGFX/BusSPI.h` |
 | | I2C（Wire） | `TinyGFX/BusI2C.h` |
+| | ソフト I2C（任意の GPIO 2 本） | `TinyGFX/BusSoftI2C.h` |
 | | コマンド列の記録（検証用） | `TinyGFX/BusCapture.h` |
-| パネル | ST7789（カラー TFT） | `TinyGFX/PanelST7789.h` |
+| パネル（カラー） | ST7789 | `TinyGFX/PanelST7789.h` |
 | | ILI9342C（M5Stack Core / BASIC） | `TinyGFX/PanelILI9342.h` |
-| | SSD1306（モノクロ OLED） | `TinyGFX/PanelSSD1306.h` |
-| | RAM バッファ（テスト・帯用） | `TinyGFX/PanelMemory.h` |
+| | ILI9341 | `TinyGFX/PanelILI9341.h` |
+| パネル（モノクロ） | SSD1306 | `TinyGFX/PanelSSD1306.h` |
+| | SH1106 | `TinyGFX/PanelSH1106.h` |
+| パネル（その他） | RAM バッファ（オフスクリーン・帯・テスト用） | `TinyGFX/PanelMemory.h` |
 | フォント | CellFont（H≤16 向けの外部仕様 v1） | `TinyGFX/FontCell.h` |
 | | u8g2 | `TinyGFX/FontU8g2.h` |
+| 画像 | 生 RGB565 / RLE / RLE+パレット / 1bpp（横・縦） | `TinyGFX/Image.h` |
 | 拡張 | 帯レンダリング（ちらつき対策） | `TinyGFX/TileCanvas.h` |
 | | `print` / `printf` / float | `TinyGFX/Print.h` |
+
+カラーパネルは `TinyGFX/PanelDcs.h`、モノクロパネルは `TinyGFX/PanelPaged.h`
+の上に乗っています。**同じ系統のコントローラを足す代金は実測 +0 バイト**なので、
+対応パネルは増やしやすいはずです。
+
+**ソフト SPI とソフト I2C は、理由が違います。**
+
+| | CH32V003 のコアに | なぜ用意したか |
+| --- | --- | --- |
+| `SPI.h` | **無い** | **無いから。**`BusSoftSPI` が第一実装 |
+| `Wire.h` | **ある** | **ピンのため。**ハード I2C は固定ピンにしか出ないので、ピンの少ない部品ではそこを別の用途に使いたいことがある |
+
+大きさは環境で逆転します（実測）。
+
+| | Wire | ソフト |
+| --- | ---: | ---: |
+| CH32V003 | **8,052** | 8,452（+400） |
+| AVR | 5,608 | **4,164（−1,444、RAM も −217）** |
+
+**AVR ではソフトのほうが小さい** —— Wire がバッファと割り込み駆動の
+状態機械を持つためです。CH32V003 では Wire がコアに組み込まれていて
+空スケッチに既に入っているので、逆に Wire が有利になります。
+
+ソフト I2C は**外部プルアップが要ります**（I2C として当然のこと）。
 
 **include していないものはリンクされません。** バスもパネルもフォント形式も同じです。
 
@@ -118,10 +148,15 @@ void loop() {}
 ```
 drawPixel  drawFastHLine  drawFastVLine  drawLine  drawRect  fillRect  fillScreen  clear
 drawCircle  fillCircle  drawRoundRect  fillRoundRect  drawTriangle  fillTriangle
-pushImage（透過版あり）  setAddrWindow  writeColor  writePixels
+pushImage（透過版あり）  drawBitmap（1bpp）  drawImage（生成した画像）
+setAddrWindow  writeColor  writePixels
 setClipRect  setRotation  startWrite / endWrite
-setFont  setCursor  setTextColor  setTextSize  drawChar  drawString  textWidth  fontHeight
+setFont  setCursor  setTextColor  setTextSize
+drawChar  drawString  drawCenterString  drawRightString  textWidth  fontHeight
 ```
+
+**それぞれの値札は [docs/API.ja.md](docs/API.ja.md) にあります。**
+「この API がいくらか」を実測で載せてあるので、予算を組むときはそちらを。
 
 名前は決めの問題でしかないところを LovyanGFX に寄せてあります。**互換レイヤではありません。**
 
@@ -242,7 +277,10 @@ Arduino IDE のライブラリマネージャからはまだ入りません（�
 | API の形と内部構造 | [docs/CORE_DESIGN.ja.md](docs/CORE_DESIGN.ja.md) |
 | **なぜそう設計したのか（理由と、採らなかった案）** | [docs/DECISIONS.ja.md](docs/DECISIONS.ja.md) |
 | フラッシュ・RAM の予算と実測 | [docs/FOOTPRINT.ja.md](docs/FOOTPRINT.ja.md) |
+| **公開 API と、それぞれの値札** | **[docs/API.ja.md](docs/API.ja.md)** |
+| **他の GFX ライブラリとの違いと、その理由** | **[docs/COMPARISON.ja.md](docs/COMPARISON.ja.md)** |
 | フォントまわりの実測（形式そのものは外部仕様） | [docs/FONT_FORMAT.ja.md](docs/FONT_FORMAT.ja.md) |
+| 画像フォーマットの実測 | [docs/IMAGE_FORMAT.ja.md](docs/IMAGE_FORMAT.ja.md) |
 | テストの方針 | [docs/TEST_PLAN.ja.md](docs/TEST_PLAN.ja.md) |
 | **実機で何を確かめるか** | [docs/MANUAL_TEST.ja.md](docs/MANUAL_TEST.ja.md) |
 | 現在地と残作業 | [docs/DEVELOPMENT_PLAN.ja.md](docs/DEVELOPMENT_PLAN.ja.md) |
