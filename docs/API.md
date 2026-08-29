@@ -200,6 +200,58 @@ the loop.
 `fillRect` seam serves this too. That costs 84 B more than placing pixels one at
 a time, and saves an order of magnitude of window setups on a colour panel.
 
+### Drawing a generated image
+
+```cpp
+#include <TinyGFX/Image.h>
+#include "my_icon.h"          // what the converter emitted
+lcd.drawImage(&my_iconRef, 10, 10);
+```
+
+**You do not pick the format.** The converter brute-forces every encoding for
+each picture and the generated header points at its own decoder. **Only the
+formats you actually use are linked**, so `Image.h` carrying all of them costs
+nothing for the ones you do not.
+
+| Format | CH32V003 | AVR | ESP32 |
+| --- | ---: | ---: | ---: |
+| raw RGB565 | 400 | 638 | 492 |
+| RLE | 387 | 663 | 467 |
+| RLE + 4-bit palette | 395 | 679 | 483 |
+| 1bpp (horizontal / vertical) | 392-400 | 654-690 | 592 |
+
+**Convert a whole folder at once.** A decoder is paid for once per format, not
+once per image, so picking each picture's own smallest encoding scatters the
+formats and costs more (343-597 B measured). See
+[IMAGE_FORMAT.ja.md](IMAGE_FORMAT.ja.md).
+
+A page-addressed monochrome panel can take a page-aligned vertical bitmap
+directly through `TinyGFXPanelPaged::pushVBitmap()`. It returns false when the
+position does not line up, so fall back to `drawImage()`.
+
+### Raw arrays and generated assets - two entrances
+
+There are two ways in, and they are **not two ways to make the same call** -
+the difference is where the data comes from.
+
+| | What you hand it | Tooling |
+| --- | --- | --- |
+| **Raw** `pushImage` / `drawBitmap` | an array; you supply the size and colour | **none** |
+| **Generated** `drawImage` | a self-describing struct; the tool picks the encoding | yes |
+
+Every icon converter on the internet emits an Adafruit-style 1bpp array, so
+**`drawBitmap` takes one with no build step at all.** It measures cheaper for
+the simple case too:
+
+| | CH32V003 | AVR |
+| --- | ---: | ---: |
+| `drawBitmap` alone | **308** | **368** |
+| `drawImage` (1bpp) alone | 556 | 832 |
+| both | 808 | 1,038 (**−162 of overlap**) |
+
+Using both is less than the sum - they share the run coalescing and the
+`fillRect` path. **Call neither and both cost nothing.**
+
 ### Drawing offscreen (what other libraries call a sprite)
 
 **There is no separate API.** `TinyGFXPanelMemory` presents a RAM buffer as a

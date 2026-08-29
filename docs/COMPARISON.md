@@ -116,6 +116,22 @@ TinyGFX has neither duplication.
   so opening one on the outside simply nests the drawing inside it. No second
   family needed
 
+### 4.5 What looks like two families but is not
+
+TinyGFX has two entrances for images too - `drawBitmap` and `drawImage` - but
+**that is a different thing from the duplication above.**
+
+- `setTextDatum` + `drawString` and `drawCenterString` take **the same input
+  and produce the same result**. One of them is enough
+- `drawBitmap` and `drawImage` differ in **where the data comes from**: the
+  first takes the raw array any converter on the internet emits, with no build
+  step; the second takes a self-describing struct whose encoding a dedicated
+  tool chose
+
+`drawBitmap` measures cheaper for the simple case (308 against 556 on a
+CH32V003) and using both overlaps by −56. **Call neither and both cost
+nothing.**
+
 ### 5. Print
 
 **`Adafruit_GFX : public Print`** - inheritance, so the base class always
