@@ -153,26 +153,32 @@ def enc_bitmap1v(w, h, rows, pal):
     return bytes(out), pal
 
 
+# pal4 / pal8（非圧縮パレット）は**実装していない。** 測った全画像で
+# rlepal4 に負けたため（64x64 の UI アイコンで 2,054 対 416）。必要になったら
+# enc_pal と DECODER_BYTES を戻して測り直す。
 ENCODERS = [
     ("raw565",   enc_raw565),
-    ("pal4",     lambda w, h, r, p: enc_pal(w, h, r, p, 4)),
-    ("pal8",     lambda w, h, r, p: enc_pal(w, h, r, p, 8)),
     ("rle565",   enc_rle565),
     ("rlepal4",  enc_rlepal4),
     ("bitmap1h", enc_bitmap1h),
     ("bitmap1v", enc_bitmap1v),
 ]
-FORMAT_ID = {n: i for i, n in enumerate(
-    ["raw565", "pal4", "pal8", "rle565", "rlepal4", "bitmap1h", "bitmap1v"])}
 
-# デコーダの実費（CH32V003、-Os、2026-08-29 実測）。
+
+# デコーダの実費（CH32V003、-Os、**src/TinyGFX/Image.h の本実装で実測**、
+# 2026-08-29）。使い捨ての実験実装より 60〜90 B 高い —— PROGMEM 経由の
+# ヘッダ読み、透過の判定、ops の間接呼び出しぶん。**どれも 383〜400 の
+# 範囲に収まるので、形式は実質データ量だけで決まる。**
 #
 # **データ量だけで選ぶと間違える。** CellFont 仕様 §13.4 と同じ話で、
 # 「データ + デコーダ」で比べないと総量が最小にならない。実例:
 # 128x64 のスプラッシュは rlepal4 が 816 B、bitmap1v が 1,028 B だが、
 # **bitmap1v はページ方式パネルのフレームバッファそのもの**なので
 # memcpy で貼れてデコーダが要らず、総量では bitmap1v が勝つ。
-# デコーダの実費（CH32V003、-Os、2026-08-29 実測）。
+# デコーダの実費（CH32V003、-Os、**src/TinyGFX/Image.h の本実装で実測**、
+# 2026-08-29）。使い捨ての実験実装より 60〜90 B 高い —— PROGMEM 経由の
+# ヘッダ読み、透過の判定、ops の間接呼び出しぶん。**どれも 383〜400 の
+# 範囲に収まるので、形式は実質データ量だけで決まる。**
 #
 # **データ量だけで選ぶと間違える。** CellFont 仕様 §13.4 と同じ話で、
 # 「データ + デコーダ」で比べないと総量が最小にならない。
@@ -181,19 +187,18 @@ FORMAT_ID = {n: i for i, n in enumerate(
 # 最小化すると形式が散らばってデコーダを何本も積むことになる。だから
 # --batch では「使う形式の組み合わせ」を総当たりする。
 DECODER_BYTES = {
-    "raw565": 312, "pal4": 264, "pal8": 264, "rle565": 280,
-    "rlepal4": 320, "bitmap1h": 292, "bitmap1v": 276,
+    "raw565": 400, "rle565": 383, "rlepal4": 391,
+    "bitmap1h": 400, "bitmap1v": 392,
 }
 
 # **同じデコーダを共有する形式の組。** 1bpp の横詰めと縦詰めは、ビットの
 # 取り出し方が 1 行違うだけの同じループなので 1 本にまとめられる。実測:
 #
-#   横のみ 292 / 縦のみ 276 / 両対応だが横しか使わない 292（+0）
-#   両対応で両方使う 360 / 別関数 2 本で両方 516（+156 損）
+#   横のみ 400 / 縦のみ 392 / 両方使う 504（別々に足すと 792、288 B 損）
 #
 # 呼び出し側で向きがコンパイル時定数なので、片方しか使わなければ
 # 片方ぶんの代金しか出ない。**「両対応にすると無駄」は起きない。**
-SHARED = {("bitmap1h", "bitmap1v"): 360}
+SHARED = {("bitmap1h", "bitmap1v"): 504}
 
 # ページ境界に揃った全幅の縦詰めは、ページ方式パネルのフレームバッファ
 # そのものなので memcpy で貼れる。**汎用経路の代わりではなく追加の速い
@@ -234,10 +239,12 @@ def carray(name, data, per_line=16, typ="uint8_t"):
     return f"static const {typ} {name}[{len(data)}] TINYGFX_IMAGE_PROGMEM = {{\n  {body}\n}};\n"
 
 
-def emit(name, w, h, fmt, data, pal, uniq, argv):
+def emit(name, w, h, fmt, data, pal, uniq, argv, transparent=None):
+    ops = {"raw565": "Raw565", "rle565": "Rle565", "rlepal4": "Rlepal4",
+           "bitmap1h": "Bitmap1h", "bitmap1v": "Bitmap1v"}[fmt]
     L = []
     L.append(f"// {name} — TinyGFX 画像\n//")
-    L.append(f"// tools/img2h.py が生成（**実験用**。正式なツールに置き換わる）")
+    L.append("// tools/img2h.py が生成（**実験用**。正式なツールに置き換わる）")
     L.append(f"// 形式   : {fmt}")
     L.append(f"// 寸法   : {w}x{h}")
     L.append(f"// 色数   : {len(uniq)}")
@@ -254,18 +261,20 @@ def emit(name, w, h, fmt, data, pal, uniq, argv):
                           for i in range(0, len(pal), 8))
         L.append(f"\nstatic const uint16_t {name}Palette[{len(pal)}] "
                  f"TINYGFX_IMAGE_PROGMEM = {{\n  {pb}\n}};\n")
+    tr = transparent if transparent is not None else 0
     L.append(f"\nstatic const CellImage {name} TINYGFX_IMAGE_PROGMEM = {{")
     L.append(f"  {name}Data,")
     L.append(f"  {name}Palette," if pal else "  NULL,")
     L.append(f"  {w}, {h},")
     L.append(f"  {len(data)},")
-    L.append(f"  {FORMAT_ID[fmt]},  // {fmt}")
+    L.append(f"  0x{tr:04X},  // transparent")
     L.append(f"  {len(pal) if pal else 0},")
+    L.append(f"  {1 if transparent is not None else 0},")
     L.append("};")
     # **使う形式のデコーダだけがリンクされる。** ops を指すだけでよく、
     # マクロでの事前有効化は要らない（実測で確認済み: 未使用は +0 B）。
     L.append(f"\nstatic const TinyGFXImageRef {name}Ref = "
-             f"{{&{name}, &tinygfxImage{fmt.capitalize()}Ops}};")
+             f"{{&{name}, &tinygfxImage{ops}Ops}};")
     return "\n".join(L) + "\n"
 
 
@@ -276,15 +285,14 @@ def pick_set(per_image, dec):
     5 枚がそれぞれ別の形式を選ぶとデコーダを 5 本積むことになり、多少
     データが増えても 1 つの形式に揃えたほうが総量で勝つことが多い。
 
-    形式は 7 つしかないので、**使う形式の組み合わせ 2^7 を総当たり**して
-    総量が最小のものを採る。返すのは (画像ごとの形式, 総量, 使う形式の集合)。
+    形式は少ないので、**使う形式の組み合わせを総当たり**して総量が最小の
+    ものを採る。返すのは (画像ごとの形式, 総量, 使う形式の集合)。
     """
     names = [n for n, _ in ENCODERS]
     best = None
     for mask in range(1, 1 << len(names)):
         allowed = [names[i] for i in range(len(names)) if mask & (1 << i)]
-        total, choice = 0, {}
-        ok = True
+        total, choice, ok = 0, {}, True
         for key, enc in per_image.items():
             cand = [f for f in allowed if f in enc]
             if not cand:
@@ -304,9 +312,12 @@ def pick_set(per_image, dec):
 
 def batch(a):
     """フォルダを一括で処理する。"""
-    dec = (lambda fs: group_cost(fs) - (len(fs) and 0)) if not a.aligned else \
-          (lambda fs: group_cost(fs) - (DECODER_BYTES["bitmap1v"] - ALIGNED_VBLIT
-                                        if "bitmap1v" in fs and len(fs) == 1 else 0))
+    def dec(fs):
+        c = group_cost(fs)
+        if a.aligned and set(fs) == {"bitmap1v"}:
+            c = ALIGNED_VBLIT          # 揃った全幅なら memcpy で済む
+        return c
+
     files = sorted(p for p in Path(a.batch).iterdir()
                    if p.suffix.lower() in (".png", ".bmp", ".gif", ".jpg", ".jpeg"))
     if not files:
@@ -318,16 +329,15 @@ def batch(a):
         per_image[f.name] = enc
         meta[f.name] = (f, w, h, uniq)
 
-    # 1) 1 枚ずつ最小を選んだ場合
     naive_fmt = {k: min(v, key=lambda x: v[x][2]) for k, v in per_image.items()}
     naive_data = sum(per_image[k][naive_fmt[k]][2] for k in per_image)
     naive_dec = dec({naive_fmt[k] for k in naive_fmt})
-    # 2) まとめて選んだ場合
     choice, total, used = pick_set(per_image, dec)
     set_data = total - dec(used)
 
     print(f"画像 {len(files)} 枚"
-          + (f"   （--mono {a.mono} で 2 値化）" if a.mono is not None else ""))
+          + (f"   （--mono {a.mono} で 2 値化）" if a.mono is not None else "")
+          + ("   （--aligned）" if a.aligned else ""))
     print()
     print(f"  {'画像':<20} {'1枚ずつ':<10} {'まとめて':<10} {'データ':>7}")
     for k in per_image:
