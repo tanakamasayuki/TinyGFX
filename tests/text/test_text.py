@@ -72,3 +72,19 @@ def test_text(dut):
         img = tc.image(SKETCH, name)
         box = ImageChops.difference(ref, img).getbbox()
         assert box is None, f"{name} が固定ピッチ版と違う: bbox={box}"
+
+    # --- 中央揃え・右揃え ----------------------------------------------------
+    #
+    # **不変条件で見る。** 揃え版と「算出位置に置いた drawString」が 1 画素も
+    # 違わないこと。絶対座標で期待値を書くとグリフの左余白に依存してしまう。
+    #
+    # LovyanGFX はこれを setTextDatum でも提供しているが、TinyGFX は明示関数
+    # だけにした。datum は drawString が毎回参照する状態になるので、中央揃えを
+    # 使わない人まで 204 B 払う（CH32V003 で実測。明示関数は呼ばなければ 0）。
+    w = r["plain_width"]
+    assert w > 0, "textWidth が 0"
+    assert r["center_matches"] == 1, "drawCenterString が drawString(cx - w/2) と違う"
+    assert r["right_matches"] == 1, "drawRightString が drawString(rx - w) と違う"
+    assert r["center_moved"] == 1, "中央揃えと右揃えが同じ位置に描かれている"
+    assert r["center_ret"] == w, f"drawCenterString の戻り値が {r['center_ret']}（{w} のはず）"
+    assert r["right_ret"] == w, f"drawRightString の戻り値が {r['right_ret']}（{w} のはず）"

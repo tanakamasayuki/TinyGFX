@@ -409,6 +409,25 @@ class TinyGFX {
   }
 
   /// Draw a string and return the width drawn. Newlines are not interpreted.
+  /// Draw `str` centred on `cx`. Returns the width drawn.
+  ///
+  /// LovyanGFX offers this twice - as its own call, and as
+  /// setTextDatum(TC_DATUM) followed by drawString(). Only the call is here,
+  /// and the reason is the price: a datum is state that drawString has to
+  /// consult on every call, which drags textWidth() in whether or not anyone
+  /// ever centres anything. **Measured on a CH32V003: the datum costs 204
+  /// bytes to a sketch that only ever draws text left-aligned. These cost
+  /// nothing at all until called** (116 for one, 232 for both), because an
+  /// inline member nobody calls is never emitted.
+  int16_t drawCenterString(const char* str, int16_t cx, int16_t y) {
+    return drawString(str, (int16_t)(cx - textWidth(str) / 2), y);
+  }
+
+  /// Draw `str` with its right edge at `rx`. Returns the width drawn.
+  int16_t drawRightString(const char* str, int16_t rx, int16_t y) {
+    return drawString(str, (int16_t)(rx - textWidth(str)), y);
+  }
+
   int16_t drawString(const char* str, int16_t x, int16_t y) {
     if (str == nullptr) return 0;
     const int16_t x0 = x;
