@@ -33,6 +33,7 @@ Anything you do not call costs nothing at all.
 | **Unused features cost 0 bytes** | A sketch that only calls `fillScreen` contains no circles and no text. **A test checks this mechanically** |
 | **No framebuffer required** | Drawing streams straight to the panel. Keep one only when you want to (see below) |
 | **No dynamic allocation** | No `malloc`, `new` or `String`. Buffers are supplied by you |
+| **It never begins the bus for you** | It calls neither `SPI.begin()` nor `Wire.begin()`, and picks no pins. **You hand it a bus you already set up**, so your settings survive |
 | **Bus, panel and font format are all swappable** | and **the implementations you do not use are not linked in** |
 | **Decisions are made from measurements** | every design call is backed by a number measured on a CH32V003 (`docs/FOOTPRINT.ja.md`) |
 
@@ -161,6 +162,114 @@ can budget before you write the sketch.
 
 Names follow LovyanGFX wherever the name was the only thing at stake.
 **This is not a compatibility layer.**
+
+## Portability, and the speed you trade for it
+
+### It never begins the bus for you
+
+**A small thing that prevents a real problem.** Plenty of libraries set the bus
+up themselves, and when one of those is handed
+
+```cpp
+Wire.begin(21, 22, 400000);   // your pins, your clock
+display.begin();              // <- and this calls Wire.begin() inside
+```
+
+**your configuration is overwritten.** The pins revert to the defaults, the
+clock drops, and the other sensors on that bus stop working - silently.
+
+TinyGFX calls neither `SPI.begin()` nor `Wire.begin()` and picks no pins. It
+**takes an instance you already prepared**.
+
+```cpp
+Wire.begin(21, 22, 400000);            // yours. TinyGFX does not touch it
+TinyGFXBusI2C bus(Wire, 0x3C);
+```
+
+The only pins it drives are **DC and CS, which belong to that panel**.
+Transfers are wrapped in `beginTransaction` / `endTransaction` the standard
+Arduino way, so an SD card on the same wires keeps working.
+
+**The page-addressed monochrome panels were found not to be doing this on
+2026-08-29, and it is fixed.** I2C starts and stops on every transfer so it
+never showed, and there was no SPI test for those panels. `tests/monospi/` now
+checks that not one byte leaves outside a transaction.
+
+### It uses nothing but the standard Arduino API
+
+The complete list of what `src/` touches:
+
+```
+pinMode  digitalWrite  digitalRead  delay  delayMicroseconds
+SPI   (only if you include <TinyGFX/BusSPI.h>)
+Wire  (only if you include <TinyGFX/BusI2C.h>)
+```
+
+No vendor SDK, no register banging, no per-platform `#ifdef` (bar the PROGMEM
+read, which is a plain dereference everywhere but AVR). **The drawing core does
+not even reference `Arduino.h`** - only the bus implementations do.
+
+That is why `library.properties` says `architectures=*`, and why it will
+**probably work on anything Arduino runs on**. Measured on CH32V003, Arduino
+Uno R3, ESP32 and the host.
+
+### The price is that it is not fast
+
+The portability is bought by using **nothing but plain GPIO and
+`SPI.transfer()`**. There is no DMA, no register-level path, no per-platform
+fast route. Measured on an M5Stack Core (320x240) at 24MHz, **with
+`TINYGFX_FILL_CHUNK` switched off**:
+
+| | |
+| --- | --- |
+| `fillScreen` | 178 ms |
+| `fillRect` 100x100 | 23 ms |
+| `fillCircle` r100 | 89 ms |
+| `drawString`, 10 characters at size 2 | 3 ms |
+| `TileCanvas`, one full frame | 194 ms |
+
+**Setting `TINYGFX_FILL_CHUNK` to 1 or more makes fills faster** - it uses
+Arduino's block write, `SPI.transfer(buf, len)`, and costs `size * 2` bytes of
+stack and nothing else. The figures above are the floor without it, taken
+before the `fillRect` seam went in, so today's should be a little better.
+
+**Still not the library for smooth animation.** It is built for instruments, clocks
+and settings screens - the kind that redraw what changed.
+
+### If you want speed, write the bus yourself
+
+Subclass `TinyGFXBus`. **The library is not touched at all.**
+
+```cpp
+class MyDmaBus : public TinyGFXBus {
+ public:
+  void init() override { /* pins and peripheral */ }
+  void beginTransaction() override { /* CS low */ }
+  void endTransaction() override { /* CS high */ }
+  void writeCommand(uint8_t c) override { /* DC low, one byte */ }
+  void writeData(const uint8_t* d, size_t n) override { /* n bytes */ }
+
+  // **this is where the speed goes.** The same colour, count times
+  void writeColor(uint16_t color, uint32_t count) override { /* DMA if you like */ }
+  // **and here.** A run of pixels, as they are
+  void writePixels(const uint16_t* d, uint32_t count) override { /* DMA if you like */ }
+};
+
+MyDmaBus bus;
+TinyGFXPanelST7789 panel(bus, 240, 240, /*rst*/2);
+TinyGFX lcd(panel);
+```
+
+`writeColor` and `writePixels` are where bulk transfers enter, and fills,
+images and glyphs all end up there. **Not a line of your drawing code changes.**
+
+The panel has a seam too: override `fillRect` and you can bypass the address
+window entirely, which is what the monochrome panels do.
+
+**A test can hold you to it** - `TinyGFXBusCapture` reassembles the bytes that
+actually went out into a virtual GRAM, so a fast bus and a plain one can be
+compared for pixel equality without any hardware (`tests/hostbus/` is that
+shape).
 
 ## Footprint (CH32V003, `-Os`, measured)
 
