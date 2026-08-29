@@ -1,6 +1,7 @@
 # TinyGFX
 
-**LovyanGFX に似た書き味の描画 API を、フラッシュと RAM が極端に少ない MCU でも載るところまで削ったライブラリ。**
+**Arduino のグラフィックスライブラリでおなじみの書き味を、フラッシュと RAM が
+極端に少ない MCU でも載るところまで削ったライブラリ。**
 
 > English: [README.md](README.md)
 
@@ -159,7 +160,9 @@ drawChar  drawString  drawCenterString  drawRightString  textWidth  fontHeight
 **それぞれの値札は [docs/API.ja.md](docs/API.ja.md) にあります。**
 「この API がいくらか」を実測で載せてあるので、予算を組むときはそちらを。
 
-名前は決めの問題でしかないところを LovyanGFX に寄せてあります。**互換レイヤではありません。**
+`fillRect` / `drawString` / `setRotation` / `startWrite` のように、
+Arduino のグラフィックスライブラリが共通して使っている名前に合わせてあります。
+**どれかの互換レイヤではありません。**
 
 ## 移植性と、速さの話
 

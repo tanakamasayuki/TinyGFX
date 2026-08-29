@@ -144,7 +144,7 @@ ST7735 / ILI9341。パネル初期化テーブルの整理。CH32V 向け Fast B
 
 **途中リリースをしない。** フェーズ 4 まで終わり、CH32V003 と ESP32 の実機で動いた時点で **1.0.0 として初回リリース**する。
 
-理由: API を LovyanGFX に寄せる方針（[DECISIONS.ja.md](DECISIONS.ja.md) D14）なので、0.x で出すと「寄せ方」を変えづらくなる。フットプリント予算も実測前に約束したくない。
+理由: API を既存のグラフィックスライブラリ共通の語彙に寄せる方針（[DECISIONS.ja.md](DECISIONS.ja.md) D14）なので、0.x で出すと「寄せ方」を変えづらくなる。フットプリント予算も実測前に約束したくない。
 
 **要確認（リリース前）**: ライブラリ名 `TinyGFX` の重複を GitHub / Arduino Library Registry / PlatformIO Registry で確認する（[DECISIONS.ja.md](DECISIONS.ja.md) Q8）。**リポジトリを公開する前にやる。**
 
