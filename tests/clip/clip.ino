@@ -60,6 +60,43 @@ void setup() {
   lcd.clearClipRect();
   tgfxReport("empty_clip_pixels", (long)bus.pixelCount());
 
+  // --- 極端な座標でもクリップして描くこと ---------------------------------
+  //
+  // **2026-08-29 の設計レビューの P1。** 遠い側の端を int16_t で計算していた
+  // ので、x + w - 1 が桁溢れした。x=2 / w=32767 なら 32768 が -32768 に
+  // 折り返し、「x > x1」で**画面いっぱいに描くべき矩形が丸ごと消えていた。**
+  // 総当たりで 28,441 通りの (x, w) が食い違う。
+  //
+  // 「画面外の座標を受け取ってクリップする」のは契約なので、そこが守れて
+  // いなかったことになる。
+  {
+    bus.fill(BG);
+    bus.resetCounters();
+    lcd.fillRect(2, 2, 32767, 32767, TFT_WHITE);   // 画面内から始まる巨大な矩形
+    tgfxReport("huge_rect_pixels", (long)bus.pixelCount());
+  }
+  {
+    bus.fill(BG);
+    bus.resetCounters();
+    lcd.fillRect(-32768, -32768, 32767, 32767, TFT_WHITE);  // 遠い左上から
+    tgfxReport("far_negative_pixels", (long)bus.pixelCount());
+  }
+  {
+    bus.fill(BG);
+    bus.resetCounters();
+    lcd.fillRect(30000, 30000, 30000, 30000, TFT_WHITE);    // 画面外の右下だけ
+    tgfxReport("far_positive_pixels", (long)bus.pixelCount());
+  }
+  {
+    // クリップ側の桁溢れも同じ
+    bus.fill(BG);
+    bus.resetCounters();
+    lcd.setClipRect(2, 2, 32767, 32767);
+    lcd.fillScreen(TFT_WHITE);
+    lcd.clearClipRect();
+    tgfxReport("huge_clip_pixels", (long)bus.pixelCount());
+  }
+
   tgfxTestDone();
 }
 void loop() {}

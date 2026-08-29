@@ -56,17 +56,24 @@ class TinyGFXPanelSH1106 : public TinyGFXPanelPaged {
 };
 
 inline bool TinyGFXPanelSH1106::init() {
-  static const uint8_t kInit[] = {
+  // Split in three because two of the bytes depend on how tall the glass is.
+  // A 128x32 wants multiplex 0x1F and COM pins 0x02 where a 128x64 wants 0x3F
+  // and 0x12; sending the 64-row pair to a 32-row panel squeezes the picture
+  // into half the glass, which is the usual symptom of a library that
+  // hardcodes them.
+  static const uint8_t kHead[] = {
       0xAE,        // display off
       0xD5, 0x80,  // clock
-      0xA8, 0x3F,  // multiplex (128x64)
+  };
+  static const uint8_t kMid[] = {
       0xD3, 0x00,  // display offset
       0x40,        // start line 0
       0xAD, 0x8B,  // DC-DC on (the SSD1306 spells this 0x8D 0x14)
       0x33,        // pump voltage 9.0V - SH1106 only
       0xA1,        // segment remap
       0xC8,        // com scan dec
-      0xDA, 0x12,  // com pins
+  };
+  static const uint8_t kTail[] = {
       0x81, 0xCF,  // contrast
       0xD9, 0xF1,  // precharge
       0xDB, 0x40,  // vcom detect
@@ -74,11 +81,18 @@ inline bool TinyGFXPanelSH1106::init() {
       0xA6,        // normal (not inverted)
       0xAF,        // display on
   };
+  if (!configOk()) return false;
   _bus->init();
   // One transaction around the whole sequence; SPI.beginTransaction() does not
   // nest, so cmd() cannot be used here.
   _bus->beginTransaction();
-  for (uint8_t i = 0; i < sizeof(kInit); ++i) _bus->writeCommand(kInit[i]);
+  for (uint8_t i = 0; i < sizeof(kHead); ++i) _bus->writeCommand(kHead[i]);
+  _bus->writeCommand(0xA8);
+  _bus->writeCommand(multiplexRatio());
+  for (uint8_t i = 0; i < sizeof(kMid); ++i) _bus->writeCommand(kMid[i]);
+  _bus->writeCommand(0xDA);
+  _bus->writeCommand(comPinsConfig());
+  for (uint8_t i = 0; i < sizeof(kTail); ++i) _bus->writeCommand(kTail[i]);
   _bus->endTransaction();
   clearBuffer(false);
   return true;

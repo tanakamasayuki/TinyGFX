@@ -201,6 +201,30 @@ class TinyGFXPanelPaged : public TinyGFXPanel {
     _bus->endTransaction();
   }
 
+  /// Is this panel set up in a way it can actually work with?
+  ///
+  /// Checked once, in init(), so that a mistake shows up as begin() returning
+  /// false instead of as a corrupt picture or a write past the end of the
+  /// buffer. None of it can be caught at compile time: the buffer is a pointer
+  /// the sketch owns and the size comes from constructor arguments.
+  bool configOk() const {
+    if (_buf == nullptr) return false;
+    if (_natW <= 0 || _natH <= 0) return false;
+    if ((_natH & 7) != 0) return false;   // whole pages only - 8 rows to a byte
+    if (_bandPages < 0 || _bandPages > _pages) return false;
+    return true;
+  }
+
+  /// The multiplex ratio and COM pin layout for this height.
+  ///
+  /// The rest of the init sequence is the same for every size, but these two
+  /// are not: a 128x32 wants 0x1F / 0x02 where a 128x64 wants 0x3F / 0x12.
+  /// Sending the 64-row values to a 32-row panel gives a picture squeezed into
+  /// half the glass, which is the usual symptom of a library that hardcodes
+  /// them.
+  uint8_t multiplexRatio() const { return (uint8_t)(_natH - 1); }
+  uint8_t comPinsConfig() const { return (_natH == 32) ? (uint8_t)0x02 : (uint8_t)0x12; }
+
   /// Logical coordinates to buffer coordinates. Rotation lives here.
   void toBuffer(int16_t x, int16_t y, int16_t* fx, int16_t* fy) const {
     switch (_rotation) {

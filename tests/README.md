@@ -8,7 +8,7 @@ The TinyGFX test suite. Strategy and case list live in
 - [pytest-embedded](https://docs.espressif.com/projects/pytest-embedded/en/latest/) with the Arduino CLI backend, dependencies managed by `uv`
 - **Tier 0 (`footprint/`, `linkprune/`) never runs a sketch.** It builds and inspects
   size and the symbol table, so there is no `dut` fixture and no hardware
-- **Tier 1 (`capture/` and 15 more) runs headless on the `lang-ship:host` core** and checks
+- **Tier 1 runs headless on the `lang-ship:host` core** and checks
   the drawn result pixel by pixel. No SDL2, no LovyanGFX, no hardware
 - **Tier 2 (`build_matrix/`) only compiles** the examples for several cores
 
@@ -61,6 +61,8 @@ tests/
   hw/m5stack/         **real hardware (Tier 3).** Runs only when .env is passed
   u8g2/               u8g2-format font decoding
   i2c/                I2C + SSD1306 (monochrome, page transfer, dirty pages)
+  monospi/            SPI + SSD1306 / SH1106: transaction and CS etiquette
+  sh1106/             SH1106 wiring: the same picture an SSD1306 gives
   build_matrix/       examples compile for ch32v003 / uno / esp32 / m5stack (never run)
   manual/m5stack/     **hardware check sketch.** Not run by pytest (only compiled)
 ```
