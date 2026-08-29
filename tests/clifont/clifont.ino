@@ -36,7 +36,7 @@ void setup() {
   tgfxReport("ascent", (long)lcd.getTextAscent());
 
   // 収録されている字だけを並べる。**UTF-8 なのでコードポイントで送る**
-  const int16_t w = tgfxDrawUtf8(lcd, "温度 23.5℃ 設定完了", 1, 2);
+  const int16_t w = lcd.drawString("温度 23.5℃ 設定完了", 1, 2);
   tgfxReport("width", (long)w);
   tgfxReport("lit", (long)[]() {
     long n = 0;

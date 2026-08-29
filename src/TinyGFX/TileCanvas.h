@@ -52,6 +52,20 @@ class TinyGFXTileCanvas {
   /// across render() calls.
   TinyGFX& gfx() { return _gfx; }
 
+  /// Draw one frame with any callable taking `(TinyGFX&)` - typically a
+  /// lambda, which can capture what the scene needs instead of packing it
+  /// into a struct behind a void*.
+  ///
+  ///     canvas.render([&](TinyGFX& g) { g.fillCircle(ball.x, ball.y, 16, c); });
+  ///
+  /// The band loop is not duplicated per lambda: this hands the callable to
+  /// the function-pointer form through a one-line trampoline, so what a second
+  /// call site costs is that trampoline, not another copy of the loop.
+  template <class F>
+  bool render(const F& draw) {
+    return render(&callThrough<F>, const_cast<void*>(static_cast<const void*>(&draw)));
+  }
+
   /// Draw one frame. `draw` runs once per band.
   bool render(DrawFn draw, void* ctx = nullptr) {
     if (_rows <= 0 || draw == nullptr) return false;
@@ -74,6 +88,9 @@ class TinyGFXTileCanvas {
   }
 
  private:
+  template <class F>
+  static void callThrough(TinyGFX& g, void* ctx) { (*(const F*)ctx)(g); }
+
   /// Band rows = bufPixels / width, worked out by subtraction because a
   /// divide instruction cannot be assumed.
   bool recalc() {

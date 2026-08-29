@@ -80,10 +80,11 @@ def test_hardware_spi_still_fails_on_ch32():
     pytest.skip("CH32 コアで SPI が使えるようになった。CASES に足してこのテストを消すこと")
 
 
-# フォントデコーダの切り落としマクロ（src/TinyGFX/FontCell.h）。
+# 文字まわりの切り落としマクロ（src/TinyGFX/FontCell.h と src/TinyGFX/Gfx.h）。
 # 既定は全部 on。off の経路はスケッチが使わないとビルドされないので、
 # ここで実際にコンパイルしておかないと静かに腐る。
-FONT_MACROS = ["TINYGFX_FONT_BG", "TINYGFX_FONT_SCALE", "TINYGFX_FONT_CHAIN"]
+FONT_MACROS = ["TINYGFX_FONT_BG", "TINYGFX_FONT_SCALE", "TINYGFX_FONT_CHAIN",
+               "TINYGFX_FONT_UTF8"]
 
 
 @pytest.mark.parametrize("off", [[m] for m in FONT_MACROS] + [FONT_MACROS],
@@ -101,3 +102,18 @@ def test_font_macros_build(off):
     saved = base["flash"] - got["flash"]
     print(f"  {'+'.join(off):<58} -{saved} B")
     assert saved >= 0, f"{off} を off にして {-saved} B 増えている"
+
+
+# 色定数の 2 つの綴り（docs/DECISIONS.ja.md D30）。中身は全部 static_assert
+# なので、**ビルドが通ること自体が検査**。他ライブラリが先に TFT_RED を
+# 定義している状況を -D で作る。
+@pytest.mark.parametrize("foreign", [False, True], ids=["alone", "foreign_tft_red"])
+def test_color_macros(foreign):
+    if not tb.have_core(tb.CH32V003):
+        pytest.skip("CH32V003 のコアが入っていない")
+    defines = {"TFT_RED": "0x1234", "TGFX_FOREIGN_RED": "0x1234"} if foreign else None
+    base = tb.compile_construct("base")
+    got = tb.compile_construct("color", defines=defines)
+    # マクロなので 1 バイトも増えない
+    assert got["flash"] == base["flash"], (
+        f"色定数だけで {got['flash'] - base['flash']} B 増えている")

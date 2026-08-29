@@ -280,13 +280,13 @@ An empty sketch is 5,892 bytes on this core, so the budget is tracked as the
 
 | Cumulative | Δ flash | Δ RAM |
 | --- | --- | --- |
-| Bus + panel + `fillScreen` | +1,712 | +68 |
-| + rectangles, pixels, H/V lines | +1,988 | +68 |
-| + every primitive (lines, circles, rounded, triangles) | +4,880 | +68 |
-| + text | +5,916 | +68 |
-| **+ `pushImage` (everything)** | **+6,536** | **+68** |
-| + tiled rendering (240px × 1 row) | +7,524 | +624 |
-| + `print` / `println` (no float) | +6,200 | +80 |
+| Bus + panel + `fillScreen` | +1,792 | +72 |
+| + rectangles, pixels, H/V lines | +1,952 | +72 |
+| + every primitive (lines, circles, rounded, triangles) | +4,840 | +72 |
+| + text (UTF-8 included) | +6,100 | +72 |
+| **+ `pushImage` (everything)** | **+6,688** | **+72** |
+| + tiled rendering (240px × 1 row) | +7,632 | +628 |
+| + `print` / `println` (no float) | +6,504 | +88 |
 | + `println(float)` | **does not fit** (~ +8,650) | — |
 
 That last row is a measurement, not a policy: float formatting alone eats more than half
@@ -306,11 +306,15 @@ bands, each rendered into a small RAM buffer and then pushed**.
 static uint16_t band[240 * 2];          // width × rows × 2 bytes
 TinyGFXTileCanvas canvas(panel, band, sizeof(band) / sizeof(band[0]));
 
-static void scene(TinyGFX& g, void* ctx) {   // called once per band
-  g.fillCircle(120, 120, 40, TFT_CYAN);      // coordinates are full-screen
-}
-canvas.render(scene);
+canvas.render([&](TinyGFX& g) {         // called once per band
+  g.fillCircle(ball.x, ball.y, 40, TFT_CYAN);   // coordinates are full-screen
+});
 ```
+
+A lambda can just read the variables the scene needs. If you would rather have a
+named function, `canvas.render(fn, &ctx)` with `void fn(TinyGFX&, void*)` works
+too — **the two cost the same** (measured; the capturing lambda is in fact 16
+bytes smaller than packing state behind a `void*`).
 
 The RAM cost is **width × rows × 2 bytes** and nothing else (240px × 1 row = 480 bytes).
 **Changing the row count does not change a single pixel** — a test enforces that.
@@ -354,6 +358,24 @@ lcd.drawString("23.5", 8, 8);
 
 `TinyGFX.h` brings in the CellFont types, so **include order does not matter**
 (types only, zero bytes).
+
+### Strings are UTF-8
+
+`drawString` and `print` read `char*` **as UTF-8** - and not just for CJK. The
+Arduino IDE saves sketches as UTF-8, so `"25°C"` is already five bytes by the
+time it reaches the library. Read a byte at a time, **one degree sign turns into
+two characters**.
+
+```cpp
+lcd.drawString("temperature 23.5℃", 8, 8);   // just write it
+```
+
+Characters above U+FFFF (emoji) cannot be drawn, because the font interface is
+16-bit. Their bytes are still **skipped correctly**, so nothing after them shifts.
+
+If you do not want it, `-DTINYGFX_FONT_UTF8=0` gives back **148 bytes** (292 if
+`print` is in too), returning to byte-for-byte the size it was before UTF-8
+existed - measured.
 
 ### Two formats
 

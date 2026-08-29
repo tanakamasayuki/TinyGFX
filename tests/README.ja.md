@@ -59,7 +59,10 @@ tests/
   tile/               帯の行数を変えても直接描画と同じ（不変条件）
   text/               文字。戻り値・倍角・収録外・背景色つき・透過
   fontchain/          CellFont の連鎖・U+FFFD 退避・ベースライン揃え
-  image/              pushImage の配置・切り取り・透過
+  utf8/               UTF-8 の復号。列ごとにコードポイントと消費バイト数を直接見る
+  image/              pushImage の配置・切り取り・透過・バイト順の入れ替え
+  image_fmt/          同じ絵をどの形式で符号化しても 1 画素も違わないこと
+  image_oracle/       変換ツールの出力を、ツール自身の期待画像と突き合わせる
   hostbus/            本番の SPI バスが実際に流したバイトを拾って画に戻す
   fillchunk/          まとめ書きを有効にしても線に出るバイトが変わらないこと
   clifont/            **本番の生成器が出した CellFont** を描けること
@@ -68,6 +71,7 @@ tests/
   u8g2/               u8g2 形式フォントのデコード
   i2c/                I2C + SSD1306（モノクロ・ページ転送・dirty ページ・寸法契約）
   monospi/            SPI + SSD1306 / SH1106。トランザクションと CS の作法
+  softi2c/            ビットバン I2C の波形を復号してバイト列に戻す
   sh1106/             SH1106 の配線。SSD1306 と同じ絵になること
   build_matrix/       examples が ch32v003 / uno / esp32 / m5stack でビルドできるか（実行はしない）
   manual/m5stack/     **実機検証スケッチ。** pytest では走らない（ビルドだけ検査する）

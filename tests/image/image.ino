@@ -88,6 +88,42 @@ void setup() {
   reset(); lcd.pushImage(2, 2, 0, 4, img4);
   tgfxReport("zero_pixels", (long)bus.pixelCount());
 
+  // 極端な座標。クリップの計算（`_clipX0 - x`）が int16_t で桁溢れすると
+  // 元画像の手前を読む。**1 画素も送らないこと。**
+  reset();
+  lcd.pushImage(-32768, 0, 4, 4, img4);
+  lcd.pushImage(32767, 0, 4, 4, img4);
+  lcd.pushImage(0, -32768, 4, 4, img4);
+  lcd.pushImage(0, 32767, 4, 4, img4);
+  lcd.pushImage(-32768, -32768, 4, 4, img4);
+  tgfxReport("extreme_pixels", (long)bus.pixelCount());
+
+  // --- バイト順の入れ替え ---------------------------------------------------
+  //
+  // TinyGFX に setSwapBytes() は無い（DECISIONS.ja.md D29）。代わりに
+  // `tinygfx_swapBytes565` を呼ぶ。**2 回かけると元に戻ること**と、
+  // 入れ替えた配列を描くと元の絵と違うこと（本当に効いていること）を見る。
+  {
+    reset(); lcd.pushImage(2, 2, 4, 4, img4);
+    for (int i = 0; i < W * H; ++i) snap[i] = gram[i];
+
+    uint16_t tmp[16];
+    for (int i = 0; i < 16; ++i) tmp[i] = img4[i];
+    tinygfx_swapBytes565(tmp, 16);
+    reset(); lcd.pushImage(2, 2, 4, 4, tmp);
+    tgfxReport("swapped_diff", diffFrom(snap));
+
+    tinygfx_swapBytes565(tmp, 16);
+    long same = 0;
+    for (int i = 0; i < 16; ++i) { if (tmp[i] == img4[i]) ++same; }
+    tgfxReport("swap_roundtrip", same);
+
+    // 長さ 0 で何も触らないこと
+    uint16_t one = 0x1234;
+    tinygfx_swapBytes565(&one, 0);
+    tgfxReport("swap_zero_kept", one == 0x1234 ? 1 : 0);
+  }
+
   // --- 1bpp ビットマップ ---------------------------------------------------
   //
   // **不変条件で見る。** ラン単位で fillRect を投げる実装が、1 画素ずつ

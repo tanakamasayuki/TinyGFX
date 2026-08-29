@@ -47,6 +47,23 @@ def test_tile(dut):
     # 中身が空だと上の比較が自明に通るので、実際に描けていることを確かめる
     assert len(tc.colors(direct)) >= 4, f"基準画像の色数が少なすぎる: {tc.colors(direct)}"
 
+    # --- ラムダで渡しても同じ絵 --------------------------------------------
+    #
+    # 関数ポインタ + void* と、任意の callable を取るテンプレートは通る道が
+    # 違う（後者はトランポリンを 1 枚挟む）。**同じ絵、同じ転送画素数**で
+    # なければならない。実測ではサイズも同じか小さい（DECISIONS.ja.md D28）。
+    assert r["lambda_diff"] == 0, (
+        f"ラムダで渡すと {r['lambda_diff']} 画素違う")
+    assert r["lambda_pixels"] == r["fnptr_pixels"], (
+        f"転送画素数が違う: ラムダ {r['lambda_pixels']} / "
+        f"関数ポインタ {r['fnptr_pixels']}")
+
+    # 捕捉した変数が実際に更新されていること（トランポリンが同じ実体を呼んでいる）
+    from math import ceil
+    expected_bands = ceil(H / r["lambda_tilerows"])
+    assert r["lambda_bands"] == expected_bands, (
+        f"ラムダが {r['lambda_bands']} 回呼ばれた。帯は {expected_bands} 本")
+
     # --- バッファが足りない場合 --------------------------------------------
     assert r["toosmall_rows"] == 0, "1 行ぶんも無いのに帯が作れている"
     assert r["toosmall_ok"] == 0, "1 行ぶんも無いのに render が成功している"

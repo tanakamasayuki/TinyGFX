@@ -18,6 +18,22 @@
 /// U+FFFD; the core has no built-in box of its own (CellFont spec 7.2).
 #define TINYGFX_NOTDEF 0xFFFDu
 
+/// Treat the char* the text calls take as UTF-8.
+///
+/// On by default, because it is what the strings actually are: the Arduino
+/// IDE saves sketches as UTF-8, so "abc" and "\u00e9\u00e9" and "\u3042" all
+/// arrive here UTF-8-encoded whether or not anyone thought about it. Decoding
+/// them byte by byte draws two wrong glyphs for a letter with an accent and
+/// three for a kana - and does so silently.
+///
+/// Set to 0 to get the byte-per-glyph reading back (each byte is the code
+/// point, i.e. Latin-1). That is right for a font whose codes were chosen to
+/// match a byte-oriented encoding, and it is smaller. See docs/FOOTPRINT.ja.md
+/// for the price of each.
+#ifndef TINYGFX_FONT_UTF8
+#define TINYGFX_FONT_UTF8 1
+#endif
+
 class TinyGFX {
  public:
   explicit TinyGFX(TinyGFXPanel& panel) : _panel(&panel) {}
@@ -82,6 +98,17 @@ class TinyGFX {
     _clipY1 = (int16_t)(height() - 1);
   }
   void clearClipRect() { resetClipRect(); }
+
+  /// The clip rectangle, inclusive on both edges.
+  ///
+  /// **For decoders.** An image or font decoder is a free function handed a
+  /// `TinyGFX&`, and a decoder that opens its own window (setAddrWindow) has
+  /// to do its own clipping, because the window path deliberately does not
+  /// clip. Ordinary drawing never needs these - every primitive clips itself.
+  int16_t clipX0() const { return _clipX0; }
+  int16_t clipY0() const { return _clipY0; }
+  int16_t clipX1() const { return _clipX1; }
+  int16_t clipY1() const { return _clipY1; }
 
   // ---- low-level transfer ----------------------------------------------
   void setAddrWindow(int16_t x, int16_t y, int16_t w, int16_t h) {
@@ -361,6 +388,12 @@ class TinyGFX {
     int16_t sx = 0, sy = 0;
     // 32 bits for the far edge - see fillRect for why.
     int32_t x1 = (int32_t)x + w - 1, y1 = (int32_t)y + h - 1;
+    // sx and sy stay in 16 bits, and that is safe rather than lucky.
+    // _clipX0 - x only exceeds int16_t when it exceeds 32767, and getting past
+    // the x > x1 test below then needs w - 1 >= _clipX0 - x > 32767, i.e. a
+    // width above 32768 - which an int16_t cannot hold. Every input that could
+    // wrap these has already been rejected by the time they are used.
+    // The far edges are the ones that need 32 bits (see fillRect).
     if (x < _clipX0) { sx = (int16_t)(_clipX0 - x); x = _clipX0; }
     if (y < _clipY0) { sy = (int16_t)(_clipY0 - y); y = _clipY0; }
     if (x1 > _clipX1) x1 = _clipX1;
@@ -442,11 +475,65 @@ class TinyGFX {
     return (_font == nullptr) ? 0 : _font->ops->ascent(_font->data);
   }
 
+#if TINYGFX_FONT_UTF8
+  /// How many bytes the character led by `c` occupies, 1 to 4.
+  /// 0 means `c` cannot lead one: a continuation byte with no lead, or
+  /// 0xFE / 0xFF, which UTF-8 never produces.
+  static uint8_t utf8Len(uint8_t c) {
+    if (c < 0x80u) return 1;
+    if ((c & 0xE0u) == 0xC0u) return 2;
+    if ((c & 0xF0u) == 0xE0u) return 3;
+    if ((c & 0xF8u) == 0xF0u) return 4;
+    return 0;
+  }
+
+  /// Step over one character and return its code point.
+  ///
+  /// `p` is advanced past the character. This is what drawString and
+  /// textWidth walk strings with, exposed because anything that lays text out
+  /// itself - wrapping at a width, measuring a substring - has to walk them
+  /// the same way to get the same answer.
+  ///
+  /// It never reads past the terminator: a sequence cut short stops on the
+  /// byte that broke it, so a truncated string still ends where it ends.
+  ///
+  /// Malformed input yields U+FFFD having consumed a single byte, so one bad
+  /// byte costs one notdef rather than the remainder of the line.
+  ///
+  /// Code points above U+FFFF - emoji, and the rest of the astral planes - do
+  /// not fit the uint16_t that the font interface takes. The sequence is
+  /// consumed whole and reported as U+FFFD: one notdef, and everything after
+  /// it stays where it belongs.
+  ///
+  /// Overlong encodings are decoded rather than rejected. They name a
+  /// character that was drawable anyway, so the check would buy nothing here;
+  /// this is a text renderer, not a parser deciding what a name means.
+  static uint16_t nextCode(const char*& p) {
+    const uint8_t c = (uint8_t)*p++;
+    if (c < 0x80u) return c;
+    const uint8_t len = utf8Len(c);
+    if (len == 0) return TINYGFX_NOTDEF;
+    // The lead byte carries 7 - len payload bits: 0x1F, 0x0F, 0x07.
+    uint16_t cp = (uint16_t)(c & (uint8_t)(0x7Fu >> len));
+    for (uint8_t i = 1; i < len; ++i) {
+      const uint8_t t = (uint8_t)*p;
+      if ((t & 0xC0u) != 0x80u) return TINYGFX_NOTDEF;  // truncated; p stays on it
+      ++p;
+      cp = (uint16_t)((cp << 6) | (uint16_t)(t & 0x3Fu));
+    }
+    // Four bytes means above U+FFFF. The loop consumed it, which is what keeps
+    // the rest of the string aligned; the value it built is thrown away.
+    return (len == 4) ? (uint16_t)TINYGFX_NOTDEF : cp;
+  }
+#else
+  static uint16_t nextCode(const char*& p) { return (uint8_t)*p++; }
+#endif
+
   int16_t textWidth(const char* str) const {
     if (_font == nullptr || str == nullptr) return 0;
     int16_t total = 0;
     while (*str) {
-      const int16_t a = advanceOf((uint8_t)*str++);
+      const int16_t a = advanceOf(nextCode(str));
       if (a > 0) total = (int16_t)(total + a);
     }
     return total;
@@ -494,7 +581,7 @@ class TinyGFX {
     const int16_t x0 = x;
     startWrite();
     while (*str) {
-      x = (int16_t)(x + drawChar((uint8_t)*str++, x, y));
+      x = (int16_t)(x + drawChar(nextCode(str), x, y));
     }
     endWrite();
     return (int16_t)(x - x0);

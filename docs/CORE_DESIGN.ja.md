@@ -482,7 +482,7 @@ lcd.println(3.14f);           // ここまで来ると浮動小数点書式化�
 | `TinyGFX/FontU8g2.h` | u8g2 のデコーダ | 実装済み |
 | `TinyGFX/Print.h` | `Print` 継承、`printf`、float | 実装済み |
 | `TinyGFX/TileCanvas.h` | 帯レンダリング（§12） | 実装済み |
-| `TinyGFX/Utf8.h` | UTF-8 の入口（CJK に要る。+153 B 実測） | 未（Q12） |
+| ~~`TinyGFX/Utf8.h`~~ | ~~UTF-8 の入口~~ | **作らなかった。コアに入れた**（D26）。`drawString` はコアのメンバなので、別ヘッダから差し替えるには仮想化かテンプレートが要り、D1 に反する。`TINYGFX_FONT_UTF8=0` なら 0 バイトに戻る |
 | `TinyGFX/TextDatum.h` | `setTextDatum` / `drawCenterString` | 未 |
 
 いずれも **コアからは参照されない**。取り込んだ人だけが払う。
@@ -494,6 +494,7 @@ lcd.println(3.14f);           // ここまで来ると浮動小数点書式化�
 | `TINYGFX_FILL_CHUNK` | 0 | `TinyGFXBusSPI` の塗りつぶしで使うスタック上の一時バッファ画素数 | 実装済み・**未測定** |
 | `TINYGFX_FONT_SPARSE` | 1 | 0 で疎索引（コード表）の分岐を落とす | **−56 B**（[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md) §4） |
 | `TINYGFX_FONT_RECORDS` | 1 | 0 で可変ピッチ（グリフ表）の分岐を落とす | **−24 B** |
+| `TINYGFX_FONT_UTF8` | 1 | 0 で文字列をバイト単位（Latin-1）として読む | **−148 B**（`TinyGFXPrint` も使っていれば −292 B。D26） |
 | `TINYGFX_STATIC_BUS` / `TINYGFX_STATIC_PANEL` | — | Bus / Panel を単一実装に固定して virtual を消す | **未実装。** 構成 E が予算内に収まったので保留（D2） |
 | `TINYGFX_NO_CLIP` | — | クリップ判定を省く | **未実装。** 効果を測ってから決める |
 

@@ -172,12 +172,15 @@ ASCII 95 字 + 記号 6 字で −190 B（仕様 §7）。
 
 ## 5. まだやっていないこと — UTF-8 の入口
 
-`drawString(const char*)` はいまバイトをそのままコードとして扱う。
-**疎索引の CellFont で CJK を出すには UTF-8 の入口が要る**（u8g2 を選んでも同じ）。
+**実装済み**（2026-08-29、D26）。`drawString` / `textWidth` / `TinyGFXPrint::print` は
+`char*` を UTF-8 として読む。形式に依らない話なので、CellFont でも u8g2 でも同じ。
 
-実測 **+153 B**（u8g2 の `drawString` 837 − `drawChar` 684）。形式に依らない。
+実測 **+164 B**（CH32V003。AVR +134、ESP32 +116）。`TinyGFXPrint` まで含めると
++292 B —— `Print::write(uint8_t)` が 1 バイトずつ渡してくるので、組み立て中の
+コードポイントを状態として持つ必要があるため。
 
-→ CJK を実際に出す段になったら足す（[DECISIONS.ja.md](DECISIONS.ja.md) Q12）。
+`TINYGFX_FONT_UTF8=0` でバイト単位（Latin-1）に戻り、**入れる前と 1 バイトも
+違わない値になる**（[DECISIONS.ja.md](DECISIONS.ja.md) D26）。
 
 ## 6. フォントをどう作るか
 

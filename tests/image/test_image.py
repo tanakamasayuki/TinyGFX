@@ -68,3 +68,20 @@ def test_image(dut):
     lit = bin(0xA5).count("1") + bin(0x00).count("1") + bin(0xFF).count("1")
     assert r["bmp_kept_bg"] == 16 * 16 - lit, (
         f"背景が {r['bmp_kept_bg']} 画素（{16 * 16 - lit} のはず。透過が効いていない）")
+
+    # 極端な座標。クリップの計算が int16_t で桁溢れすると元画像の手前を読む。
+    # `pushImage` は遠い側の端を int32_t で持っているので弾けているが、
+    # **理屈で安全なだけ**なので数字で押さえておく。
+    assert r["extreme_pixels"] == 0, (
+        f"完全に画面外なのに {r['extreme_pixels']} 画素送っている")
+
+    # --- バイト順の入れ替え ---------------------------------------------------
+    #
+    # TinyGFX に setSwapBytes() は無い（DECISIONS.ja.md D29）。実行時のモードは
+    # 「使わないスケッチにも +44 B / RAM +4 B」だったので、呼んだときだけ払う
+    # 自由関数にした。**呼ばなければ 0 B**（実測）。
+    assert r["swapped_diff"] > 0, (
+        "バイト順を入れ替えても絵が変わらない。入れ替えが効いていない")
+    assert r["swap_roundtrip"] == 16, (
+        f"2 回かけて元に戻ったのが {r['swap_roundtrip']} / 16 語")
+    assert r["swap_zero_kept"] == 1, "長さ 0 で配列を書き換えている"
