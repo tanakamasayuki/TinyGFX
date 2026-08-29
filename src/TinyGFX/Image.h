@@ -182,11 +182,16 @@ inline void drawRle565(TinyGFX& g, const CellImage* im, int16_t x, int16_t y) {
 inline void drawRlePal4(TinyGFX& g, const CellImage* im, int16_t x, int16_t y) {
   const Head d = head(im);
   if (d.data == nullptr || d.palette == nullptr || d.w <= 0 || d.h <= 0) return;
+  const uint8_t palCount = tinygfx_rd8(&im->paletteCount);
   Cursor c = {0, 0};
   g.startWrite();
   for (uint16_t i = 0; i < d.len && c.row < d.h; ++i) {
     const uint8_t b = tinygfx_rd8(&d.data[i]);
-    const uint8_t idx = (uint8_t)(b & 0x0F);
+    // **索引はパレットの外へ出さない。** 壊れたヘッダや手で書いた
+    // データでも、配列の外を読まないようにする。ここを外すと
+    // `pal[15]` のような読みがそのまま通ってしまう（実際に踏んだ）。
+    uint8_t idx = (uint8_t)(b & 0x0F);
+    if (idx >= palCount) idx = 0;
     const bool skip = d.hasTransparent && idx == (uint8_t)d.transparent;
     emitRun(g, x, y, d.w, d.h, c, (int16_t)((b >> 4) + 1),
             tinygfx_rd16(&d.palette[idx]), skip);
