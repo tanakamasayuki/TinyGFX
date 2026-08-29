@@ -17,6 +17,8 @@
 #include <TinyGFX/BusI2C.h>
 #include <TinyGFX/PanelSH1106.h>
 #include <TinyGFX/PanelSSD1306.h>
+#include <TinyGFX/Image.h>
+#include "splash_v.h"
 #include <tgfx_test.h>
 #include <TinyGFX/FontCell.h>
 #include <tgfx_digits.h>
@@ -185,6 +187,50 @@ void setup() {
   }
   tgfxReport("offset0_matches_ssd", same == W * H / 8 ? 1 : 0);
   sh.setColumnOffset(2);
+
+  // --- 縦詰めビットマップの速い経路 -----------------------------------------
+  //
+  // **ページ境界に揃った縦詰めは、このパネルのバッファそのもの。**
+  // pushVBitmap() が memcpy 相当で貼る。汎用の drawImage() と 1 ビットも
+  // 違わないことを見る（違えば速いだけの経路ではなく別物になってしまう）。
+  sh1106Mode = false;   // SSD1306 の模型で見る
+  {
+
+  }
+  {
+    for (int i = 0; i < RAM_W * PAGES; ++i) model[i] = 0;
+    ssd.clearBuffer();
+    const bool fast = ssd.pushVBitmap(0, 0, W, H, splash_vData);
+    ssd.display();
+    static uint8_t viaFast[W * H / 8];
+    extract(viaFast, 0);
+    tgfxReport("vblit_taken", fast ? 1 : 0);
+
+    for (int i = 0; i < RAM_W * PAGES; ++i) model[i] = 0;
+    ssd.clearBuffer();
+    ssdLcd.drawImage(&splash_vRef, 0, 0);
+    ssd.display();
+    static uint8_t viaGeneric[W * H / 8];
+    extract(viaGeneric, 0);
+
+    long d = 0;
+    for (int i = 0; i < W * H / 8; ++i) { if (viaFast[i] != viaGeneric[i]) ++d; }
+    tgfxReport("vblit_diff", d);
+
+    long lit = 0;
+    for (int i = 0; i < W * H / 8; ++i) {
+      for (int b = 0; b < 8; ++b) { if ((viaFast[i] >> b) & 1) ++lit; }
+    }
+    tgfxReport("vblit_lit", lit);
+
+    // 揃っていない位置は断る（描かずに false）
+    ssd.clearBuffer();
+    tgfxReport("vblit_unaligned", ssd.pushVBitmap(0, 3, W, H, splash_vData) ? 1 : 0);
+    tgfxReport("vblit_offpanel", ssd.pushVBitmap(0, 0, W, 128, splash_vData) ? 1 : 0);
+    ssdLcd.setRotation(1);
+    tgfxReport("vblit_rotated", ssd.pushVBitmap(0, 0, W, H, splash_vData) ? 1 : 0);
+    ssdLcd.setRotation(0);
+  }
 
   tgfxTestDone();
 }

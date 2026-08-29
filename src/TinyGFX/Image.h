@@ -36,7 +36,22 @@ struct CellImage {
   const uint16_t* palette;  ///< NULL なら直接色
   uint16_t width, height;
   uint16_t dataLen;         ///< data のバイト数。RLE の終端判定に要る
-  uint16_t transparent;     ///< 透過。直接色なら色、パレットなら索引
+  /// 透過。直接色なら色、パレットなら索引。`hasTransparent` が 0 なら無視。
+  ///
+  /// **形式と違って、これは実行時に見る。** 形式は ops ポインタで表して
+  /// 使わないデコーダを落としているのに透過だけ実行時なのは、実測すると
+  /// 差が付かなかったから（CH32V003、rlepal4）:
+  ///
+  ///   |                | 透過なしのみ | 透過ありのみ | 両方 |
+  ///   | 実行時に見る    |      576 |      576 |  784 |
+  ///   | ops で分ける    |      544 |      560 |  796 |
+  ///
+  /// **どの使い方でも 32 バイト以内。** 均一なら分割が僅かに得、混在なら
+  /// 実行時が僅かに得。差が小さいので、デコーダが 1 本で済むほうを採った。
+  ///
+  /// 判定そのものの実費は形式と MCU による: 直接色 +32〜66、RLE +24〜54。
+  /// **1bpp は 0 が元から透過**なので、この値を見ない。
+  uint16_t transparent;
   uint8_t paletteCount;
   uint8_t hasTransparent;
 };
@@ -75,22 +90,29 @@ inline Head head(const CellImage* im) {
   return d;
 }
 
-/// 走った位置から (行, 列) を出して、行をまたがない範囲で塗る。
-/// RLE 系が共有する。
-inline int32_t emitRun(TinyGFX& g, int16_t x, int16_t y, int16_t w, int32_t pos,
-                       int32_t len, uint16_t color, bool skip) {
-  while (len > 0) {
-    const int16_t row = (int16_t)(pos / w);
-    const int16_t cx = (int16_t)(pos - (int32_t)row * w);
-    int32_t run = w - cx;
+/// RLE の走査位置。**行と列を持ち回る。**
+///
+/// 通し位置から `pos / w` で行を出すほうが素直だが、**除算が高い。**
+/// CH32V003 は rv32ec で除算命令が無く、AVR は 8 ビットなので 32 ビットの
+/// 除算がソフトウェアルーチンになる。行をまたぐたびに 1 つ足すだけで
+/// 済むので、除算は要らない。
+struct Cursor {
+  int16_t row, col;
+};
+
+/// 行をまたがない範囲で塗り、カーソルを進める。RLE 系が共有する。
+inline void emitRun(TinyGFX& g, int16_t x, int16_t y, int16_t w, int16_t h,
+                    Cursor& c, int16_t len, uint16_t color, bool skip) {
+  while (len > 0 && c.row < h) {
+    int16_t run = (int16_t)(w - c.col);
     if (run > len) run = len;
     if (!skip) {
-      g.fillRect((int16_t)(x + cx), (int16_t)(y + row), (int16_t)run, 1, color);
+      g.fillRect((int16_t)(x + c.col), (int16_t)(y + c.row), run, 1, color);
     }
-    pos += run;
-    len -= run;
+    c.col = (int16_t)(c.col + run);
+    if (c.col >= w) { c.col = 0; ++c.row; }
+    len = (int16_t)(len - run);
   }
-  return pos;
 }
 
 // ---- 1bpp ---------------------------------------------------------------
@@ -144,14 +166,13 @@ inline void drawBitmap1V(TinyGFX& g, const CellImage* im, int16_t x, int16_t y) 
 inline void drawRle565(TinyGFX& g, const CellImage* im, int16_t x, int16_t y) {
   const Head d = head(im);
   if (d.data == nullptr || d.w <= 0 || d.h <= 0) return;
-  const int32_t total = (int32_t)d.w * d.h;
-  int32_t pos = 0;
+  Cursor c = {0, 0};
   g.startWrite();
-  for (uint16_t i = 0; i + 2 < d.len && pos < total; i += 3) {
+  for (uint16_t i = 0; i + 2 < d.len && c.row < d.h; i += 3) {
     const uint16_t col = (uint16_t)((tinygfx_rd8(&d.data[i + 1]) << 8) |
                                     tinygfx_rd8(&d.data[i + 2]));
     const bool skip = d.hasTransparent && col == d.transparent;
-    pos = emitRun(g, x, y, d.w, pos, tinygfx_rd8(&d.data[i]), col, skip);
+    emitRun(g, x, y, d.w, d.h, c, tinygfx_rd8(&d.data[i]), col, skip);
   }
   g.endWrite();
 }
@@ -161,15 +182,14 @@ inline void drawRle565(TinyGFX& g, const CellImage* im, int16_t x, int16_t y) {
 inline void drawRlePal4(TinyGFX& g, const CellImage* im, int16_t x, int16_t y) {
   const Head d = head(im);
   if (d.data == nullptr || d.palette == nullptr || d.w <= 0 || d.h <= 0) return;
-  const int32_t total = (int32_t)d.w * d.h;
-  int32_t pos = 0;
+  Cursor c = {0, 0};
   g.startWrite();
-  for (uint16_t i = 0; i < d.len && pos < total; ++i) {
+  for (uint16_t i = 0; i < d.len && c.row < d.h; ++i) {
     const uint8_t b = tinygfx_rd8(&d.data[i]);
     const uint8_t idx = (uint8_t)(b & 0x0F);
     const bool skip = d.hasTransparent && idx == (uint8_t)d.transparent;
-    pos = emitRun(g, x, y, d.w, pos, (int32_t)(b >> 4) + 1,
-                  tinygfx_rd16(&d.palette[idx]), skip);
+    emitRun(g, x, y, d.w, d.h, c, (int16_t)((b >> 4) + 1),
+            tinygfx_rd16(&d.palette[idx]), skip);
   }
   g.endWrite();
 }

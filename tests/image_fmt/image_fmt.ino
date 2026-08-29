@@ -15,6 +15,7 @@
 #include "same_rlepal4.h"
 #include "mono_h.h"
 #include "mono_v.h"
+#include "trans_icon.h"
 
 static const int W = 32, H = 32;
 static uint16_t gram[W * H];
@@ -83,6 +84,35 @@ void setup() {
   lcd.drawImage(&same_rlepal4Ref, -40, -40);
   lcd.drawImage(&same_rlepal4Ref, 40, 40);
   tgfxReport("offscreen_pixels", (long)bus.pixelCount());
+
+  // --- 透過 -----------------------------------------------------------------
+  //
+  // 同じ画像を、透過ありと無しで描く。**透過色の画素だけが下地を残し、
+  // それ以外は 1 画素も違わないこと。**
+  //
+  // 透過を見るかどうかは形式ではなく ops が決める（生成ヘッダが指す）ので、
+  // 透過の無い画像しか使わないスケッチには判定のコードが載らない。
+  {
+    reset();
+    lcd.fillRect(0, 0, W, H, 0xF81F);       // 下地。マゼンタ
+    lcd.drawImage(&same_rlepal4Ref, 0, 0);  // 透過なし: 全部塗る
+    long bgLeftOpaque = 0;
+    for (int i = 0; i < W * H; ++i) { if (gram[i] == 0xF81F) ++bgLeftOpaque; }
+    tgfxReport("opaque_bg_left", bgLeftOpaque);
+    snap();
+
+    reset();
+    lcd.fillRect(0, 0, W, H, 0xF81F);
+    lcd.drawImage(&trans_iconRef, 0, 0);    // 透過あり: 黒を飛ばす
+    long bgLeftTrans = 0, differ = 0;
+    for (int i = 0; i < W * H; ++i) {
+      if (gram[i] == 0xF81F) ++bgLeftTrans;
+      if (gram[i] != ref[i]) ++differ;
+    }
+    tgfxReport("trans_bg_left", bgLeftTrans);
+    tgfxReport("trans_differ", differ);
+    tgfxShot("trans", gram, W, H);
+  }
 
   tgfxTestDone();
 }

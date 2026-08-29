@@ -52,6 +52,7 @@
 #endif
 
 #include "Panel.h"
+#include "Progmem.h"
 
 class TinyGFXPanelPaged : public TinyGFXPanel {
  public:
@@ -135,6 +136,60 @@ class TinyGFXPanelPaged : public TinyGFXPanel {
     }
   }
 #endif  // TINYGFX_MONO_FAST_FILL
+
+  /// Blit a vertically packed 1bpp bitmap straight into the buffer.
+  ///
+  /// **This is the reason the vertical layout exists.** One byte of the data
+  /// is eight vertical pixels, which is exactly what one byte of this panel's
+  /// buffer is - so when the two line up, the whole picture is a copy. No bit
+  /// twiddling, no runs, no fillRect.
+  ///
+  /// Lining up means all of:
+  ///
+  ///   - `y` on a page boundary and `h` a whole number of pages
+  ///   - rotation 0 (any other rotation is a different traversal)
+  ///   - the rectangle inside the panel, and inside the band if there is one
+  ///
+  /// **Returns false when they do not hold, having drawn nothing** - fall back
+  /// to `lcd.drawImage()`, which handles any position at any rotation. A
+  /// splash screen or a fixed background hits the fast path; a sprite moving a
+  /// pixel at a time does not, and should not use this.
+  ///
+  /// ```cpp
+  /// if (!panel.pushVBitmap(0, 0, 128, 64, splashData)) {
+  ///   lcd.drawImage(&splashRef, 0, 0);   // どこにでも貼れる汎用経路
+  /// }
+  /// panel.display();
+  /// ```
+  ///
+  /// Deliberately **not** virtual and not part of TinyGFXPanel: a colour panel
+  /// has no such layout, and making it virtual would charge every panel for a
+  /// vtable slot it can never use (the fillRect seam cost +40 B that way).
+  ///
+  /// The data is read with `tinygfx_rd8`, so on AVR it must be in PROGMEM -
+  /// the same rule as fonts and `drawBitmap`.
+  bool pushVBitmap(int16_t x, int16_t y, int16_t w, int16_t h, const uint8_t* data) {
+    if (data == nullptr || w <= 0 || h <= 0) return false;
+    if (_rotation != 0) return false;
+    if ((y & 7) != 0 || (h & 7) != 0) return false;
+    if (x < 0 || y < 0 || x + w > _natW || y + h > _natH) return false;
+
+    const int16_t page0 = (int16_t)(y >> 3);
+    const int16_t pages = (int16_t)(h >> 3);
+    for (int16_t p = 0; p < pages; ++p) {
+      int16_t slot = (int16_t)(page0 + p);
+      if (_bandPages != 0) {
+        slot = (int16_t)(slot - _pageFirst);
+        if (slot < 0 || slot >= _bandPages) continue;  // この帯には出ない
+      }
+      uint8_t* dst = &_buf[(int32_t)slot * _natW + x];
+      const uint8_t* src = data + (int32_t)p * w;
+      for (int16_t i = 0; i < w; ++i) dst[i] = tinygfx_rd8(&src[i]);
+      if (slot < _dirtyLo) _dirtyLo = slot;
+      if (slot > _dirtyHi) _dirtyHi = slot;
+    }
+    return true;
+  }
 
   /// Which page the band buffer currently stands for. Only meaningful when the
   /// constructor was given a `bufferPages` smaller than the screen.
