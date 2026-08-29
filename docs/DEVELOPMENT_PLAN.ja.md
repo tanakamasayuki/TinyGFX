@@ -4,7 +4,7 @@
 
 ## 1. 現在地
 
-**フェーズ 0〜4 の実装、Tier 0〜2 の検証、examples まで完了。残るのは実機と利用者向けドキュメント。**
+**フェーズ 0〜4 の実装、Tier 0〜2 の検証、examples まで完了。残るのはリリース前の設計修正、実機確認、利用者向けドキュメント。**
 
 | 項目 | 状況 |
 | --- | --- |
@@ -13,14 +13,14 @@
 | 外部への依頼 | **[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) に E1〜E6 として固めた** |
 | リポジトリ整備 | **完了**（§4） |
 | 描画コア `src/TinyGFX/Gfx.h` | **実装済み。** 全プリミティブ + クリップ + 回転 + 画像 + 文字 |
-| Bus | `BusSoftSPI`（既定）/ `BusSPI` / `BusCapture` **実装済み** |
-| Panel | `PanelST7789` / `PanelMemory` **実装済み** |
+| Bus | `BusSoftSPI`（既定）/ `BusSPI` / `BusI2C` / `BusCapture` **実装済み** |
+| Panel | `PanelST7789` / `PanelILI9341` / `PanelILI9342` / `PanelSSD1306` / `PanelSH1106` / `PanelMemory` **実装済み** |
 | 帯レンダリング `TileCanvas.h` | **実装済み**（D16） |
 | `Print.h`（拡張） | **実装済み** |
 | フォント | **CellFont v1 へ移行（2026-08-28、D17 再改訂）。** 形式の仕様は LGFXFontToolJs 側に切り出し、TinyGFX はその描画器の 1 実装になった。頭ブロック・形式内連鎖・U+FFFD 退避・ベースライン基準を取り込んで **+248 B**（[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md)） |
-| `tests/linkprune/` | **通っている（11 件）** |
+| `tests/linkprune/` | **通っている。** 未使用プリミティブ、float、除算、未使用フォント形式を検査 |
 | `tests/footprint/` | **通っている（2 件）**。実測は [FOOTPRINT.ja.md](FOOTPRINT.ja.md) §5 |
-| Tier 1（描画の正しさ） | **完了。9 本すべて通っている**（`capture` `window` `primitive` `clip` `fill` `tile` `text` `image` `hostbus`） |
+| Tier 1（描画の正しさ） | **現行テストはすべて通っている。** 描画、画像、文字、フォント、カラー/モノクロパネル、Bus、帯レンダリングをホスト実行で検査 |
 | 本番の Bus 実装の検証 | **完了。** ホストコアのバス観測口（E1）で `BusSoftSPI` / `BusSPI` を通しで検証できるようになった |
 | 回転オフセットの導出 | `setGramSize()` を追加。135x240 のような GRAM より小さいパネルで回転 2/3 がずれる問題を修正 |
 | Tier 2（移植性のコンパイル）| **完了。`build_matrix/` の 11 ビルドが通過**（ch32v003 / uno / esp32 / m5stack × examples） |
@@ -31,6 +31,20 @@
 | examples | **完了。6 本**（HelloWorld / Shapes / FlickerFree / HardwareSPI / OledI2C / M5StackBasic）。日英 README つき |
 | 利用者向けドキュメント | `README.md` / `README.ja.md` は**あり**。`docs/GUIDE` / `docs/API` は未着手（実機の後） |
 
+### 1.1 リリース前 TODO（2026-08-29 設計レビュー）
+
+細かな速度・サイズ最適化より先に、公開 API と層の境界を固める。コアの
+`TinyGFX → Panel → Bus` という構成は維持し、次の局所修正と回帰テストを行う。
+
+| 優先度 | 項目 | 完了条件 |
+| --- | --- | --- |
+| **P0** | **SSD1306 / SH1106 の SPI トランザクション所有を修正する。** 現在の `PanelPaged::cmd()`、`init()`、`display()` は `BusSPI::beginTransaction()` を通らず、I2C では見えない不整合がある | SSD1306 + `TinyGFXBusSPI` のホストテストを追加し、SPI 設定、CS、DC、転送バイト列を確認する。I2C の既存結果は不変 |
+| **P0** | **ST7789 の GRAM サイズ・原点オフセットの設定契約を決める。** `setGramSize()` / `setOffset()` を呼ぶ順序に依存して現在回転の `_offX/_offY` が古いままにならないようにする | setter で現在回転の派生値も更新するか、「`begin()` 前のみ」と API 契約を固定する。240x240 / 135x240 の代表例と全回転テストを更新する |
+| **P1** | **ページ方式パネルの対応寸法とバッファ契約を明示する。** 初期化列は 128x64 固定だが、コンストラクタは任意の `w` / `h` を受け取っている | 128x64 専用に API を狭めるか、128x32 等の初期化値を導出する。高さ 8 の倍数、null、必要バイト数の扱いを決めてテストする |
+| **P1** | **座標の境界演算を確認する。** `x + w - 1` などが `int16_t` の範囲を越えると、「画面外座標を受けてクリップする」という契約を満たせない | 終端・差分だけ `int32_t` にする案を実装し、極端な負座標・正座標をテストする。CH32V003 の増分も測る |
+| **P1** | **初期化失敗のモデルを決める。** 現状の `begin()` は `bool` だが、実パネルは転送失敗を検出せずほぼ常に `true` | best effort として `void` にするか、無効バッファ・I2C NACK 等を伝播するか決定する。少なくとも I2C の `chunk == 0` は拒否または 1 へ正規化する |
+| **P2** | **文書と実装の同期を続ける。** `fillRect` 追加後の Panel の virtual 数など、古い記述が残っていた | API 安定化時に CORE_DESIGN / DECISIONS / README / テスト一覧を一巡し、固定のテスト件数はなるべく書かない |
+
 ## 2. 実装順序
 
 ### フェーズ 0 — スパイク（**完了**）
@@ -38,7 +52,7 @@
 | # | 確かめたこと | 結果 |
 | --- | --- | --- |
 | 0-1 | 構成 base / A のサイズ | base 5,892 B / A +1,600 B。**当初の予算（総量ベース）は的外れだった**ので増分方式へ変更 |
-| 0-2 | 未使用機能が落ちるか | **落ちる。** `linkprune` 11 件通過。D1 / D15 は成立している |
+| 0-2 | 未使用機能が落ちるか | **落ちる。** `linkprune` が継続して検査しており、D1 / D15 は成立している |
 | 0-3 | virtual 2 枚で予算に入るか | **入る。** 構成 E で +6,484 B。**静的結合スイッチは不要**と判断（D2 確定） |
 | 0-4 | `--gc-sections` と除算 | gc-sections はコア既定で有効。**rv32ec で除算命令なし**を確認し、除算ルーチンが 1 つも出ていないことをテストで固定 |
 | 0-5 | `BusCapture` で画を復元 | **未。** コンパイルは通るが検証テストは未実装 → フェーズ 1 で |
@@ -124,15 +138,14 @@ ST7735 / ILI9341。パネル初期化テーブルの整理。CH32V 向け Fast B
 | `.github/workflows/tests.yml` | **あり** | プロジェクト固有（[TEST_PLAN.ja.md](TEST_PLAN.ja.md) §7） |
 | `src/TinyGFX.h` ほか | **あり** | ヘッダオンリー。`.cpp` は 0 |
 | `src/tinygfx_version.h` | **あり**（0.0.0） | 以降は `bump_version.py` が生成 |
-| `tests/` 一式 | **あり** | Tier 0 のみ。Tier 1 はこれから |
+| `tests/` 一式 | **あり** | Tier 0〜2 と、環境を渡したときだけ動く Tier 3 を含む |
 
 ## 5. 決めてから進みたいこと
 
 [DECISIONS.ja.md](DECISIONS.ja.md) §2 の Q1〜Q8 のうち、**フェーズ 0 の前に決めたいのは次の 2 つだけ。** 残りは実装しながらで間に合う。
 
 **先に決めておきたいものは無くなった。** Q8（名前）は確認済み、Q9（サブセット化）は
-外部ツールに切り出して取り下げ、Q7 は実測で決着（Panel の virtual は 7 本）。
+外部ツールに切り出して取り下げ、Q7 は実測で決着（Panel の virtual は 8 本）。
 
 残っているのは実物を見て決めるもの（Q1 糖衣クラス、Q2 色定数、Q4 `setSwapBytes`、
 Q5 CS 共有、Q6 PROGMEM 画像、Q10 コールバックの形、Q11 基準機の移行時期）だけ。
-

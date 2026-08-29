@@ -10,7 +10,7 @@ CH32V003（フラッシュ 16KB / RAM 2KB）で、**全機能を使っても +6.
 > ### 実機で動いたのは M5Stack だけです
 >
 > **2026-08-28、M5Stack BASIC（ILI9342C）で初めて実機に絵が出ました。** ホスト上のテストも
-> **ホストで 45 本、実機で 1 本**通っています。ただし**実物のディスプレイで確かめたのはこの 1 構成だけ**です。
+> ホスト自動テストと M5Stack の実機自動テストは通っています。ただし**実物のディスプレイで確かめたのはこの 1 構成だけ**です。
 >
 > | | |
 > | --- | --- |
@@ -49,6 +49,7 @@ TinyGFXPanelST7789 panel(bus, 240, 240, /*rst*/2);
 TinyGFX            lcd(panel);
 
 void setup() {
+  panel.setGramSize(240, 320);  // 240x240 ST7789 のコントローラ側 GRAM
   lcd.begin();
   lcd.setRotation(1);
   lcd.fillScreen(TFT_BLACK);
@@ -255,7 +256,7 @@ cd tests && uv sync && uv run pytest -v -s
 実機は要りません。ホスト実行と、ビルドしてサイズ・シンボルを見るだけのテストです。
 詳細は [tests/README.ja.md](tests/README.ja.md)。
 
-45 本のうち特徴的なもの:
+自動テストのうち特徴的なもの:
 
 - **`linkprune/`** — 使っていない機能・フォント形式が最終バイナリに残っていないことを `nm` で検査
 - **`footprint/`** — 構成ごとの増分が予算内か。**数字は常に出します**
