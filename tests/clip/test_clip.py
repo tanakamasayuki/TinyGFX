@@ -1,7 +1,8 @@
-"""クリップの不変条件。
+"""The clipping invariant.
 
-クリップ内はクリップ無しと 1 画素も違わず、外は 1 画素も触られないこと。
-期待画像を持たずに済むので、絵が変わってもテストは壊れない。
+Inside the clip, not one pixel differs from drawing without a clip; outside it,
+not one pixel is touched. Stating it that way needs no expected image, so
+changing what is drawn does not break the test.
 """
 
 from pathlib import Path
@@ -32,36 +33,40 @@ def test_clip(dut):
                 outside_dirty.append((x, y))
 
     assert not outside_dirty, (
-        f"クリップの外が {len(outside_dirty)} 画素塗られている: {outside_dirty[:8]}")
+        f"{len(outside_dirty)} pixels painted outside the clip: {outside_dirty[:8]}")
     assert not inside_mismatch, (
-        f"クリップ内がクリップ無しと違う: {len(inside_mismatch)} 画素 {inside_mismatch[:8]}")
+        f"inside the clip differs from no clip: {len(inside_mismatch)} pixels "
+        f"{inside_mismatch[:8]}")
 
-    # 中身が空だと上の 2 つは自明に通ってしまうので、実際に描けていることを確かめる
+    # Both assertions above pass trivially on an empty picture, so check
+    # something was actually drawn.
     drawn = sum(1 for y in range(CY, CY + CH) for x in range(CX, CX + CW)
                 if clipped[x, y] != BLACK)
-    assert drawn > CW * CH // 4, f"クリップ内がほとんど空: {drawn} 画素"
+    assert drawn > CW * CH // 4, f"the clip region is nearly empty: {drawn} pixels"
 
     assert r["clipped_pixels"] < r["free_pixels"], (
-        "クリップしても転送量が減っていない"
-        f"（{r['clipped_pixels']} vs {r['free_pixels']}）")
+        "clipping did not reduce the traffic "
+        f"({r['clipped_pixels']} vs {r['free_pixels']})")
     assert r["oversize_clip_pixels"] == 64 * 64, (
-        f"画面より大きいクリップで {r['oversize_clip_pixels']} 画素（4096 のはず）")
+        f"a clip larger than the screen sent {r['oversize_clip_pixels']} pixels (should be 4096)")
     assert r["empty_clip_pixels"] == 0, (
-        f"空のクリップで {r['empty_clip_pixels']} 画素送っている")
+        f"an empty clip sent {r['empty_clip_pixels']} pixels")
 
-    # --- 極端な座標でも契約どおりクリップすること（2026-08-29 レビューの P1）--
+    # --- extreme coordinates must still clip to contract (P1 of the 2026-08-29
+    # review) --------------------------------------------------------------
     #
-    # 遠い側の端を int16_t で計算していたので x + w - 1 が桁溢れし、
-    # **画面いっぱいに描くべき矩形が丸ごと消えていた。** 総当たりで
-    # 28,441 通りの (x, w) が int32 版と食い違う。
+    # The far edge used to be computed in int16_t, so x + w - 1 overflowed and
+    # **a rectangle that should have covered the whole screen vanished
+    # instead.** Exhaustively, 28,441 (x, w) pairs disagreed with the int32
+    # version.
     W = H = 64
     assert r["huge_rect_pixels"] == (W - 2) * (H - 2), (
-        f"(2,2) から幅 32767 の矩形が {r['huge_rect_pixels']} 画素"
-        f"（{(W - 2) * (H - 2)} のはず。0 なら桁溢れで丸ごと消えている）")
+        f"a rectangle from (2,2) of width 32767 sent {r['huge_rect_pixels']} pixels "
+        f"(should be {(W - 2) * (H - 2)}; 0 means it vanished to overflow)")
     assert r["far_negative_pixels"] == 0, (
-        f"遠い左上の矩形が画面に届いている: {r['far_negative_pixels']} 画素")
+        f"a rectangle far to the top left reached the screen: {r['far_negative_pixels']} pixels")
     assert r["far_positive_pixels"] == 0, (
-        f"画面外の右下の矩形が描かれている: {r['far_positive_pixels']} 画素")
+        f"a rectangle past the bottom right was drawn: {r['far_positive_pixels']} pixels")
     assert r["huge_clip_pixels"] == (W - 2) * (H - 2), (
-        f"巨大なクリップ矩形で {r['huge_clip_pixels']} 画素"
-        f"（{(W - 2) * (H - 2)} のはず）")
+        f"a huge clip rectangle sent {r['huge_clip_pixels']} pixels "
+        f"(should be {(W - 2) * (H - 2)})")

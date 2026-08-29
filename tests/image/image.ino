@@ -1,4 +1,4 @@
-// pushImage の配置と切り取り、transparent 版。
+// pushImage: placement, cropping, and the transparent form.
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
 #include <TinyGFX/PanelST7789.h>
@@ -19,22 +19,23 @@ static const uint16_t img4[16] = {
 };
 static void reset() { bus.fill(0); bus.resetCounters(); }
 
-// 幅が 8 の倍数でない 1bpp ビットマップ。**各行がバイト境界から始まる**ので
-// 5 幅でも 1 行 1 バイト。右の 3 ビットは詰め物。
+// A 1bpp bitmap whose width is not a multiple of 8. **Every row starts on a
+// byte boundary**, so a width of 5 is still one byte a row; the right 3 bits
+// are padding.
 static const uint8_t bmp5x4[4] TINYGFX_FONT_PROGMEM = {
     0xF8,  // 11111
     0x88,  // 10001
     0x88,  // 10001
     0xF8,  // 11111
 };
-// 8 幅ちょうど。行の途中で切れ目が複数ある
+// Exactly 8 wide, with several breaks part way along a row
 static const uint8_t bmp8x3[3] TINYGFX_FONT_PROGMEM = {
     0xA5,  // 10100101
     0x00,  // 00000000
     0xFF,  // 11111111
 };
 
-/// 同じ絵を drawPixel で描く（不変条件の相手側）
+/// The same picture drawn with drawPixel (the other side of the invariant)
 static void byPixel(TinyGFX& g, int16_t x, int16_t y, const uint8_t* bm,
                     int16_t w, int16_t h, uint16_t c) {
   const int16_t bpr = (int16_t)((w + 7) >> 3);
@@ -47,7 +48,7 @@ static void byPixel(TinyGFX& g, int16_t x, int16_t y, const uint8_t* bm,
   }
 }
 
-/// gram を丸ごと比べる
+/// Compare the whole gram
 static long diffFrom(const uint16_t* other) {
   long d = 0;
   for (int i = 0; i < W * H; ++i) {
@@ -88,8 +89,8 @@ void setup() {
   reset(); lcd.pushImage(2, 2, 0, 4, img4);
   tgfxReport("zero_pixels", (long)bus.pixelCount());
 
-  // 極端な座標。クリップの計算（`_clipX0 - x`）が int16_t で桁溢れすると
-  // 元画像の手前を読む。**1 画素も送らないこと。**
+  // Extreme coordinates. If the clipping arithmetic (`_clipX0 - x`) overflows
+  // int16_t, it reads in front of the source image. **Not one pixel may be sent.**
   reset();
   lcd.pushImage(-32768, 0, 4, 4, img4);
   lcd.pushImage(32767, 0, 4, 4, img4);
@@ -98,11 +99,12 @@ void setup() {
   lcd.pushImage(-32768, -32768, 4, 4, img4);
   tgfxReport("extreme_pixels", (long)bus.pixelCount());
 
-  // --- バイト順の入れ替え ---------------------------------------------------
+  // --- byte swapping --------------------------------------------------------
   //
-  // TinyGFX に setSwapBytes() は無い（DECISIONS.ja.md D29）。代わりに
-  // `tinygfx_swapBytes565` を呼ぶ。**2 回かけると元に戻ること**と、
-  // 入れ替えた配列を描くと元の絵と違うこと（本当に効いていること）を見る。
+  // TinyGFX has no setSwapBytes() (DECISIONS.ja.md D29); `tinygfx_swapBytes565`
+  // takes its place. Two things are checked: that **applying it twice restores
+  // the original**, and that drawing a swapped array differs from the original
+  // (i.e. that it does anything at all).
   {
     reset(); lcd.pushImage(2, 2, 4, 4, img4);
     for (int i = 0; i < W * H; ++i) snap[i] = gram[i];
@@ -118,20 +120,20 @@ void setup() {
     for (int i = 0; i < 16; ++i) { if (tmp[i] == img4[i]) ++same; }
     tgfxReport("swap_roundtrip", same);
 
-    // 長さ 0 で何も触らないこと
+    // A length of 0 must touch nothing
     uint16_t one = 0x1234;
     tinygfx_swapBytes565(&one, 0);
     tgfxReport("swap_zero_kept", one == 0x1234 ? 1 : 0);
   }
 
-  // --- 1bpp ビットマップ ---------------------------------------------------
+  // --- 1bpp bitmaps ---------------------------------------------------------
   //
-  // **不変条件で見る。** ラン単位で fillRect を投げる実装が、1 画素ずつ
-  // drawPixel した結果と 1 画素も違わないこと。ランのまとめ方は速度の話で
-  // あって、絵が変わってはいけない。
+  // **Stated as an invariant.** Throwing a fillRect per run must not differ by
+  // a pixel from placing each pixel with drawPixel. How runs get coalesced is a
+  // question of speed; the picture may not change.
   //
-  // 幅 5（バイト境界に満たない・右に詰め物）と幅 8（行の途中に切れ目が複数）
-  // の両方を通す。
+  // Both a width of 5 (short of a byte, padded on the right) and a width of 8
+  // (several breaks part way along a row) go through here.
   {
     reset(); lcd.drawBitmap(2, 3, bmp5x4, 5, 4, WH);
     for (int i = 0; i < W * H; ++i) snap[i] = gram[i];
@@ -146,7 +148,7 @@ void setup() {
     reset(); byPixel(lcd, 1, 1, bmp8x3, 8, 3, WH);
     tgfxReport("bmp8_diff", diffFrom(snap));
 
-    // 0 のビットは触らないこと（透過）
+    // A 0 bit is left alone (transparent)
     reset();
     lcd.fillRect(0, 0, W, H, R);
     lcd.drawBitmap(1, 1, bmp8x3, 8, 3, WH);
@@ -156,7 +158,7 @@ void setup() {
     }
     tgfxReport("bmp_kept_bg", red);
 
-    // 画面外でも落ちないこと
+    // Off screen must not fall over
     reset();
     lcd.drawBitmap(-3, -2, bmp8x3, 8, 3, WH);
     lcd.drawBitmap((int16_t)(W - 2), (int16_t)(H - 1), bmp8x3, 8, 3, WH);

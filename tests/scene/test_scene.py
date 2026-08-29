@@ -1,9 +1,11 @@
-"""実機と突き合わせるためのゴールデンを、ホストで作って凍結する。
+"""Produce the golden on the host and freeze it, for the hardware to be checked
+against.
 
-**ゴールデンを実機の出力から作らない。** 実機がおかしくても「一致」してしまう。
-ホスト（`TinyGFXBusCapture`）で描いたものを正とし、実機側
-（`tests/hw/m5stack/`）はそれに合わせる。シーンの定義は
-`tests/common_libs/tgfx_test/src/tgfx_scene.h` の 1 箇所だけ。
+**The golden is never made from the hardware's own output.** That would
+"match" even when the hardware is wrong. What the host draws
+(`TinyGFXBusCapture`) is the truth; the hardware side (`tests/hw/m5stack/`) is
+held to it. The scene itself is defined in exactly one place,
+`tests/common_libs/tgfx_test/src/tgfx_scene.h`.
 """
 
 from pathlib import Path
@@ -20,20 +22,21 @@ def test_scene_matches_golden(dut):
     dut.expect("TEST done", timeout=60)
 
     r = tc.report(SKETCH)
-    # 実機の読み戻しは RGB666 で返る。飽和した色だけならバイト一致で比べられる
+    # Reading back from real glass returns RGB666. Restricting the scene to
+    # saturated colours is what makes a byte-for-byte comparison possible.
     assert r["unsaturated"] == 0, (
-        f"飽和していない色が {r['unsaturated']} 画素ある。"
-        "実機の読み戻しと往復で 1 LSB ずれるので、シーンには使わないこと")
+        f"{r['unsaturated']} pixels are not a saturated colour. Those come back "
+        "1 LSB off through the hardware read-back, so keep them out of the scene")
 
     produced = (SKETCH / "output" / "scene.ppm").read_bytes()
     if not GOLDEN.exists():
         GOLDEN.parent.mkdir(parents=True, exist_ok=True)
         GOLDEN.write_bytes(produced)
         pytest.fail(
-            f"ゴールデンが無かったので作った: {GOLDEN}\n"
-            "**目で見てからコミットすること。** 一度凍結したら、"
-            "変わったときはシーンを変えたのか壊したのかを判断する")
+            f"no golden existed, so one was written: {GOLDEN}\n"
+            "**Look at it before committing it.** Once frozen, a change means "
+            "deciding whether the scene changed or something broke")
 
     assert produced == GOLDEN.read_bytes(), (
-        "シーンの出力がゴールデンと違う。シーンを変えたなら golden/scene.ppm を"
-        "更新し、実機側（tests/hw/m5stack/）も測り直すこと")
+        "the scene differs from the golden. If the scene was changed on purpose, "
+        "update golden/scene.ppm and re-run the hardware side (tests/hw/m5stack/)")

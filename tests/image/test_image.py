@@ -1,4 +1,4 @@
-"""pushImage の配置と切り取り、transparent 版。"""
+"""pushImage: placement, cropping, and the transparent form."""
 
 from pathlib import Path
 
@@ -15,73 +15,78 @@ def test_image(dut):
 
     r = tc.report(SKETCH)
 
-    # --- 転送量 -------------------------------------------------------------
-    assert r["plain_pixels"] == 16, f"4x4 が {r['plain_pixels']} 画素"
-    assert r["topleft_pixels"] == 4, f"左上へ半分はみ出した 4x4 が {r['topleft_pixels']} 画素"
-    assert r["bottomright_pixels"] == 4, f"右下へ半分はみ出した 4x4 が {r['bottomright_pixels']} 画素"
-    assert r["clipped_pixels"] == 4, f"クリップされた 4x4 が {r['clipped_pixels']} 画素"
+    # --- how much was sent --------------------------------------------------
+    assert r["plain_pixels"] == 16, f"a 4x4 sent {r['plain_pixels']} pixels"
+    assert r["topleft_pixels"] == 4, (
+        f"a 4x4 half off the top left sent {r['topleft_pixels']} pixels")
+    assert r["bottomright_pixels"] == 4, (
+        f"a 4x4 half off the bottom right sent {r['bottomright_pixels']} pixels")
+    assert r["clipped_pixels"] == 4, f"a clipped 4x4 sent {r['clipped_pixels']} pixels"
     assert r["transparent_pixels"] == 12, (
-        f"赤 4 画素を抜いた 4x4 が {r['transparent_pixels']} 画素（12 のはず）")
-    assert r["offscreen_pixels"] == 0, "画面外の pushImage が画素を送っている"
-    assert r["zero_pixels"] == 0, "幅 0 の pushImage が画素を送っている"
+        f"a 4x4 minus 4 red pixels sent {r['transparent_pixels']} (should be 12)")
+    assert r["offscreen_pixels"] == 0, "a pushImage entirely off screen sent pixels"
+    assert r["zero_pixels"] == 0, "a pushImage of width 0 sent pixels"
 
-    # --- 配置 ---------------------------------------------------------------
+    # --- placement ----------------------------------------------------------
     p = tc.image(SKETCH, "plain").load()
-    assert p[2, 2] == RED and p[5, 2] == GREEN, "上段の並びが違う"
-    assert p[2, 5] == BLUE and p[5, 5] == WHITE, "下段の並びが違う"
-    assert p[1, 2] == BLACK and p[6, 2] == BLACK, "左右へはみ出している"
+    assert p[2, 2] == RED and p[5, 2] == GREEN, "the top row is in the wrong order"
+    assert p[2, 5] == BLUE and p[5, 5] == WHITE, "the bottom row is in the wrong order"
+    assert p[1, 2] == BLACK and p[6, 2] == BLACK, "it spilled left or right"
 
-    # 左上へはみ出した場合、見えるのは画像の右下 2x2
+    # Off the top left, what survives is the image's bottom right 2x2
     p = tc.image(SKETCH, "topleft").load()
-    assert p[0, 0] == WHITE, f"左上の切り取りがずれている: {p[0, 0]}"
-    assert p[2, 0] == BLACK, "切り取り後に余計な画素が出ている"
+    assert p[0, 0] == WHITE, f"the top-left crop is off: {p[0, 0]}"
+    assert p[2, 0] == BLACK, "extra pixels survived the crop"
 
-    # 右下へはみ出した場合、見えるのは画像の左上 2x2
+    # Off the bottom right, what survives is the image's top left 2x2
     p = tc.image(SKETCH, "bottomright").load()
-    assert p[14, 14] == RED, f"右下の切り取りがずれている: {p[14, 14]}"
+    assert p[14, 14] == RED, f"the bottom-right crop is off: {p[14, 14]}"
 
-    # クリップ (4,4,4,4) と画像 (2,2,4,4) の重なりは (4,4)-(5,5) の 2x2
+    # Clip (4,4,4,4) against image (2,2,4,4) overlaps in the 2x2 at (4,4)-(5,5)
     p = tc.image(SKETCH, "clipped").load()
-    assert p[4, 4] == WHITE, f"クリップ内が違う: {p[4, 4]}"
-    assert p[3, 4] == BLACK and p[6, 4] == BLACK, "クリップの外へ出ている"
+    assert p[4, 4] == WHITE, f"wrong colour inside the clip: {p[4, 4]}"
+    assert p[3, 4] == BLACK and p[6, 4] == BLACK, "it escaped the clip"
 
-    # 透過: 赤の 4 画素だけ背景のまま
+    # Transparent: only the four red pixels stay as background
     p = tc.image(SKETCH, "transparent").load()
-    assert p[2, 2] == BLACK and p[3, 3] == BLACK, "透過色が描かれてしまっている"
-    assert p[4, 2] == GREEN and p[2, 4] == BLUE, "透過以外が欠けている"
+    assert p[2, 2] == BLACK and p[3, 3] == BLACK, "the transparent colour was drawn"
+    assert p[4, 2] == GREEN and p[2, 4] == BLUE, "something other than the transparent colour is missing"
 
-    # --- 1bpp ビットマップ ---------------------------------------------------
+    # --- 1bpp bitmaps -------------------------------------------------------
     #
-    # **不変条件。** ラン単位で fillRect を投げる実装と、1 画素ずつ drawPixel
-    # した結果が 1 画素も違わないこと。ランのまとめ方は速度の話で、絵が
-    # 変わってはいけない。
-    assert r["bmp5_diff"] == 0, f"幅 5（詰め物あり）で {r['bmp5_diff']} 画素違う"
-    assert r["bmp8_diff"] == 0, f"幅 8 で {r['bmp8_diff']} 画素違う"
+    # **An invariant.** Throwing a fillRect per run must not differ by a pixel
+    # from placing each pixel with drawPixel. How runs get coalesced is a
+    # question of speed; the picture may not change.
+    assert r["bmp5_diff"] == 0, f"width 5 (with padding) differs by {r['bmp5_diff']} pixels"
+    assert r["bmp8_diff"] == 0, f"width 8 differs by {r['bmp8_diff']} pixels"
 
-    # ランでまとめているぶん、送った画素数は同じでも呼び出しは減っている。
-    # 送った画素数まで変わっていたら描き過ぎ／描き足りず。
+    # Coalescing means fewer calls, but the same pixels. A different pixel
+    # count would mean drawing too much or too little.
     assert r["bmp5_run_pixels"] == r["bmp5_px_pixels"], (
-        f"送った画素数が違う: ラン {r['bmp5_run_pixels']} / 画素 {r['bmp5_px_pixels']}")
+        f"different pixel counts: runs {r['bmp5_run_pixels']} / "
+        f"per pixel {r['bmp5_px_pixels']}")
 
-    # 0 のビットは触らない（透過）。bmp8x3 の立っているビットは
-    # 0xA5 が 4、0x00 が 0、0xFF が 8 で計 12。
+    # A 0 bit is left alone (transparent). The set bits in bmp8x3 are
+    # 4 from 0xA5, 0 from 0x00 and 8 from 0xFF: 12 in all.
     lit = bin(0xA5).count("1") + bin(0x00).count("1") + bin(0xFF).count("1")
     assert r["bmp_kept_bg"] == 16 * 16 - lit, (
-        f"背景が {r['bmp_kept_bg']} 画素（{16 * 16 - lit} のはず。透過が効いていない）")
+        f"{r['bmp_kept_bg']} pixels left as background (want {16 * 16 - lit}; "
+        "transparency is not working)")
 
-    # 極端な座標。クリップの計算が int16_t で桁溢れすると元画像の手前を読む。
-    # `pushImage` は遠い側の端を int32_t で持っているので弾けているが、
-    # **理屈で安全なだけ**なので数字で押さえておく。
+    # Extreme coordinates. If the clipping arithmetic overflows int16_t, it
+    # reads in front of the source image. `pushImage` keeps its far edges in
+    # int32_t so it is safe - but **safe by argument only**, so pin it with a
+    # number.
     assert r["extreme_pixels"] == 0, (
-        f"完全に画面外なのに {r['extreme_pixels']} 画素送っている")
+        f"entirely off screen, yet {r['extreme_pixels']} pixels were sent")
 
-    # --- バイト順の入れ替え ---------------------------------------------------
+    # --- byte swapping ------------------------------------------------------
     #
-    # TinyGFX に setSwapBytes() は無い（DECISIONS.ja.md D29）。実行時のモードは
-    # 「使わないスケッチにも +44 B / RAM +4 B」だったので、呼んだときだけ払う
-    # 自由関数にした。**呼ばなければ 0 B**（実測）。
+    # TinyGFX has no setSwapBytes() (DECISIONS.ja.md D29). A runtime mode cost
+    # "+44 B and +4 B of RAM even to sketches that never swap", so it is a free
+    # function you pay for when you call it. **0 B unless called** (measured).
     assert r["swapped_diff"] > 0, (
-        "バイト順を入れ替えても絵が変わらない。入れ替えが効いていない")
+        "swapping the byte order changed nothing; the swap is not working")
     assert r["swap_roundtrip"] == 16, (
-        f"2 回かけて元に戻ったのが {r['swap_roundtrip']} / 16 語")
-    assert r["swap_zero_kept"] == 1, "長さ 0 で配列を書き換えている"
+        f"only {r['swap_roundtrip']} of 16 words came back after swapping twice")
+    assert r["swap_zero_kept"] == 1, "a length of 0 still wrote to the array"

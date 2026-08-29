@@ -1,6 +1,7 @@
-// Tier 1 スパイク: BusCapture が ST7789 のコマンド列から画を復元できるか。
+// The Tier 1 spike: can BusCapture rebuild a picture from an ST7789 command
+// stream?
 //
-// これが通らないと以降の描画テストが全部書けない。
+// Nothing else in the drawing tests can be written until this passes.
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
 #include <TinyGFX/PanelST7789.h>
@@ -26,25 +27,25 @@ void setup() {
   lcd.begin();
   tgfxReport("init_commands", (long)bus.commandCount());
 
-  // 1) 全面塗り: ちょうど W*H 画素のはず
+  // 1) a full fill: exactly W*H pixels
   bus.fill(0);
   bus.resetCounters();
   lcd.fillScreen(0x001F);
   scene("fillscreen");
 
-  // 2) 矩形: ちょうど 8*8 画素
+  // 2) a rectangle: exactly 8*8 pixels
   bus.fill(0);
   bus.resetCounters();
   lcd.fillRect(4, 4, 8, 8, 0xF800);
   scene("fillrect");
 
-  // 3) 1 画素
+  // 3) one pixel
   bus.fill(0);
   bus.resetCounters();
   lcd.drawPixel(9, 3, 0x07E0);
   scene("pixel");
 
-  // 4) ウィンドウの値（CASET / RASET が正しく出ているか）
+  // 4) the window values (are CASET / RASET coming out right?)
   bus.resetCounters();
   lcd.setAddrWindow(3, 5, 10, 7);
   tgfxReport("win_xs", (long)bus.windowXs());
@@ -52,7 +53,7 @@ void setup() {
   tgfxReport("win_xe", (long)bus.windowXe());
   tgfxReport("win_ye", (long)bus.windowYe());
 
-  // 5) パネル原点オフセットがウィンドウに乗るか
+  // 5) does the panel's origin offset reach the window?
   panel.setOffset(2, 1);
   panel.setRotation(0);
   lcd.setAddrWindow(0, 0, 4, 4);
@@ -61,7 +62,7 @@ void setup() {
   panel.setOffset(0, 0);
   panel.setRotation(0);
 
-  // 6) startWrite / endWrite の入れ子が戻っているか
+  // 6) has the startWrite / endWrite nesting unwound?
   tgfxReport("txn_depth", (long)bus.txnDepth());
 
   tgfxTestDone();

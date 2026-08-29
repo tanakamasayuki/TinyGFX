@@ -1,10 +1,12 @@
-// **同じ絵をどの形式で符号化しても、1 画素も違わないこと。**
+// **However a picture is encoded, not one pixel may differ.**
 //
-// 変換ツール（tools/img2h.py）は絵ごとに最小の形式を総当たりで選ぶ。
-// **どれを選んだかがスケッチから見えてはいけない**ので、ここでそれを固定する。
-// CellFont の「3 通りの符号化が同じ画素を描く」（tests/text/）と同じ考え方。
+// The converter (tools/img2h.py) brute-forces the smallest format for each
+// picture. **Which one it picked must not be visible from the sketch**, and
+// that is what this pins down - the same idea as "three encodings draw the same
+// pixels" for CellFont (tests/text/).
 //
-// 縦詰めと横詰ても同様。データの並びは全く違うが、絵は同じでなければならない。
+// Vertical and horizontal packing likewise: the data is laid out completely
+// differently, and the picture must be the same.
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
 #include <TinyGFX/PanelST7789.h>
@@ -43,7 +45,7 @@ void setup() {
   tgfxTestBegin("image_fmt");
   lcd.begin();
 
-  // --- 同じ絵、3 つの形式 ---------------------------------------------------
+  // --- one picture, three formats -------------------------------------------
   reset(); lcd.drawImage(&same_raw565Ref, 0, 0);
   snap();
   tgfxReport("raw_lit", lit());
@@ -58,7 +60,7 @@ void setup() {
   tgfxReport("rlepal4_diff", diff());
   tgfxShot("rlepal4", gram, W, H);
 
-  // --- 1bpp の横詰めと縦詰て -----------------------------------------------
+  // --- 1bpp packed horizontally and vertically ------------------------------
   reset(); lcd.drawImage(&mono_hRef, 0, 0);
   snap();
   tgfxReport("mono_lit", lit());
@@ -68,7 +70,7 @@ void setup() {
   tgfxReport("mono_v_diff", diff());
   tgfxShot("mono_v", gram, W, H);
 
-  // --- クリップと画面外 -----------------------------------------------------
+  // --- clipping and off screen ----------------------------------------------
   reset();
   lcd.setClipRect(8, 8, 8, 8);
   lcd.drawImage(&same_rlepal4Ref, 0, 0);
@@ -86,12 +88,12 @@ void setup() {
   lcd.drawImage(&same_rlepal4Ref, 40, 40);
   tgfxReport("offscreen_pixels", (long)bus.pixelCount());
 
-  // --- raw565 は 1 行に窓を 1 つしか開かない ---------------------------------
+  // --- raw565 opens one window a row, no more -------------------------------
   //
-  // 写真は連長が 1 なので、連ごとに fillRect を呼ぶと**画素ごとに窓を開く**
-  // ことになる（CASET + RASET + RAMWR で 11 バイト、画素は 2 バイト）。
-  // 64x64 の写真を 32x32 の画面に描くと、見えるのは 32 行。
-  // **窓は 1 行に 1 つ = コマンド 96 個**でなければならない。
+  // A photograph has runs of one, so a fillRect per run means **a window per
+  // pixel** (CASET + RASET + RAMWR is 11 bytes; a pixel is 2). Drawing a 64x64
+  // photograph into a 32x32 screen leaves 32 rows visible, so there must be
+  // **one window a row: 96 commands**.
   reset();
   lcd.drawImage(&img_photo64Ref, 0, 0);
   tgfxReport("photo_cmds", (long)bus.commandCount());
@@ -99,14 +101,15 @@ void setup() {
   snap();
   tgfxShot("photo", gram, W, H);
 
-  // 左上をはみ出させても同じ。**窓の外を数えないこと**（自前でクリップする
-  // 経路なので、ここを間違えると画面外に書く）。
+  // The same hanging off the top left. **Nothing outside the window may be
+  // counted** - this path clips itself, and getting it wrong writes off screen.
   reset();
   lcd.drawImage(&img_photo64Ref, -8, -8);
   tgfxReport("photo_off_cmds", (long)bus.commandCount());
   tgfxReport("photo_off_pixels", (long)bus.pixelCount());
 
-  // クリップ内はクリップ無しと 1 画素も違わず、外は 1 画素も触られないこと。
+  // Inside the clip must not differ by a pixel from no clip; outside it, not
+  // one pixel may be touched.
   reset();
   lcd.setClipRect(8, 8, 16, 16);
   lcd.drawImage(&img_photo64Ref, 0, 0);
@@ -126,10 +129,11 @@ void setup() {
     tgfxReport("photo_clip_pixels", (long)bus.pixelCount());
   }
 
-  // 極端な座標。**`clipX0 - x` は int16_t で桁溢れする** —— x = -32768 で
-  // 差が 32768 になる。画面の外の座標を渡してクリップさせるのは契約のうち
-  // なので（tests/clip の「極端な座標」と同じ）、ここで踏んでおく。
-  // 溢れると c0 が負に化けて、**画像データの手前を読む。**
+  // Extreme coordinates. **`clipX0 - x` overflows int16_t**: at x = -32768 the
+  // difference is 32768. Taking coordinates from outside the screen and
+  // clipping them is part of the contract (the same case as "extreme
+  // coordinates" in tests/clip), so walk into it here. On overflow c0 goes
+  // negative and it **reads in front of the image data.**
   reset();
   lcd.drawImage(&img_photo64Ref, -32768, 0);
   lcd.drawImage(&img_photo64Ref, 32767, 0);
@@ -138,17 +142,19 @@ void setup() {
   tgfxReport("photo_extreme_pixels", (long)bus.pixelCount());
   tgfxReport("photo_extreme_cmds", (long)bus.commandCount());
 
-  // --- 透過 -----------------------------------------------------------------
+  // --- transparency ---------------------------------------------------------
   //
-  // 同じ画像を、透過ありと無しで描く。**透過色の画素だけが下地を残し、
-  // それ以外は 1 画素も違わないこと。**
+  // The same image drawn with and without transparency. **Only the pixels of
+  // the transparent colour leave the background showing; nothing else may
+  // differ by a pixel.**
   //
-  // 透過を見るかどうかは形式ではなく ops が決める（生成ヘッダが指す）ので、
-  // 透過の無い画像しか使わないスケッチには判定のコードが載らない。
+  // Whether transparency is honoured is decided by the ops, not the format (the
+  // generated header points at one), so a sketch that only uses opaque images
+  // does not link the test for it.
   {
     reset();
-    lcd.fillRect(0, 0, W, H, 0xF81F);       // 下地。マゼンタ
-    lcd.drawImage(&same_rlepal4Ref, 0, 0);  // 透過なし: 全部塗る
+    lcd.fillRect(0, 0, W, H, 0xF81F);       // the background: magenta
+    lcd.drawImage(&same_rlepal4Ref, 0, 0);  // opaque: paints everything
     long bgLeftOpaque = 0;
     for (int i = 0; i < W * H; ++i) { if (gram[i] == 0xF81F) ++bgLeftOpaque; }
     tgfxReport("opaque_bg_left", bgLeftOpaque);
@@ -156,7 +162,7 @@ void setup() {
 
     reset();
     lcd.fillRect(0, 0, W, H, 0xF81F);
-    lcd.drawImage(&trans_iconRef, 0, 0);    // 透過あり: 黒を飛ばす
+    lcd.drawImage(&trans_iconRef, 0, 0);    // transparent: skips the black
     long bgLeftTrans = 0, differ = 0;
     for (int i = 0; i < W * H; ++i) {
       if (gram[i] == 0xF81F) ++bgLeftTrans;

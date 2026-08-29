@@ -1,12 +1,13 @@
-"""`TINYGFX_FILL_CHUNK` は速さだけを変える — 絵も転送量も変えない。
+"""`TINYGFX_FILL_CHUNK` changes speed and nothing else - not the picture, not
+the traffic.
 
-このスイッチを入れると `TinyGFXBusSPI` が Arduino 標準の
-`SPI.transfer(buf, len)`（ブロック転送）を使うようになる。**速さのためだけ**の
-もので、線の上に出るバイトが変わってはいけない。
+Turning it on makes `TinyGFXBusSPI` use Arduino's block transfer,
+`SPI.transfer(buf, len)`. It exists **only** to go faster; the bytes that reach
+the wire must not change.
 
-まとめ書きを持たないソフト SPI を基準にして、1 画素も違わないことを見る。
-docs/MANUAL_TEST.ja.md M3 の「FILL_CHUNK を付けても絵が変わらない」を
-実機を待たずにここで押さえる。
+Software SPI, which has no block write, is the baseline. Not one pixel may
+differ. This pins docs/MANUAL_TEST.ja.md M3 ("FILL_CHUNK does not change the
+picture") without waiting for hardware.
 """
 
 from pathlib import Path
@@ -23,7 +24,7 @@ def test_fill_chunk_changes_nothing(dut):
     r = tc.report(SKETCH)
     if "plain_bytes" not in r:
         import pytest
-        pytest.skip("ホストの観測フックが無い")
+        pytest.skip("the host probe hook is not available")
 
     assert r["chunk_size"] == 32
 
@@ -36,9 +37,9 @@ def test_fill_chunk_changes_nothing(dut):
         for x in range(plain.size[0])
         if plain.getpixel((x, y)) != chunk.getpixel((x, y))
     ]
-    assert not diff, f"まとめ書きで絵が変わった: {len(diff)} 画素（先頭 {diff[:5]}）"
+    assert not diff, f"block writes changed the picture: {len(diff)} pixels (first {diff[:5]})"
 
     assert r["plain_pixels"] == r["chunk_pixels"], (
-        f"転送画素数が違う: {r['plain_pixels']} vs {r['chunk_pixels']}")
+        f"different pixel counts: {r['plain_pixels']} vs {r['chunk_pixels']}")
     assert r["plain_bytes"] == r["chunk_bytes"], (
-        f"線に出たバイト数が違う: {r['plain_bytes']} vs {r['chunk_bytes']}")
+        f"different byte counts on the wire: {r['plain_bytes']} vs {r['chunk_bytes']}")

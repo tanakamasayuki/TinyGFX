@@ -1,11 +1,12 @@
-// ホストのバス観測口に載せる TinyGFX 側のパネル模型。
+// A model of the panel, sitting on top of the host core's bus probe.
 //
-// コアは周辺機器を模型化しない。ST7789 のコマンド列を知っているのは
-// こちら側なので、ピン／バイトを拾って TinyGFXBusCapture へ流し込む。
-// これで「スケッチ → 描画コア → Panel → **本番の Bus** → 線 → 模型 → 画素」
-// が通しで検証できる（docs/EXTERNAL_REQUESTS.ja.md E1 の受入条件）。
+// The core does not model peripherals. Knowing the ST7789 command stream is
+// this side's job, so the pins and bytes are picked up here and fed into
+// TinyGFXBusCapture. That makes the whole run checkable end to end:
+// sketch -> drawing core -> Panel -> **the real Bus** -> the wire -> the model
+// -> pixels (the acceptance criterion of docs/EXTERNAL_REQUESTS.ja.md E1).
 //
-// 観測口の無い古いホストコアでは丸ごと無効になる。
+// On an older host core with no probe, all of this compiles away.
 #pragma once
 #include <Arduino.h>
 
@@ -19,9 +20,9 @@
 
 #include <TinyGFX/BusCapture.h>
 
-/// ビットバン（TinyGFXBusSoftSPI）を GPIO の書き込みから組み立て直す。
-/// SCK の立ち上がりで MOSI をシフトインし、8 bit たまったら DC を見て
-/// コマンドかデータかを決める。
+/// Reassembles bit-banging (TinyGFXBusSoftSPI) from the GPIO writes.
+/// MOSI shifts in on the rising edge of SCK, and once 8 bits have gathered, DC
+/// says whether they were a command or data.
 class TgfxPinProbe {
  public:
   TgfxPinProbe(TinyGFXBusCapture& sink, uint8_t sck, uint8_t mosi, uint8_t dc, int8_t cs = -1)
@@ -37,8 +38,8 @@ class TgfxPinProbe {
  private:
   static void onWrite(uint8_t pin, uint8_t value, void* user) {
     TgfxPinProbe* p = static_cast<TgfxPinProbe*>(user);
-    if (pin != p->_sck || value == 0) return;  // 立ち上がりだけ見る
-    if (p->_cs >= 0 && digitalRead(p->_cs) != LOW) return;  // CS が上がっている間は無視
+    if (pin != p->_sck || value == 0) return;  // rising edges only
+    if (p->_cs >= 0 && digitalRead(p->_cs) != LOW) return;  // ignored while CS is high
     ++p->_edges;
     p->_acc = (uint8_t)((p->_acc << 1) | (digitalRead(p->_mosi) ? 1 : 0));
     if (++p->_bits < 8) return;
@@ -60,8 +61,8 @@ class TgfxPinProbe {
 #if defined(TGFX_HOST_PROBE_SPI)
 #include <SPI.h>
 
-/// ハードウェア SPI（TinyGFXBusSPI）をバイト単位で拾う。
-/// DC はピンの保持値から読む。
+/// Picks up hardware SPI (TinyGFXBusSPI) a byte at a time.
+/// DC is read from what the pin is holding.
 class TgfxSpiProbe {
  public:
   TgfxSpiProbe(TinyGFXBusCapture& sink, uint8_t dc) : _sink(&sink), _dc(dc) {}
@@ -78,7 +79,7 @@ class TgfxSpiProbe {
     ++p->_bytes;
     if (digitalRead(p->_dc) == LOW) p->_sink->writeCommand(out);
     else p->_sink->writeData(&out, 1);
-    return 0xFF;  // ディスプレイは書き込み専用。MISO は駆動しない
+    return 0xFF;  // the display is write-only and never drives MISO
   }
 
   TinyGFXBusCapture* _sink;

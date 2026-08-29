@@ -1,4 +1,5 @@
-// 転送量の過不足。ウィンドウ計算がずれると、多く送るか足りなくなる。
+// Exactly the right number of pixels. A window computed wrong sends too many
+// or too few.
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
 #include <TinyGFX/PanelST7789.h>
@@ -25,12 +26,12 @@ void setup() {
   reset(); lcd.fillRect(5, 5, 7, 11, 1);        count("r7x11");
   reset(); lcd.drawFastHLine(3, 3, 13, 1);      count("hline13");
   reset(); lcd.drawFastVLine(3, 3, 9, 1);       count("vline9");
-  reset(); lcd.fillRect(W - 3, H - 3, 10, 10, 1); count("corner_clip");   // 3x3 のはず
-  reset(); lcd.fillRect(-5, -5, 10, 10, 1);     count("topleft_clip");    // 5x5 のはず
+  reset(); lcd.fillRect(W - 3, H - 3, 10, 10, 1); count("corner_clip");   // should be 3x3
+  reset(); lcd.fillRect(-5, -5, 10, 10, 1);     count("topleft_clip");    // should be 5x5
   reset(); lcd.setClipRect(4, 4, 8, 8);
-           lcd.fillScreen(1); lcd.clearClipRect(); count("clipped_screen"); // 8x8 のはず
+           lcd.fillScreen(1); lcd.clearClipRect(); count("clipped_screen"); // should be 8x8
 
-  // 回転すると幅と高さが入れ替わるので、全面塗りの画素数は同じ
+  // Rotating swaps width and height, so a full fill is the same pixel count
   reset(); lcd.setRotation(1); lcd.fillScreen(1); count("fillscreen_rot1");
   lcd.setRotation(0);
 

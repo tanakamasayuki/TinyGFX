@@ -1,11 +1,12 @@
-// TinyGFX テストスケッチの共通部品。ライブラリ本体には含まれない。
+// Shared parts for the TinyGFX test sketches. Not part of the library itself.
 //
-// 生成物は output/ に書く:
-//   output/<name>.ppm    描いた結果（P6。RGB565 を展開するだけで済むので PNG 不要）
-//   output/report.txt    key=value を 1 行ずつ
+// Everything produced goes into output/:
+//   output/<name>.ppm    what was drawn (P6; RGB565 only needs expanding, so
+//                        there is no reason to reach for PNG)
+//   output/report.txt    one key=value a line
 //
-// 値をシリアルではなくファイルに出しているのは、dut.expect の取りこぼしで
-// テストが不安定になるのを避けるため。シリアルには進行状況だけ流す。
+// Values go to a file rather than the serial line so that a dropped
+// dut.expect cannot make a test flaky. Serial carries progress only.
 #pragma once
 #include <Arduino.h>
 #include <stdint.h>
@@ -33,7 +34,7 @@ inline void tgfxTestDone() {
   Serial.println("TEST done");
 }
 
-/// key=value を report.txt に 1 行書く。シリアルにも出す（ログ用）。
+/// Write one key=value line into report.txt, and echo it to serial for the log.
 inline void tgfxReport(const char* key, long value) {
   FILE* f = tgfxReportFile();
   if (f != nullptr) fprintf(f, "%s=%ld\n", key, value);
@@ -42,14 +43,14 @@ inline void tgfxReport(const char* key, long value) {
   Serial.println(value);
 }
 
-/// key=value を接頭辞つきで書く（scene ごとの値など）。
+/// The same, with a prefix - one value per scene, say.
 inline void tgfxReport2(const char* prefix, const char* key, long value) {
   char buf[64];
   snprintf(buf, sizeof(buf), "%s_%s", prefix, key);
   tgfxReport(buf, value);
 }
 
-/// RGB565 のバッファを PPM (P6) で書き出す。
+/// Write an RGB565 buffer out as a PPM (P6).
 inline bool tgfxWritePpm(const char* path, const uint16_t* px, int w, int h) {
   FILE* f = fopen(path, "wb");
   if (f == nullptr) return false;
@@ -67,7 +68,7 @@ inline bool tgfxWritePpm(const char* path, const uint16_t* px, int w, int h) {
   return true;
 }
 
-/// output/<name>.ppm へ書き、進行をシリアルに出す。
+/// Write output/<name>.ppm and report the progress on serial.
 inline void tgfxShot(const char* name, const uint16_t* px, int w, int h) {
   char path[80];
   snprintf(path, sizeof(path), "output/%s.ppm", name);

@@ -1,7 +1,7 @@
-// u8g2 形式のデコーダの正しさ。
+// The u8g2-format decoder.
 //
-// LGFXFontToolJs が同じフォント・同じ文字列を描いた絵と一致すること。
-// あわせて「形式が違っても setFont で同じように使える」ことも見る。
+// Must match what LGFXFontToolJs draws for the same font and the same string.
+// Also shows that a different format goes through setFont just the same.
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
 #include <TinyGFX/PanelST7789.h>
@@ -40,7 +40,7 @@ void setup() {
   tgfxReport("cjk_width", (long)lcd.drawString("日本語表示", 2, 4));
   tgfxShot("cjk", gram, W, H);
 
-  // 収録外の文字は何も描かず 0
+  // An uncovered code draws nothing and returns 0
   lcd.setFont(&u8g2AsciiFont);
   bus.fill(0);
   bus.resetCounters();

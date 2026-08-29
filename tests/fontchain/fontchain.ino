@@ -62,7 +62,7 @@ static const CellFont fontANChain CELLFONT_PROGMEM = {
 static const uint16_t loCodes[1] CELLFONT_PROGMEM = {0x0041};
 static const CellFont fontLo CELLFONT_PROGMEM = {
     anBits, nullptr, loCodes, nullptr,
-    0x42, 2,   // first='B'（頭）、count=2
+    0x42, 2,   // first='B' (the head block), count=2
     3, 5, 4, 6, 0, -5, 2,
     1,         // headCount=1
 };

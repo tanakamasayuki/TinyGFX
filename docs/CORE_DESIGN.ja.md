@@ -495,6 +495,7 @@ lcd.println(3.14f);           // ここまで来ると浮動小数点書式化�
 | `TINYGFX_FILL_CHUNK` | 0 | `TinyGFXBusSPI` の塗りつぶしで使うスタック上の一時バッファ画素数 | 実装済み・**未測定** |
 | `TINYGFX_FONT_SPARSE` | 1 | 0 で疎索引（コード表）の分岐を落とす | **−56 B**（[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md) §4） |
 | `TINYGFX_FONT_RECORDS` | 1 | 0 で可変ピッチ（グリフ表）の分岐を落とす | **−24 B** |
+| `TINYGFX_TEXT_WRAP` | **0** | 1 で `TinyGFXPrint::setTextWrap()`（右端での自動折り返し）が現れる | **+164 B**（D33） |
 | `TINYGFX_FONT_UTF8` | 1 | 0 で文字列をバイト単位（Latin-1）として読む | **−148 B**（`TinyGFXPrint` も使っていれば −292 B。D26） |
 | `TINYGFX_STATIC_BUS` / `TINYGFX_STATIC_PANEL` | — | Bus / Panel を単一実装に固定して virtual を消す | **未実装。** 構成 E が予算内に収まったので保留（D2） |
 | `TINYGFX_NO_CLIP` | — | クリップ判定を省く | **未実装。** 効果を測ってから決める |

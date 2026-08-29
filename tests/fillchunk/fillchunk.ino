@@ -1,13 +1,14 @@
-// TINYGFX_FILL_CHUNK を有効にしても**線の上のバイトが変わらない**こと。
+// Turning TINYGFX_FILL_CHUNK on must **not change a byte on the wire**.
 //
-// このスイッチは速さのためだけのもので、絵も転送量も変えてはいけない。
-// ソフト SPI（まとめ書きを持たない）と、まとめ書きを有効にしたハードウェア SPI で
-// 同じ絵を描き、**画素もバイト数も一致すること**を見る。
+// The switch exists only to go faster; neither the picture nor the traffic may
+// change. The same picture is drawn on software SPI (which has no block write)
+// and on hardware SPI with block writes on, and **both the pixels and the byte
+// count must match**.
 //
-// ホストの観測フックはブロック転送も 1 バイトずつ拾うので、
-// `SPI.transfer(buf, len)` に変えても数え方は変わらない。
+// The host probe picks up a block transfer one byte at a time, so switching to
+// `SPI.transfer(buf, len)` does not change how anything is counted.
 #define TGFX_HOST_PROBE_SPI 1
-#define TINYGFX_FILL_CHUNK 32  // **BusSPI.h より前に定義する**
+#define TINYGFX_FILL_CHUNK 32  // **must come before BusSPI.h**
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
 #include <TinyGFX/BusSPI.h>
@@ -22,15 +23,16 @@ static const uint8_t PIN_SCK = 18, PIN_MOSI = 23, PIN_DC = 5, PIN_CS = 15;
 static uint16_t gram[W * H];
 TinyGFXBusCapture sink(gram, W, H);
 
-// まとめ書きの単位（32 画素）に対して、割り切れる・余る・足りない場面を混ぜる。
+// Against the block size of 32 pixels: cases that divide evenly, leave a
+// remainder, and fall short of one block.
 static uint16_t image[7 * 5];
 
 static void draw(TinyGFX& lcd) {
-  lcd.fillScreen(0x001F);              // 1,024 画素 = 32 の倍数
-  lcd.fillRect(4, 4, 9, 7, 0xF800);    // 63 画素 = 単位 1 回 + 端数 31
-  lcd.fillRect(20, 20, 3, 3, 0x07E0);  // 9 画素 = 単位に足りない
-  lcd.drawPixel(31, 0, 0xFFFF);        // 1 画素
-  lcd.pushImage(1, 24, 7, 5, image);   // writePixels 経由（35 画素）
+  lcd.fillScreen(0x001F);              // 1,024 pixels: a multiple of 32
+  lcd.fillRect(4, 4, 9, 7, 0xF800);    // 63 pixels: one block plus 31
+  lcd.fillRect(20, 20, 3, 3, 0x07E0);  // 9 pixels: short of one block
+  lcd.drawPixel(31, 0, 0xFFFF);        // one pixel
+  lcd.pushImage(1, 24, 7, 5, image);   // through writePixels (35 pixels)
 }
 
 void setup() {
@@ -44,7 +46,7 @@ void setup() {
   SPI.begin();  // the sketch owns the bus; TinyGFX never begins it
   for (int i = 0; i < 7 * 5; ++i) image[i] = (uint16_t)(i * 1493 + 7);
 
-  // ---- ソフト SPI（まとめ書きを持たない。これが基準） --------------------
+  // ---- software SPI: no block write, and the baseline --------------------
   {
     TinyGFXBusSoftSPI bus(PIN_SCK, PIN_MOSI, PIN_DC, PIN_CS);
     TinyGFXPanelST7789 panel(bus, W, H);
@@ -62,7 +64,7 @@ void setup() {
     probe.detach();
   }
 
-  // ---- ハードウェア SPI + まとめ書き ------------------------------------
+  // ---- hardware SPI with block writes ------------------------------------
   {
     TinyGFXBusSPI bus(SPI, PIN_DC, PIN_CS, 24000000UL);
     TinyGFXPanelST7789 panel(bus, W, H);

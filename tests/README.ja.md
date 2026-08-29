@@ -53,6 +53,7 @@ tests/
   capture/            BusCapture が ST7789 のコマンド列から画を復元できるか（Tier 1 の土台）
   window/             ST7789 の回転 MADCTL・幅高さ・原点オフセットの導出
   ili9342/            ILI9342C の MADCTL・色順（BGR）・ミラー
+  ili9341/            ILI9341 と、DCS 系 3 パネルが流す init 列そのもの
   primitive/          全プリミティブと縮退ケース
   clip/               クリップ内はクリップ無しと同じ、外は無傷（不変条件）
   fill/               転送画素数の過不足
@@ -60,6 +61,7 @@ tests/
   text/               文字。戻り値・倍角・収録外・背景色つき・透過
   fontchain/          CellFont の連鎖・U+FFFD 退避・ベースライン揃え
   utf8/               UTF-8 の復号。列ごとにコードポイントと消費バイト数を直接見る
+  textwrap/           右端での自動折り返し（`TINYGFX_TEXT_WRAP=1`。既定では入っていない）
   image/              pushImage の配置・切り取り・透過・バイト順の入れ替え
   image_fmt/          同じ絵をどの形式で符号化しても 1 画素も違わないこと
   image_oracle/       変換ツールの出力を、ツール自身の期待画像と突き合わせる

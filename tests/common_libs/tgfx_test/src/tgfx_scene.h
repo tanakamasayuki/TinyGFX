@@ -1,19 +1,22 @@
-// ホストと実機で**同じ絵**を描くための共通シーン。
+// The shared scene, so the host and the hardware draw **the same picture**.
 //
-// ホスト側（tests/scene/）が BusCapture で描いてゴールデンを作り、
-// 実機側（tests/hw/m5stack/）がパネルに描いて読み戻し、同じかを見る。
-// **1 箇所にしか書かない**ので、片方だけ変わって嘘の一致になることがない。
+// The host side (tests/scene/) draws it through BusCapture to make the golden;
+// the hardware side (tests/hw/m5stack/) draws it on a panel, reads it back, and
+// compares. **It is written in exactly one place**, so one side cannot drift
+// and produce a false match.
 //
-// **使う色は全チャンネルが 0 か満のものだけ。** パネルの読み戻しは 1 画素 3 バイトの
-// RGB666 で返るので、中間の階調は往復で 1 LSB ずれうる。飽和した色なら
-// 5bit 31 -> 6bit 63 -> 5bit 31 とちょうど戻るので、**バイト一致で比較できる。**
+// **Every colour has all its channels either 0 or full.** Reading a panel back
+// returns RGB666, three bytes a pixel, so an intermediate level can come back
+// 1 LSB off. A saturated colour goes 5-bit 31 -> 6-bit 63 -> 5-bit 31 and lands
+// exactly where it started, which is what makes **a byte-for-byte comparison**
+// possible.
 #pragma once
 #include <TinyGFX.h>
 
 static const int16_t TGFX_SCENE_W = 64;
 static const int16_t TGFX_SCENE_H = 48;
 
-/// フォントは呼び出し側で setFont() / setTextColor() しておくこと。
+/// The caller is expected to have called setFont() and setTextColor().
 inline void tgfxGoldenScene(TinyGFX& g) {
   g.startWrite();
   g.fillRect(0, 0, TGFX_SCENE_W, TGFX_SCENE_H, TFT_BLACK);

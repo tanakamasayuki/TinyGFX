@@ -1,20 +1,21 @@
-"""SH1106 の配線を実機なしで検証する。
+"""The SH1106 wiring, checked without hardware.
 
-SH1106 が SSD1306 と違うのは 2 点だけ。どちらもホストの Wire 観測フックで
-見られる。
+An SH1106 differs from an SSD1306 in exactly two ways, and the host's Wire
+probe can see both.
 
-- **132 カラムの RAM に 128 カラムのガラス。** 絵の左端は RAM のカラム 2
-- **カラム／ページの範囲指定コマンド（0x21 / 0x22）が無い。** ページごとに
-  カーソルを置いて 1 ページずつ流す
+- **132 columns of RAM behind 128 columns of glass.** The left edge of the
+  picture is RAM column 2
+- **no column/page range commands (0x21 / 0x22).** The cursor is placed per
+  page and one page is streamed at a time
 
-共有部分（`PanelPaged`）は SSD1306 と同じものを使っているので、**同じ絵を
-両方で描いて復号し、1 ビットも違わないこと**を見れば転送側だけを切り出して
-検証できる。
+Everything shared (`PanelPaged`) is the same code the SSD1306 uses, so drawing
+**the same picture on both, decoding it, and requiring not one bit of
+difference** isolates the transfer layer on its own.
 
-**実機では未確認**（docs/MANUAL_TEST.ja.md M6）。ここが守るのは「TinyGFX が
-SH1106 のつもりで出しているバイト列が、SH1106 の仕様どおりに解釈すると
-正しい絵になる」ところまで。本物の SH1106 がその解釈で動くかは実機でしか
-分からない。
+**Unconfirmed on real glass** (docs/MANUAL_TEST.ja.md M6). What this holds is
+that the bytes TinyGFX emits as an SH1106, read the way the SH1106 datasheet
+says to read them, make the right picture. Whether a real SH1106 agrees with
+that reading can only be found out on hardware.
 """
 
 from pathlib import Path
@@ -31,42 +32,46 @@ def test_sh1106(dut):
 
     r = tc.report(SKETCH)
 
-    # --- 転送量。ページごとに 128 バイト -------------------------------------
-    assert r["sh_bytes"] == W * H // 8, f"転送量が違う: {r['sh_bytes']}"
-    assert r["ssd_bytes"] == W * H // 8, f"SSD1306 側の転送量が違う: {r['ssd_bytes']}"
+    # --- traffic: 128 bytes a page ------------------------------------------
+    assert r["sh_bytes"] == W * H // 8, f"wrong amount of traffic: {r['sh_bytes']}"
+    assert r["ssd_bytes"] == W * H // 8, f"wrong amount of traffic on the SSD1306 side: {r['ssd_bytes']}"
 
-    # --- ガラスの外に書いていないこと ---------------------------------------
-    # カラム 0,1 と 130,131 は 132 カラム RAM のうち見えない部分。
+    # --- nothing written outside the glass ----------------------------------
+    # Columns 0, 1 and 130, 131 are the parts of the 132-column RAM nobody sees.
     assert r["outside_glass"] == 0, (
-        f"ガラスの外に {r['outside_glass']} バイト書いている（カラムオフセットが違う）")
+        f"{r['outside_glass']} bytes written outside the glass "
+        "(the column offset is wrong)")
 
-    # --- **本命。** SSD1306 と同じ絵になること -------------------------------
+    # --- **the point.** The same picture an SSD1306 gives --------------------
     assert r["sh_vs_ssd_diff"] == 0, (
-        f"SH1106 と SSD1306 で絵が違う: {r['sh_vs_ssd_diff']} バイト")
+        f"SH1106 and SSD1306 differ by {r['sh_vs_ssd_diff']} bytes")
 
-    # --- 絵が単色でないこと ---------------------------------------------------
-    # 真っ白どうし・真っ黒どうしで「一致」しても意味がない。
-    assert 0 < r["sh_lit"] < W * H, f"絵が単色になっている（点灯 {r['sh_lit']} / {W * H}）"
+    # --- the picture is not one flat colour ---------------------------------
+    # All-white matching all-white would prove nothing.
+    assert 0 < r["sh_lit"] < W * H, (
+        f"the picture is one flat colour ({r['sh_lit']} lit of {W * H})")
 
-    # --- オフセットが効いていること -----------------------------------------
-    # オフセットを 0 にすれば RAM のカラム 0 から書くので、カラム 0 から
-    # 取り出した絵が SSD1306 と一致するはず。ここが 0 なら
-    # setColumnOffset() が繋がっていない。
-    assert r["offset0_matches_ssd"] == 1, "setColumnOffset() が効いていない"
+    # --- the offset is actually wired up ------------------------------------
+    # With the offset at 0 it writes from RAM column 0, so the picture taken
+    # from column 0 should match the SSD1306. A 0 here means setColumnOffset()
+    # is not connected to anything.
+    assert r["offset0_matches_ssd"] == 1, "setColumnOffset() has no effect"
 
-    # --- 縦詰めビットマップの速い経路 ----------------------------------------
+    # --- the fast path for vertically packed bitmaps ------------------------
     #
-    # **ページ境界に揃った縦詰めは、このパネルのバッファそのもの。**
-    # `pushVBitmap()` が memcpy 相当で貼る。速いだけの経路であって別物では
-    # ないことを、汎用の `drawImage()` と突き合わせて固定する。
+    # **A page-aligned vertical bitmap is this panel's buffer, exactly.**
+    # `pushVBitmap()` blits it. Pinning it against the general `drawImage()`
+    # keeps it a faster path rather than a different one.
     #
-    # 揃っていないときは**描かずに false を返す**こと。黙って間違った位置に
-    # 描くより、呼び手が汎用経路に落とせるほうがいい。
-    assert r["vblit_taken"] == 1, "揃っているのに速い経路に入っていない"
-    assert 0 < r["vblit_lit"] < 128 * 64, f"絵が単色（点灯 {r['vblit_lit']}）"
+    # When it is not aligned it must **draw nothing and return false**. Letting
+    # the caller fall back to the general path beats silently drawing in the
+    # wrong place.
+    assert r["vblit_taken"] == 1, "aligned, yet the fast path was not taken"
+    assert 0 < r["vblit_lit"] < 128 * 64, (
+        f"the picture is one flat colour ({r['vblit_lit']} lit)")
     assert r["vblit_diff"] == 0, (
-        f"速い経路と汎用経路で {r['vblit_diff']} バイト違う")
+        f"the fast and general paths differ by {r['vblit_diff']} bytes")
 
-    assert r["vblit_unaligned"] == 0, "ページ境界に揃っていないのに受けている"
-    assert r["vblit_offpanel"] == 0, "パネルからはみ出しているのに受けている"
-    assert r["vblit_rotated"] == 0, "回転しているのに受けている"
+    assert r["vblit_unaligned"] == 0, "accepted a bitmap that is not page aligned"
+    assert r["vblit_offpanel"] == 0, "accepted a bitmap hanging off the panel"
+    assert r["vblit_rotated"] == 0, "accepted a bitmap while rotated"

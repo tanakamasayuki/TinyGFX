@@ -1,4 +1,5 @@
-"""転送量の過不足。ウィンドウ計算がずれると多すぎるか足りなくなる。"""
+"""Exactly the right number of pixels. A window computed wrong sends too many
+or too few."""
 
 from pathlib import Path
 
@@ -28,4 +29,4 @@ def test_fill(dut):
 
     r = tc.report(SKETCH)
     wrong = {k: (r[f"n_{k}"], v) for k, v in EXPECTED.items() if r[f"n_{k}"] != v}
-    assert not wrong, "転送画素数が期待と違う（実測, 期待）: " + repr(wrong)
+    assert not wrong, "wrong pixel count (measured, expected): " + repr(wrong)

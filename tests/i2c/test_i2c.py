@@ -1,12 +1,13 @@
-"""I2C のモノクロ OLED（SSD1306）を通しで検証する。
+"""A monochrome OLED on I2C (SSD1306), end to end.
 
-ホストの Wire 観測フックで、本番の `TinyGFXBusI2C` が実際に流したバイトを
-拾い、SSD1306 の模型で組み立て直している。コアは SSD1306 も I2C も知らない。
+The host's Wire probe picks up the bytes the real `TinyGFXBusI2C` actually
+sent, and a model of an SSD1306 puts them back together. The core knows about
+neither SSD1306 nor I2C.
 
-SPI のカラーパネルとの違いを見るのが主眼:
-  - フレームバッファを持つ（RGB565 を「0 でなければ点灯」で 1bpp に落とす）
-  - `display()` を呼ぶまで転送されない
-  - 変更のあったページだけ流す
+The point is what differs from a colour panel on SPI:
+  - it owns a framebuffer (RGB565 reduced to 1bpp as "lit unless zero")
+  - nothing is transferred until `display()` is called
+  - only the pages that changed go out
 """
 
 from pathlib import Path
@@ -15,7 +16,7 @@ import tgfx_check as tc
 
 SKETCH = Path(__file__).parent
 W, H = 128, 64
-PAGE_BYTES = W  # 1 ページ = 横 128 バイト（縦 8 画素）
+PAGE_BYTES = W  # one page = 128 bytes across, 8 pixels tall
 WHITE, BLACK = tc.WHITE, tc.BLACK
 
 
@@ -25,68 +26,72 @@ def test_i2c(dut):
 
     r = tc.report(SKETCH)
 
-    # --- 初期化がトランザクションとして流れていること -----------------------
+    # --- initialisation goes out as transactions ----------------------------
     assert r["init_transactions"] >= 20, (
-        f"初期化列が短すぎる: {r['init_transactions']} トランザクション")
+        f"init sequence too short: {r['init_transactions']} transactions")
 
-    # --- display() を呼ぶまで 1 バイトも流れない ----------------------------
+    # --- not one byte moves until display() ---------------------------------
     assert r["bytes_before_display"] == 0, (
-        f"display() 前に {r['bytes_before_display']} バイト流れている")
+        f"{r['bytes_before_display']} bytes went out before display()")
     assert r["bytes_full"] == PAGE_BYTES * 8, (
-        f"全面転送が {r['bytes_full']} バイト（{PAGE_BYTES * 8} のはず）")
+        f"a full transfer was {r['bytes_full']} bytes (should be {PAGE_BYTES * 8})")
 
-    # --- 変わったページだけ流れる -------------------------------------------
+    # --- only the pages that changed go out ---------------------------------
     assert r["bytes_one_page"] == PAGE_BYTES, (
-        f"1 ページぶんの変更で {r['bytes_one_page']} バイト流れている"
-        f"（{PAGE_BYTES} のはず）。ダーティ判定が効いていない")
+        f"a one-page change sent {r['bytes_one_page']} bytes "
+        f"(should be {PAGE_BYTES}); dirty tracking is not working")
 
-    # --- 回転 ---------------------------------------------------------------
+    # --- rotation -----------------------------------------------------------
     assert (r["rot1_w"], r["rot1_h"]) == (H, W), (
-        f"回転 1 で {r['rot1_w']}x{r['rot1_h']}（{H}x{W} のはず）")
+        f"rotation 1 gave {r['rot1_w']}x{r['rot1_h']} (should be {H}x{W})")
 
-    # --- 画 -----------------------------------------------------------------
+    # --- the picture --------------------------------------------------------
     full = tc.image(SKETCH, "full")
     assert tc.colors(full) == {WHITE: W * H}, (
-        f"全面塗りが一色になっていない: {tc.colors(full)}")
+        f"the screen fill is not one colour: {tc.colors(full)}")
 
     one = tc.image(SKETCH, "onepage").load()
-    assert one[8, 8] == WHITE and one[39, 15] == WHITE, "矩形が出ていない"
-    assert one[7, 8] == BLACK and one[40, 8] == BLACK, "矩形が横へはみ出している"
-    assert one[8, 7] == BLACK and one[8, 16] == BLACK, "矩形が縦へはみ出している"
+    assert one[8, 8] == WHITE and one[39, 15] == WHITE, "the rectangle is missing"
+    assert one[7, 8] == BLACK and one[40, 8] == BLACK, "the rectangle spilled sideways"
+    assert one[8, 7] == BLACK and one[8, 16] == BLACK, "the rectangle spilled vertically"
 
     scene = tc.image(SKETCH, "scene").load()
-    assert scene[0, 0] == WHITE and scene[W - 1, H - 1] == WHITE, "枠の角が無い"
-    assert scene[96, 32] == WHITE, "円の中心が塗られていない"
-    assert scene[96, 32 - 13] == BLACK, "円が半径より大きい"
-    assert scene[64, 40] == BLACK, "何も無いはずの場所が塗られている"
+    assert scene[0, 0] == WHITE and scene[W - 1, H - 1] == WHITE, "a corner of the frame is missing"
+    assert scene[96, 32] == WHITE, "the centre of the circle is not painted"
+    assert scene[96, 32 - 13] == BLACK, "the circle is bigger than its radius"
+    assert scene[64, 40] == BLACK, "somewhere that should be empty was painted"
 
-    # 回転 1 の左上 (0,0)-(7,23) は、パネル座標では x=0..23 / y=56..63
+    # At rotation 1, (0,0)-(7,23) is x=0..23 / y=56..63 in panel coordinates
     rot = tc.image(SKETCH, "rot1").load()
-    assert rot[0, 63] == WHITE and rot[23, 56] == WHITE, "回転後の矩形の位置が違う"
-    assert rot[24, 63] == BLACK and rot[0, 55] == BLACK, "回転後の矩形がはみ出している"
+    assert rot[0, 63] == WHITE and rot[23, 56] == WHITE, "the rotated rectangle is in the wrong place"
+    assert rot[24, 63] == BLACK and rot[0, 55] == BLACK, "the rotated rectangle spilled"
 
-    # 速い経路（バイト単位の塗り）が 1 画素ずつ描いた結果と一致すること。
-    # 6 種類の矩形 x 回転 4 通り。**速いだけで絵が変わってはいけない。**
+    # The fast path (byte-wise filling) must match drawing pixel by pixel:
+    # six rectangles across four rotations. **Faster, and not one bit different.**
     assert r["fillrect_fastpath_diff"] == 0, (
-        f"fillRect の速い経路で {r['fillrect_fastpath_diff']} バイト違う")
+        f"the fillRect fast path differs by {r['fillrect_fastpath_diff']} bytes")
 
-    # --- ページ方式パネルの寸法とバッファの契約（2026-08-29 レビューの P1）---
+    # --- dimensions and the buffer contract for a paged panel (P1 of the
+    # 2026-08-29 review) ------------------------------------------------------
     #
-    # 初期化列は 128x64 決め打ちだったのに、コンストラクタは任意の w / h を
-    # 受けていた。128x32 に 64 行ぶんの多重比（0x3F）を送ると絵がガラスの
-    # 半分に潰れる。**高さから導出する**ようにしたので、それを固定する。
-    assert r["mux64"] == 0x3F, f"128x64 の多重比が {r['mux64']:#04x}"
-    assert r["com64"] == 0x12, f"128x64 の COM ピンが {r['com64']:#04x}"
-    assert r["mux32"] == 0x1F, f"128x32 の多重比が {r['mux32']:#04x}（64 行ぶんのまま？）"
-    assert r["com32"] == 0x02, f"128x32 の COM ピンが {r['com32']:#04x}（64 行ぶんのまま？）"
+    # The init sequence was hard-coded for 128x64 while the constructor took any
+    # w / h. Sending a 64-row multiplex ratio (0x3F) to a 128x32 squashes the
+    # picture into half the glass. Both are now **derived from the height**, so
+    # pin that here.
+    assert r["mux64"] == 0x3F, f"the 128x64 multiplex ratio is {r['mux64']:#04x}"
+    assert r["com64"] == 0x12, f"the 128x64 COM pin config is {r['com64']:#04x}"
+    assert r["mux32"] == 0x1F, (
+        f"the 128x32 multiplex ratio is {r['mux32']:#04x} (still the 64-row value?)")
+    assert r["com32"] == 0x02, (
+        f"the 128x32 COM pin config is {r['com32']:#04x} (still the 64-row value?)")
 
-    # --- begin() の契約 ------------------------------------------------------
+    # --- the begin() contract -----------------------------------------------
     #
-    # **返り値は「設定が使えるものか」**であって「線の向こうにパネルが
-    # 本当に居るか」ではない（書き込み専用のパネルでは分からない）。
-    # バッファが null、高さが 8 の倍数でない、幅が 0 —— どれもコンパイル時に
-    # 分からないので、ここで落とす。
-    assert r["begin_ok"] == 1, "まっとうな設定で begin() が false を返している"
-    assert r["begin_null_buffer"] == 0, "バッファが null でも begin() が true"
-    assert r["begin_odd_height"] == 0, "高さが 8 の倍数でなくても begin() が true"
-    assert r["begin_zero_width"] == 0, "幅が 0 でも begin() が true"
+    # **The return value means "is this configuration usable"**, not "is there
+    # really a panel on the other end" - which a write-only panel cannot tell.
+    # A null buffer, a height that is not a multiple of 8, a zero width: none of
+    # those are visible to the compiler, so they are caught here.
+    assert r["begin_ok"] == 1, "begin() returned false for a sound configuration"
+    assert r["begin_null_buffer"] == 0, "begin() returned true with a null buffer"
+    assert r["begin_odd_height"] == 0, "begin() returned true for a height not a multiple of 8"
+    assert r["begin_zero_width"] == 0, "begin() returned true for a width of 0"

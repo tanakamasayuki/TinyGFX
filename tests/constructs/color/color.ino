@@ -1,23 +1,23 @@
-// 色定数の 2 つの綴り（DECISIONS.ja.md D30）。
+// The two spellings of the colour constants (DECISIONS.ja.md D30).
 //
-// **すべてコンパイル時の検査。** 実行するものは何もない。
-// `TFT_RED` を先に定義した状態でもビルドし、
-//   - 先に定義したほうが生き残ること（TinyGFX が上書きしないこと）
-//   - `TINYGFX_RED` はそれに関係なく TinyGFX の値であること
-// を見る。build_matrix が 2 通りでコンパイルする。
+// **Every check here happens at compile time.** Nothing runs.
+// It also builds with `TFT_RED` already defined, to show that
+//   - whoever defined it first keeps it (TinyGFX does not overwrite)
+//   - `TINYGFX_RED` is TinyGFX's value regardless
+// build_matrix compiles it both ways.
 #include <TinyGFX.h>
 
 static_assert(TINYGFX_BLACK == 0x0000, "TINYGFX_BLACK");
 static_assert(TINYGFX_WHITE == 0xFFFF, "TINYGFX_WHITE");
-static_assert(TINYGFX_RED == 0xF800, "TINYGFX_RED は他ライブラリに奪われない");
+static_assert(TINYGFX_RED == 0xF800, "TINYGFX_RED cannot be taken by another library");
 static_assert(TINYGFX_DARKGREY == 0x7BEF, "TINYGFX_DARKGREY");
 
 #if defined(TGFX_FOREIGN_RED)
-static_assert(TFT_RED == TGFX_FOREIGN_RED, "先に定義された TFT_RED を上書きしている");
-static_assert(TFT_BLACK == TINYGFX_BLACK, "1 つ奪われただけで他まで欠けている");
+static_assert(TFT_RED == TGFX_FOREIGN_RED, "a pre-existing TFT_RED was overwritten");
+static_assert(TFT_BLACK == TINYGFX_BLACK, "one name being taken lost the others too");
 #else
-static_assert(TFT_RED == TINYGFX_RED, "2 つの綴りが一致していない");
-static_assert(TFT_PINK == TINYGFX_PINK, "2 つの綴りが一致していない");
+static_assert(TFT_RED == TINYGFX_RED, "the two spellings disagree");
+static_assert(TFT_PINK == TINYGFX_PINK, "the two spellings disagree");
 #endif
 
 void setup() {}

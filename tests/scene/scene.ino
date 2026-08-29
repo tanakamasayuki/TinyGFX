@@ -1,7 +1,8 @@
-// 共通シーンをホストで描いてゴールデンを作る。
+// Draws the shared scene on the host to make the golden.
 //
-// 実機（tests/hw/m5stack/）はパネルに同じものを描いて読み戻し、ここで作った
-// ゴールデンと比べる。**シーンの定義は tgfx_scene.h の 1 箇所だけ。**
+// The hardware side (tests/hw/m5stack/) draws the same thing on a panel, reads
+// it back and compares against this golden. **The scene is defined in exactly
+// one place, tgfx_scene.h.**
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
 #include <TinyGFX/FontCell.h>
@@ -27,8 +28,9 @@ void setup() {
   tgfxGoldenScene(lcd);
   tgfxShot("scene", gram, TGFX_SCENE_W, TGFX_SCENE_H);
 
-  // 実機の読み戻しはバイト一致で比べる。**飽和した色しか使っていないこと**を
-  // ここで担保しておく（中間の階調が混ざると往復で 1 LSB ずれる）。
+  // The hardware read-back is compared byte for byte, so guarantee here that
+  // **only saturated colours are used** - an intermediate level comes back
+  // 1 LSB off through the round trip.
   long unsaturated = 0;
   for (int i = 0; i < TGFX_SCENE_W * TGFX_SCENE_H; ++i) {
     const uint16_t c = gram[i];

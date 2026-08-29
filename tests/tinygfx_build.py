@@ -1,7 +1,7 @@
-"""arduino-cli を叩いてビルドサイズとシンボルを取るための共通ヘルパ。
+"""Shared helper for driving arduino-cli to get build sizes and symbols.
 
-Tier 0（footprint / linkprune）はスケッチを**実行しない**。ビルドして
-サイズとシンボル表を見るだけなので pytest-embedded の dut は使わない。
+Tier 0 (footprint / linkprune) never **runs** a sketch. It builds one and reads
+the size and the symbol table, so there is no pytest-embedded dut here.
 """
 
 from __future__ import annotations
@@ -17,15 +17,16 @@ CONSTRUCTS = REPO / "tests" / "constructs"
 FONTS = [REPO / "tests" / "common_libs" / "tgfx_font" / "src",
          REPO / "tests" / "u8g2"]
 
-# 基準機。docs/FOOTPRINT.ja.md §2
+# The reference board. docs/FOOTPRINT.ja.md 2
 #
-# 環境変数 TINYGFX_FQBN で別のコアに向けられる。開発中の新コアで測るときに使う:
+# TINYGFX_FQBN points this at another core, which is how the in-development one
+# gets measured:
 #   TINYGFX_FQBN=ch32-riscv-ug:ch32v:CH32V003:pnum=CH32V003F4P6 uv run pytest footprint -s
-# CI は既定のまま（新コアはまだ Boards Manager から入らない環境がある）。
+# CI stays on the default (the new core is not in Boards Manager everywhere).
 DEFAULT_FQBN = "ch32-riscv-arduino:ch32riscv:CH32V003_EVT"
 CH32V003 = os.environ.get("TINYGFX_FQBN", DEFAULT_FQBN)
 
-# 構成の一覧。docs/FOOTPRINT.ja.md §4
+# The constructs. docs/FOOTPRINT.ja.md 4
 CONSTRUCT_ORDER = ["base", "a", "b", "c", "d", "e", "t", "p1", "p2"]
 
 
@@ -46,7 +47,7 @@ def have_core(fqbn: str) -> bool:
 
 
 def compile_construct(name: str, fqbn: str = CH32V003, defines=None) -> dict:
-    """1 構成をビルドして {flash, ram, max_flash, max_ram, elf, properties} を返す。"""
+    """Build one construct, returning {flash, ram, max_flash, max_ram, elf, properties}."""
     sketch = CONSTRUCTS / name
     if not sketch.is_dir():
         raise BuildError(f"no such construct: {sketch}")
@@ -54,10 +55,10 @@ def compile_construct(name: str, fqbn: str = CH32V003, defines=None) -> dict:
 
 
 def compile_profile(sketch, profile: str) -> dict:
-    """sketch.yaml のプロファイルでビルドする（examples 用）。
+    """Build through a sketch.yaml profile (this is how examples are built).
 
-    プロファイルがあるスケッチは --fqbn だと「そのプラットフォームは
-    プロファイルに宣言されていない」と怒られるので、こちらを使う。
+    A sketch that has profiles rejects --fqbn with "the platform is not
+    declared in the profile", so it has to go through this instead.
     """
     sketch = Path(sketch)
     return _run(["arduino-cli", "compile", "--profile", profile, "--json", str(sketch)],
@@ -65,10 +66,10 @@ def compile_profile(sketch, profile: str) -> dict:
 
 
 def compile_sketch(sketch, fqbn: str, extra_include=None, defines=None) -> dict:
-    """任意のスケッチをビルドする。ライブラリはこのリポジトリを使う。
+    """Build any sketch, with this repository as the library.
 
-    `defines` は {"TINYGFX_FONT_BG": 0} の形。`extra_include` と同じ
-    extra_flags に載るので、両方渡しても片方が消えない。
+    `defines` takes the form {"TINYGFX_FONT_BG": 0}. It shares one extra_flags
+    with `extra_include`, so passing both does not drop either.
     """
     sketch = Path(sketch)
     name = sketch.name
@@ -96,8 +97,8 @@ def _run(cmd, name: str) -> dict:
     except json.JSONDecodeError:
         data = {}
     if proc.returncode != 0:
-        # --json のときコンパイラの出力は compiler_err に入る。
-        # build_properties の羅列に埋もれるので、そこだけ取り出す。
+        # With --json the compiler output lands in compiler_err, buried under
+        # the list of build_properties. Dig just that part back out.
         detail = data.get("compiler_err") or proc.stderr or proc.stdout
         lines = [ln for ln in detail.splitlines()
                  if any(k in ln for k in ("error", "Error", "will not fit", "overflowed"))]
@@ -118,7 +119,7 @@ def _run(cmd, name: str) -> dict:
 
 
 def _nm_path(properties: list[str]) -> Path | None:
-    """build_properties から nm の場所を割り出す。"""
+    """Work out where nm lives from build_properties."""
     props = {}
     for line in properties:
         if "=" in line:
@@ -133,7 +134,7 @@ def _nm_path(properties: list[str]) -> Path | None:
 
 
 def symbols(build: dict) -> set[str]:
-    """ELF のシンボル名の集合。見つからなければ空集合。"""
+    """The symbol names in the ELF; an empty set if they cannot be read."""
     nm = _nm_path(build["properties"])
     if nm is None or not build["elf"].exists():
         return set()
@@ -150,5 +151,6 @@ def symbols(build: dict) -> set[str]:
 
 
 def contains(names: set[str], needle: str) -> bool:
-    """マングル名の部分一致。`drawCircle` は `_ZN7TinyGFX10drawCircleEssst` に当たる。"""
+    """Substring match against mangled names: `drawCircle` finds
+    `_ZN7TinyGFX10drawCircleEssst`."""
     return any(needle in n for n in names)

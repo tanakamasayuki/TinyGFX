@@ -1,4 +1,5 @@
-// プリミティブの正しさ。とくに端の 1 画素と縮退ケース。
+// The primitives, weighted towards the last pixel at each edge and the
+// degenerate cases.
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
 #include <TinyGFX/PanelST7789.h>
@@ -33,7 +34,7 @@ void setup() {
   clearGram(); lcd.fillTriangle(4, 60, 32, 4, 60, 60, FG); shot("filltriangle");
   clearGram(); lcd.fillRect(10, 10, 1, 1, FG);             shot("onepixel");
 
-  // --- 縮退ケース: 1 画素も送ってはいけない ---------------------------------
+  // --- degenerate: not one pixel may be sent --------------------------------
   clearGram(); lcd.fillRect(10, 10, 0, 5, FG);     degenerate("w0");
   clearGram(); lcd.fillRect(10, 10, 5, 0, FG);     degenerate("h0");
   clearGram(); lcd.fillRect(10, 10, -5, 5, FG);    degenerate("wneg");
@@ -45,11 +46,11 @@ void setup() {
   clearGram(); lcd.drawPixel(W, 0, FG);            degenerate("pixelover");
   clearGram(); lcd.drawCircle(32, 32, -1, FG);     degenerate("rneg");
 
-  // --- 縮退だが画素は出るケース ----------------------------------------------
+  // --- degenerate, but pixels do come out -----------------------------------
   clearGram(); lcd.drawCircle(32, 32, 0, FG);      degenerate("r0");
   clearGram(); lcd.drawLine(5, 5, 5, 5, FG);       degenerate("dot_line");
 
-  // --- はみ出しが正しく切られるか --------------------------------------------
+  // --- does what hangs off the edge get cropped -----------------------------
   clearGram(); lcd.fillRect(-4, -4, 10, 10, FG);   degenerate("clipped_rect");
   shot("clipped_rect");
 

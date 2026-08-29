@@ -1,8 +1,8 @@
-"""u8g2 形式デコーダ（測定用の試作）が正しく描けているか。
+"""Does the u8g2-format decoder draw what it should?
 
-参照は LGFXFontToolJs が同じフォント・同じ文字列を描いた絵
-（`tools/gen_u8g2_ref.mjs` が生成）。原点の流儀が違うので、
-**墨の外接矩形で切り出してから**比べる。
+The reference is what LGFXFontToolJs draws for the same font and the same
+string (produced by `tools/gen_u8g2_ref.mjs`). The two disagree about where the
+origin is, so the comparison is made **after cropping to the ink**.
 """
 
 from pathlib import Path
@@ -13,10 +13,10 @@ SKETCH = Path(__file__).parent
 
 
 def art(name):
-    """描いた結果を、墨の外接矩形で切り出したテキストアートにする。"""
+    """The drawing as text art, cropped to the bounding box of the ink."""
     im = tc.image(SKETCH, name)
     on = tc.lit(im)
-    assert on, f"{name}: 1 画素も描かれていない"
+    assert on, f"{name}: not one pixel was drawn"
     x0 = min(x for x, _ in on)
     x1 = max(x for x, _ in on)
     y0 = min(y for _, y in on)
@@ -48,13 +48,13 @@ def test_u8g2(dut):
     dut.expect("TEST done", timeout=60)
 
     r = tc.report(SKETCH)
-    assert r["line_height"] == 9, f"行送りが {r['line_height']}"
-    assert r["ascii_width"] == 64, f"描いた幅が {r['ascii_width']}"
-    assert r["ascii_measured"] == r["ascii_width"], "textWidth と drawString の戻り値が違う"
-    assert r["cjk_width"] == 40, f"CJK の幅が {r['cjk_width']}"
-    assert r["missing_adv"] == 0, "収録外の文字が送り幅を返している"
-    assert r["missing_pixels"] == 0, "収録外の文字が画素を描いている"
+    assert r["line_height"] == 9, f"line height is {r['line_height']}"
+    assert r["ascii_width"] == 64, f"drawn width is {r['ascii_width']}"
+    assert r["ascii_measured"] == r["ascii_width"], "textWidth and drawString disagree"
+    assert r["cjk_width"] == 40, f"CJK width is {r['cjk_width']}"
+    assert r["missing_adv"] == 0, "an uncovered code returned an advance"
+    assert r["missing_pixels"] == 0, "an uncovered code drew pixels"
 
     for name in ["ascii", "cjk"]:
         got, want = art(name), reference(name)
-        assert got == want, f"{name} が参照と違う:\n{diff(got, want)}"
+        assert got == want, f"{name} differs from the reference:\n{diff(got, want)}"

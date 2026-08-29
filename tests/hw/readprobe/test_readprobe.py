@@ -1,7 +1,7 @@
-"""実機で読み出しの効く条件を切り分ける治具。
+"""A jig for working out which conditions make read-back work on hardware.
 
-**通常のテストではない。** 何が効いているのかを 1 回の書き込みで比べるためのもので、
-結論が出たら消すか、通る組み合わせだけを残す。
+**Not an ordinary test.** It exists to compare what matters in a single flash.
+Once the answer is known, delete it or keep only the combination that works.
 """
 
 import os
@@ -13,7 +13,7 @@ PORT = os.environ.get("TEST_SERIAL_PORT_M5STACK") or os.environ.get("TEST_SERIAL
 
 pytestmark = [
     pytest.mark.hardware,
-    pytest.mark.skipif(not PORT or not Path(PORT).exists(), reason="M5Stack が繋がっていない"),
+    pytest.mark.skipif(not PORT or not Path(PORT).exists(), reason="no M5Stack attached"),
 ]
 
 
@@ -26,4 +26,4 @@ def test_which_strategy_reads(arduino_test):
         print(f"  {r.name:32} {r.status:8} {r.metrics}")
         for line in r.logs:
             print(f"      {line}")
-    assert arduino_test.results, "1 件も走っていない"
+    assert arduino_test.results, "nothing ran at all"

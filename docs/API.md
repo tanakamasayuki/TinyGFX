@@ -404,7 +404,9 @@ your problem.
 
 ## Macros
 
-Everything defaults to on. **Define nothing and nothing changes.**
+**Define nothing and nothing changes.** Most of these default to 1 and drop
+something; `TINYGFX_TEXT_WRAP` and `TINYGFX_FILL_CHUNK` are the two that default
+to 0 and add something.
 
 | Macro | Default | Setting it to 0 | CH32V003 |
 | --- | --- | --- | ---: |
@@ -412,6 +414,7 @@ Everything defaults to on. **Define nothing and nothing changes.**
 | `TINYGFX_FONT_SCALE` | 1 | `setTextSize(2)` and above stop working | −116 |
 | `TINYGFX_FONT_CHAIN` | 1 | `CellFont::next` is not followed | −16 |
 | `TINYGFX_FONT_UTF8` | 1 | strings are read a byte at a time (Latin-1) | **−148** (−292 if `TinyGFXPrint` is in too) |
+| `TINYGFX_TEXT_WRAP` | **0** | (1 brings out `TinyGFXPrint::setTextWrap()`) | **+164** |
 | `TINYGFX_FONT_SPARSE` | 1 | a sparse font **cannot be drawn** | font dependent |
 | `TINYGFX_FONT_RECORDS` | 1 | a variable-pitch font **cannot be drawn** | font dependent |
 | `TINYGFX_MONO_FAST_FILL` | 1 | monochrome fills go back to one pixel at a time | −428 |
@@ -436,6 +439,7 @@ to not carry what will not fit on the reference board.
 | `drawArc` / `drawEllipse` / `drawBezier` | trigonometry or parametric curves. Measure first if someone asks |
 | `setTextDatum` / `getTextDatum` | **deliberately absent.** Alignment is `drawCenterString` / `drawRightString` instead - see below |
 | A one-object convenience class (`TinyGFX_ST7789_SoftSPI` and friends) | **deliberately absent.** It measures the same size (±0), but **the bus being yours is the point of this library**, and a convenience class constructs it for you (D31) |
+| `setTextWrap` | **not on by default.** `TINYGFX_TEXT_WRAP=1` brings out `TinyGFXPrint::setTextWrap()`. **+164 B** - wrapping has to know how wide a character is *before* drawing it, which links a second entry point into the font decoder (D33) |
 | `setSwapBytes` | **deliberately absent.** A runtime mode costs **+44 B and +4 B of RAM to sketches that never swap anything** (a branch per pixel). Call `tinygfx_swapBytes565(data, count)` instead: **0 B unless called, +32 B when it is** (D29) |
 | `drawNumber` | **+168 B would buy it** (measured). Integer to string |
 | Palettes, switchable colour depth | the core has no colour-depth abstraction (D4) |

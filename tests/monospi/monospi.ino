@@ -1,19 +1,21 @@
-// **SPI に繋いだページ方式パネル（SSD1306 / SH1106）が、バスの作法を守るか。**
+// **Does a page-addressed panel on SPI (SSD1306 / SH1106) observe the bus
+// etiquette?**
 //
-// I2C では見えない層をここで見る。TinyGFXBusI2C は転送ごとに開始と停止を
-// するので beginTransaction / endTransaction が空でも動く。**SPI は違う。**
-// SPI.beginTransaction() でクロックとモードを決め、CS を落とし、終わったら
-// 戻さないと、絵が出ないうえに同じ線に繋がった SD カードを壊す。
+// This is the layer I2C cannot show. TinyGFXBusI2C starts and stops on every
+// transfer, so it works even with empty beginTransaction / endTransaction.
+// **SPI does not.** Without SPI.beginTransaction() to set the clock and the
+// mode, CS dropped, and both put back afterwards, nothing appears on the screen
+// and an SD card on the same wires gets corrupted.
 //
-// 2026-08-29 のレビューで、TinyGFXPanelPaged がこれを通していないことが
-// 見つかった（P0）。I2C のテストしか無かったので誰も気づかなかった。
-// **このテストがその再発を止める。**
+// The 2026-08-29 review found that TinyGFXPanelPaged was not doing this (P0).
+// There was only an I2C test, so nobody noticed.
+// **This test stops it coming back.**
 //
-// 見るのは 4 つ:
-//   1. 全部のバイトがトランザクションの中で出ていること
-//   2. 全部のバイトが CS を落とした状態で出ていること
-//   3. コマンドは DC=LOW、画素は DC=HIGH で出ていること
-//   4. 出たバイト列が SSD1306 の仕様どおりの絵になること
+// Four things are checked:
+//   1. every byte goes out inside a transaction
+//   2. every byte goes out with CS dropped
+//   3. commands go out with DC=LOW, pixels with DC=HIGH
+//   4. the bytes that came out form the picture the SSD1306 datasheet says
 #define TGFX_HOST_PROBE_SPI 1
 #include <TinyGFX.h>
 #include <TinyGFX/BusSPI.h>
@@ -28,12 +30,12 @@ static const uint8_t PIN_DC = 5, PIN_CS = 15;
 
 static uint8_t fb[W * H / 8];
 
-// ---- 受け側の模型（SSD1306。0x21 / 0x22 で範囲を受けて流し込まれる） -----
+// ---- a model of the receiver (an SSD1306: 0x21 / 0x22 set the range) -----
 static uint8_t model[W * PAGES];
 static uint16_t colStart = 0, colEnd = W - 1, curCol = 0, curPage = 0;
 static uint8_t pendingCmd = 0, argIndex = 0, args[2] = {0, 0};
 
-// ---- 作法の監視 -----------------------------------------------------------
+// ---- watching the etiquette ----------------------------------------------
 static long bytesTotal = 0, bytesOutsideTxn = 0, bytesWithCsHigh = 0;
 static long cmdBytes = 0, dataBytes = 0;
 
@@ -66,7 +68,7 @@ static uint8_t onByte(uint8_t out, void* user) {
     if (curCol >= colEnd) { curCol = colStart; ++curPage; }
     else { ++curCol; }
   }
-  return 0xFF;  // ディスプレイは書き込み専用
+  return 0xFF;  // the display is write-only
 }
 
 static uint16_t image[W * H];
@@ -95,13 +97,13 @@ void setup() {
 
   SPI.setTransferHook(onByte, nullptr);
 
-  // --- init() もトランザクションの中で出ること ----------------------------
+  // --- init() must also go out inside a transaction ------------------------
   lcd.begin();
   tgfxReport("init_bytes", bytesTotal);
   tgfxReport("init_outside_txn", bytesOutsideTxn);
   tgfxReport("init_cs_high", bytesWithCsHigh);
 
-  // --- 描画と display() ----------------------------------------------------
+  // --- drawing and display() ------------------------------------------------
   bytesTotal = bytesOutsideTxn = bytesWithCsHigh = cmdBytes = dataBytes = 0;
   lcd.drawRect(0, 0, W, H, TFT_WHITE);
   lcd.fillRect(8, 8, 40, 16, TFT_WHITE);
@@ -123,20 +125,20 @@ void setup() {
   }
   tgfxReport("lit", lit);
 
-  // --- SPISettings が意図どおりか -----------------------------------------
+  // --- are the SPISettings what was intended? ------------------------------
   const SPISettings s = SPI.settings();
   tgfxReport("spi_clock", (long)s.clock());
   tgfxReport("spi_bitorder", (long)s.bitOrder());
   tgfxReport("spi_mode", (long)s.dataMode());
 
-  // --- 単発コマンド（invertDisplay）もトランザクションを開くこと -----------
+  // --- a one-off command (invertDisplay) must open a transaction too -------
   bytesTotal = bytesOutsideTxn = bytesWithCsHigh = 0;
   panel.invertDisplay(true);
   tgfxReport("invert_bytes", bytesTotal);
   tgfxReport("invert_outside_txn", bytesOutsideTxn);
   tgfxReport("invert_cs_high", bytesWithCsHigh);
 
-  // --- SH1106 も同じ作法であること ----------------------------------------
+  // --- an SH1106 must observe the same etiquette ---------------------------
   {
     static uint8_t fb2[W * H / 8];
     TinyGFXPanelSH1106 sh(bus, fb2, W, H);
@@ -150,7 +152,7 @@ void setup() {
     tgfxReport("sh_cs_high", bytesWithCsHigh);
   }
 
-  // --- 終わったら CS も DC も HIGH に戻っていること ------------------------
+  // --- both CS and DC must be back HIGH when it is done --------------------
   tgfxReport("cs_idle_high", digitalRead(PIN_CS) == HIGH ? 1 : 0);
   tgfxReport("in_transaction_at_end", SPI.inTransaction() ? 1 : 0);
 

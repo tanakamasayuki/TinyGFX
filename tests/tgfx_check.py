@@ -1,4 +1,4 @@
-"""テストスケッチが output/ に残したものを読むための小道具。"""
+"""Small tools for reading what a test sketch left in output/."""
 
 from pathlib import Path
 
@@ -8,7 +8,7 @@ BG = (0, 0, 0)
 
 
 def rgb(c565: int) -> tuple:
-    """RGB565 を、スケッチが PPM に書くのと同じ RGB888 に展開する。"""
+    """Expand RGB565 the same way the sketch does when it writes the PPM."""
     return ((c565 >> 8) & 0xF8, (c565 >> 3) & 0xFC, (c565 << 3) & 0xF8)
 
 
@@ -20,9 +20,9 @@ BLUE = rgb(0x001F)
 
 
 def report(sketch_dir) -> dict:
-    """output/report.txt を key -> int の辞書で返す。"""
+    """output/report.txt as a key -> int dictionary."""
     path = Path(sketch_dir) / "output" / "report.txt"
-    assert path.exists(), f"missing {path}（スケッチが tgfxTestDone() を呼んでいない？）"
+    assert path.exists(), f"missing {path} (did the sketch call tgfxTestDone()?)"
     out = {}
     for line in path.read_text(encoding="utf-8").splitlines():
         if "=" in line:
@@ -38,12 +38,12 @@ def image(sketch_dir, name) -> Image.Image:
 
 
 def lit(im, bg=BG) -> set:
-    """背景でない画素の座標の集合。"""
+    """The coordinates of every pixel that is not the background."""
     w, h = im.size
     px = im.load()
     return {(x, y) for y in range(h) for x in range(w) if px[x, y] != bg}
 
 
 def colors(im) -> dict:
-    """色 -> 画素数。"""
+    """Colour -> pixel count."""
     return {c: n for n, c in im.getcolors(maxcolors=1 << 20)}

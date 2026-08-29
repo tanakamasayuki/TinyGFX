@@ -1,10 +1,10 @@
-"""TinyGFX テストの共通フック。
+"""Shared hooks for the TinyGFX tests.
 
-各テストの前に `<sketch_dir>/output/` を消す。生成物（PPM など）が
-前回の実行から残っていて、失敗を成功に見せかけないようにするため。
+Clears `<sketch_dir>/output/` before every test. Artefacts (PPMs and the like)
+left over from a previous run would otherwise make a failure look like a pass.
 
-注意: `output` という名前のディレクトリを無条件に rmtree する。
-他リポジトリへコピーするときは中身を確認すること。
+Careful: this rmtree's any directory named `output`, unconditionally. Check
+what is in there before copying this file into another repository.
 """
 
 import shutil

@@ -1,18 +1,22 @@
-// TinyGFX - 実機検証（M5Stack Core / BASIC）
+// TinyGFX - checking on real hardware (M5Stack Core / BASIC)
 //
-// **自動テストで守れないものだけ**を 1 本に詰めたスケッチ。配線は要らない。
-// 手順とチェック項目は docs/MANUAL_TEST.ja.md の M0b。
+// One sketch holding **only what the automated tests cannot hold.** No wiring
+// needed. The procedure and the checklist are M0b in docs/MANUAL_TEST.ja.md.
 //
-// ページは 4 秒で自動送り。Btn A（左）で次、Btn C（右）で前に戻る。
-// 何を見ればいいかはシリアル（115200）にも出る。
+// Pages advance every 4 seconds. Btn A (left) goes forward, Btn C (right) back.
+// What to look at is also printed on serial (115200).
 //
-//   0-3 回転 0..3      MADCTL の表が実機で正しいか（回転 0 だけ確認済み）
-//   4   文字           CellFont 移行後の描画。倍角・背景セル・収録外
-//   5   クリップ       外に 1 画素も漏れないか
-//   6   直接描画       同じ動きを消してから描く。**ちらつくはず**
-//   7   帯レンダリング 同じ動きを TileCanvas で。**ちらつかないはず**
-//   8   速度           シリアルに ms を出す
-//   9   読み出し       **パネルから読み戻せるか**
+//   0-3 rotations 0..3  is the MADCTL table right on real glass?
+//                       (only rotation 0 has been confirmed)
+//   4   text            drawing since the move to CellFont: sizes, background
+//                       cells, uncovered codes
+//   5   clipping        does anything leak outside?
+//   6   direct drawing  the same animation, cleared then drawn.
+//                       **It should flicker**
+//   7   tiled rendering the same animation through TileCanvas.
+//                       **It should not flicker**
+//   8   speed           milliseconds, on serial
+//   9   read-back       **can the panel be read back?**
 #include <TinyGFX.h>
 #include <TinyGFX/BusSPI.h>
 #include <TinyGFX/FontCell.h>
@@ -21,9 +25,9 @@
 
 #include "tgfx_clock.h"
 
-// 内蔵 LCD
+// The built-in LCD
 static const int8_t PIN_DC = 27, PIN_CS = 14, PIN_RST = 33, PIN_BL = 32, PIN_SD_CS = 4;
-// ボタン A / B / C（active LOW、外部プルアップあり）
+// Buttons A / B / C (active LOW, externally pulled up)
 static const int8_t BTN_A = 39, BTN_C = 37;
 
 TinyGFXBusSPI bus(SPI, PIN_DC, PIN_CS, /*freq*/ 24000000UL);
@@ -32,7 +36,7 @@ TinyGFX lcd(panel);
 
 static const TinyGFXFontRef clockFont = {&tgfxClock, &tinygfxFontCellOps};
 
-// 帯レンダリング用。ESP32 なので広めに取る（320 x 20 x 2 = 12,800 B）
+// For tiled rendering. An ESP32 can afford a generous band (320 x 20 x 2 = 12,800 B)
 static const int16_t BAND_ROWS = 20;
 static uint16_t band[320 * BAND_ROWS];
 TinyGFXTileCanvas canvas(panel, band, sizeof(band) / sizeof(band[0]));
@@ -55,19 +59,20 @@ static void header(uint8_t n) {
   lcd.setTextSize(1);
 }
 
-/// 回転 0..3。原点に赤、右下に青、数字は必ず読める向きで出ること。
+/// Rotations 0..3. Red at the origin, blue at the bottom right, and the digits
+/// must come out the right way up.
 static void pageRotation(uint8_t r) {
   lcd.setRotation(r);
   header(r);
   const int16_t w = lcd.width(), h = lcd.height();
-  lcd.fillRect(2, 2, 24, 24, TFT_RED);                 // 論理原点 (0,0)
+  lcd.fillRect(2, 2, 24, 24, TFT_RED);                 // the logical origin (0,0)
   lcd.fillRect((int16_t)(w - 26), (int16_t)(h - 26), 24, 24, TFT_BLUE);
   lcd.drawLine(0, 0, (int16_t)(w - 1), (int16_t)(h - 1), TFT_DARKGREY);
   lcd.setTextColor(TFT_WHITE);
   lcd.setTextSize(3);
   lcd.drawString("0123456789", 30, (int16_t)(h / 2 - 12));
   lcd.setTextSize(1);
-  // 幅と高さを数字で（回転 1/3 で入れ替わること）
+  // Width and height as numbers (they swap at rotations 1 and 3)
   char s[16];
   snprintf(s, sizeof(s), "%d:%d", (int)w, (int)h);
   lcd.setTextColor(TFT_CYAN);
@@ -76,52 +81,53 @@ static void pageRotation(uint8_t r) {
   lcd.setTextSize(1);
 }
 
-/// 文字。CellFont に移してから 1 度も実機に出していない。
+/// Text. Not once put on real glass since the move to CellFont.
 static void pageText() {
   lcd.setRotation(0);
   header(4);
   lcd.setFont(&clockFont);
   int16_t y = 40;
-  for (uint8_t sz = 1; sz <= 4; ++sz) {          // 倍角
+  for (uint8_t sz = 1; sz <= 4; ++sz) {          // text sizes
     lcd.setTextSize(sz);
     lcd.setTextColor(TFT_WHITE);
     lcd.drawString("0123456789", 10, y);
     y = (int16_t)(y + 8 * sz + 6);
   }
   lcd.setTextSize(2);
-  lcd.setTextColor(TFT_BLACK, TFT_GREEN);        // 背景セル。字の下に隙間なく敷かれること
+  lcd.setTextColor(TFT_BLACK, TFT_GREEN);        // background cell: no gaps under the glyph
   lcd.drawString("0123", 10, y);
   lcd.setTextColor(TFT_WHITE);
-  lcd.drawString("45", 130, y);                  // 背景なし（透過）に戻らないこと
+  lcd.drawString("45", 130, y);                  // must not revert to transparent
   lcd.setTextColor(TFT_RED, TFT_BLACK);
   lcd.drawString("12:34", 190, y);
   lcd.setTextSize(1);
-  // 収録外（英字はこのフォントに無い）。**豆腐も無いので何も出ず、詰まって見える**
+  // Uncovered (this font has no letters). **No tofu either, so nothing appears
+  // and the text looks squashed together**
   lcd.setTextColor(TFT_DARKGREY);
   lcd.setTextSize(2);
   lcd.drawString("01ABC23", 10, (int16_t)(y + 30));
   lcd.setTextSize(1);
 }
 
-/// クリップ。外に 1 画素も漏れないこと。
+/// Clipping. Not one pixel may leak outside.
 static void pageClip() {
   lcd.setRotation(0);
   header(5);
-  lcd.drawRect(59, 59, 202, 122, TFT_DARKGREY);   // クリップ枠の外側 1 画素
+  lcd.drawRect(59, 59, 202, 122, TFT_DARKGREY);   // one pixel outside the clip frame
   lcd.setClipRect(60, 60, 200, 120);
-  lcd.fillCircle(160, 120, 200, TFT_NAVY);        // 画面より大きい円
+  lcd.fillCircle(160, 120, 200, TFT_NAVY);        // a circle bigger than the screen
   for (int16_t i = -200; i < 400; i += 24) {
     lcd.drawLine(i, 0, (int16_t)(i + 120), 239, TFT_CYAN);
   }
   lcd.setTextSize(3);
   lcd.setTextColor(TFT_YELLOW);
-  lcd.drawString("0123456789", 20, 100);          // 左右にはみ出す文字列
+  lcd.drawString("0123456789", 20, 100);          // a string that runs off both sides
   lcd.setTextSize(1);
   lcd.resetClipRect();
 }
 
-/// 動く絵。**消す処理は入れない**（帯側は autoClear、直接側は fillScreen が消す）。
-/// 帯ごとに呼ばれるので、ここに重い処理を書かない。
+/// The animation. **Nothing here clears** - the band side uses autoClear and
+/// the direct side calls fillScreen. It runs once per band, so keep it cheap.
 static void ballScene(TinyGFX& g, void* ctx) {
   const int16_t t = *(const int16_t*)ctx;
   g.drawRect(0, 0, 320, 240, TFT_DARKGREY);
@@ -130,7 +136,7 @@ static void ballScene(TinyGFX& g, void* ctx) {
   g.fillTriangle(20, 220, 60, 150, 100, 220, TFT_CYAN);
 }
 
-/// 直接描画。消してから描くのでちらつく。**これが比較対象。**
+/// Direct drawing: clear, then draw, so it flickers. **This is the comparison.**
 static void pageDirect() {
   lcd.setRotation(0);
   const uint32_t until = millis() + 6000;
@@ -146,7 +152,7 @@ static void pageDirect() {
   }
 }
 
-/// 帯レンダリング。**同じ絵・同じ動きで、こちらはちらつかない。**
+/// Tiled rendering. **The same picture, the same motion, and no flicker.**
 static void pageTiled() {
   canvas.setRotation(0);
   canvas.setBackgroundColor(TFT_NAVY);
@@ -161,7 +167,7 @@ static void pageTiled() {
   lcd.setRotation(0);
 }
 
-/// 速度。**まだ 1 度も測っていない。** シリアルに出す。
+/// Speed. **Never measured even once.** Printed on serial.
 static void pageBench() {
   lcd.setRotation(0);
   header(8);
@@ -220,15 +226,18 @@ static void pageBench() {
 }
 
 
-/// パネルから読み戻せるか。**できるかどうかを決める実験。**
+/// Can the panel be read back? **The experiment that decides whether it can.**
 ///
-/// できれば「描いて読み戻して比べる」で実機を自動検証できる。ホストのテストと
-/// 同じ厳しさが実機に持ち込める。まずは線が繋がっているかを見る。
+/// If it can, the hardware can be checked automatically by drawing, reading
+/// back and comparing - the same rigour the host tests have, on real glass.
+/// The first question is simply whether the line is connected.
 ///
-/// ILI934x の作法は 3 つ。どれも外すと化けるので、生のバイトをそのまま出す。
-///   1. 読み出しは書き込みより低いクロック（ここでは 8MHz）
-///   2. RAMRD(0x2E) の先頭にダミーが 1 バイト入る
-///   3. 16bpp で書いても**読み出しは 1 画素 3 バイト**（RGB666 が上詰め）
+/// An ILI934x wants three things, and getting any of them wrong produces
+/// garbage, so the raw bytes are printed as they come.
+///   1. reads use a slower clock than writes (8MHz here)
+///   2. RAMRD (0x2E) begins with one dummy byte
+///   3. even written at 16bpp, **a read is 3 bytes a pixel** (RGB666, top
+///      aligned)
 static void dump(const char* label, uint8_t cmd, uint8_t n) {
   uint8_t buf[16];
   for (uint8_t i = 0; i < n && i < 16; ++i) buf[i] = 0;
@@ -250,19 +259,19 @@ static void dump(const char* label, uint8_t cmd, uint8_t n) {
 static void pageReadback() {
   lcd.setRotation(0);
   header(9);
-  // **M5Stack はデータ線が 1 本**（SDA=GPIO23）。SPI の MISO(19) には何も来ていない
+  // **An M5Stack has one data line** (SDA=GPIO23); nothing reaches SPI MISO (19)
   bus.setReadPins(/*sck*/ 18, /*sda*/ 23);
 
-  // 読み戻す先に、見分けのつく色を置く
-  lcd.fillRect(0, 100, 2, 1, TFT_RED);      // (0,100) 赤
-  lcd.drawPixel(1, 100, TFT_GREEN);         // (1,100) 緑
+  // Put distinguishable colours where the read-back will look
+  lcd.fillRect(0, 100, 2, 1, TFT_RED);      // (0,100) red
+  lcd.drawPixel(1, 100, TFT_GREEN);         // (1,100) green
 
   Serial.println(F("--- read-back probe ---"));
-  dump("RDDID ", 0x04, 5);   // ILI9341 なら 00 00 93 41 ... 全部 00 なら MISO が来ていない
+  dump("RDDID ", 0x04, 5);   // an ILI9341 gives 00 00 93 41; all 00 means MISO is not arriving
   dump("RDID4 ", 0xD3, 5);
   dump("RDDST ", 0x09, 6);
 
-  // (0,100)-(1,100) の 2 画素を読む。ダミー 1 + 3 バイト x 2 = 7 バイト
+  // Read the two pixels (0,100)-(1,100): 1 dummy + 3 bytes x 2 = 7 bytes
   uint8_t a[4];
   bus.beginTransaction();
   a[0] = 0; a[1] = 0; a[2] = 0; a[3] = 1;
@@ -274,11 +283,11 @@ static void pageReadback() {
   bus.endTransaction();
 
   Serial.println(F("  wrote: (0,100)=F800 red  (1,100)=07E0 green"));
-  dump("RAMRD ", 0x2E, 8);   // 期待: dummy, F8 00 00, 00 FC 00 （上位 6bit が有効）
+  dump("RAMRD ", 0x2E, 8);   // expect: dummy, F8 00 00, 00 FC 00 (the top 6 bits carry it)
 
   lcd.setTextColor(TFT_WHITE);
   lcd.setTextSize(2);
-  lcd.drawString("0123456789", 12, 140);     // 画面側は「見に行った」目印だけ
+  lcd.drawString("0123456789", 12, 140);     // on screen, just a marker that this ran
   lcd.setTextSize(1);
   Serial.println(F("  NOTE: this panel returns FF for ID registers but the GRAM reads fine"));
 }
@@ -323,10 +332,11 @@ void setup() {
 
   SPI.begin();  // the sketch owns the bus; TinyGFX never begins it
   lcd.begin();
-  canvas.begin();  // 帯レンダリング側。パネルの init が 2 回走るが害はない
+  canvas.begin();  // the tiled side. The panel init runs twice, which is harmless
 
-  // 古い世代の BASIC で色が反転するときはここを外す（M0 と同じ）。
-  // **canvas.begin() より後**でないと、パネルの再初期化で INVON に戻される。
+  // On an older BASIC where the colours come out inverted, take this out
+  // (same as M0). It has to come **after canvas.begin()**, or re-initialising
+  // the panel puts INVON back.
   // panel.invertDisplay(false);
 
   Serial.println();

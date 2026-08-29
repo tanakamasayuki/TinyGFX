@@ -1,5 +1,5 @@
-// 帯レンダリングの不変条件:
-//   帯の行数をいくつに変えても、直接描いた結果と 1 画素も違わないこと
+// The tiled-rendering invariant:
+//   whatever the band height, not one pixel differs from drawing directly
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
 #include <TinyGFX/PanelST7789.h>
@@ -40,7 +40,7 @@ void setup() {
   tgfxTestBegin("tile");
   lcd.begin();
 
-  // 直接描いたもの（基準）
+  // Drawn directly (the baseline)
   bus.fill(0);
   bus.resetCounters();
   lcd.fillScreen(BG);
@@ -67,8 +67,8 @@ void setup() {
     tgfxShot(name, gram, W, H);
   }
 
-  // ラムダで渡しても、関数ポインタ + void* とまったく同じ絵になること。
-  // 中を通る道が違う（トランポリンを 1 枚挟む）ので、ここで固定しておく。
+  // A lambda must draw exactly what the function pointer + void* form draws.
+  // The code path differs (a trampoline sits in between), so pin it here.
   {
     TinyGFXTileCanvas c(panel, band, (uint32_t)(W * 4));
     c.setBackgroundColor(BG);
@@ -79,7 +79,7 @@ void setup() {
     tgfxReport("fnptr_pixels", (long)bus.pixelCount());
     snapshot();
 
-    // 捕捉つき。呼ばれた回数も数えて、帯の数と合うことを見る。
+    // With a capture. Count the calls too, and check they match the bands.
     int bands = 0;
     TinyGFXTileCanvas c2(panel, band, (uint32_t)(W * 4));
     c2.setBackgroundColor(BG);
@@ -93,7 +93,7 @@ void setup() {
     tgfxReport("lambda_tilerows", (long)c2.tileRows());
   }
 
-  // 1 行ぶんも無いバッファでは描けない
+  // A buffer too small for even one row cannot draw
   {
     TinyGFXTileCanvas tiny(panel, band, 4);
     tiny.begin();
@@ -101,7 +101,7 @@ void setup() {
     tgfxReport("toosmall_ok", tiny.render(scene) ? 1 : 0);
   }
 
-  // 自動クリアを切ると背景で塗り直さない
+  // With auto-clear off, the background is not repainted
   {
     TinyGFXTileCanvas c(panel, band, (uint32_t)(W * 4));
     c.setBackgroundColor(BG);

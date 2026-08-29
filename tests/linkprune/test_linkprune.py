@@ -1,11 +1,12 @@
-"""「まわりまわって載る」の検出（Tier 0）。
+"""Catching things that get linked in by a chain of references (Tier 0).
 
-未使用機能が落ちること自体はリンカ（--gc-sections）の仕事。ここで見るのは
-**落ちるはずのものが参照の連鎖で残っていないか**。
-規則は docs/CORE_DESIGN.ja.md §7.4（R1〜R9）、表は docs/FOOTPRINT.ja.md §8。
+Dropping unused code is the linker's job (--gc-sections). What is checked here
+is **whether something that should have dropped is being held alive by a
+reference.** The rules are docs/CORE_DESIGN.ja.md 7.4 (R1-R9); the table is
+docs/FOOTPRINT.ja.md 8.
 
-判定は base との差で行う。`_malloc_r` のようにコア側が最初から
-持ち込んでいるものを TinyGFX のせいにしないため。
+Everything is judged as a difference from base, so that things the core brings
+in by itself - `_malloc_r` and friends - are not blamed on TinyGFX.
 """
 
 import pytest
@@ -14,11 +15,11 @@ import tinygfx_build as tb
 
 pytestmark = [
     pytest.mark.slow,
-    pytest.mark.skipif(not tb.have_arduino_cli(), reason="arduino-cli がない"),
-    pytest.mark.skipif(not tb.have_core(tb.CH32V003), reason="CH32 コアが入っていない"),
+    pytest.mark.skipif(not tb.have_arduino_cli(), reason="no arduino-cli"),
+    pytest.mark.skipif(not tb.have_core(tb.CH32V003), reason="the CH32 core is not installed"),
 ]
 
-# 構成ごとに「出てはいけない」名前（マングル名への部分一致）
+# Names that must not appear, per construct (substring of the mangled name)
 FORBIDDEN = {
     "a": ["drawLine", "drawCircle", "fillRoundRect", "fillTriangle", "drawChar",
           "tgfxDigits", "pushImage", "TileCanvas", "TinyGFXPrint"],
@@ -29,22 +30,22 @@ FORBIDDEN = {
     "e": ["TileCanvas", "TinyGFXPrint"],
 }
 
-# 全構成に共通で出てはいけないもの（base に無いのに現れたら fail）
+# Forbidden in every construct: absent from base, so appearing means TinyGFX did it
 COMMON_FORBIDDEN = [
-    "__addsf3", "__mulsf3", "__divsf3", "__floatsisf",  # 浮動小数点演算
-    "printFloat", "_dtoa",                              # 浮動小数点書式化
-    "__udivsi3", "__umodsi3", "__divsi3",               # 除算（rv32ec は命令が無い）
-    "__cxa_guard_acquire",                              # 関数内 static（R9）
+    "__addsf3", "__mulsf3", "__divsf3", "__floatsisf",  # floating point
+    "printFloat", "_dtoa",                              # float formatting
+    "__udivsi3", "__umodsi3", "__divsi3",               # division (rv32ec has no instruction)
+    "__cxa_guard_acquire",                              # function-local statics (R9)
 ]
 
 
-# フォント形式ごとのデコーダのシンボル。使っていない形式は 1 つも出てはいけない。
+# One decoder symbol per font format. An unused format must not appear at all.
 FORMAT_SYMBOLS = {
     "cell": "tinygfx_cell",
     "u8g2": "tinygfx_u8g2",
 }
 
-# 構成 -> 使っている形式
+# construct -> the formats it uses
 FORMAT_USED = {
     "d": {"cell"},
     "d_u8g2": {"u8g2"},
@@ -62,9 +63,9 @@ def syms():
 
 
 def test_symbols_are_available(syms):
-    """nm が動いていること。空だと以降のテストが素通りしてしまう。"""
-    assert syms["base"], "base のシンボルが取れていない（nm の場所を確認すること）"
-    assert tb.contains(syms["e"], "fillRect"), "e に fillRect が無い。判定方法がおかしい"
+    """nm works. An empty set would make every test below pass vacuously."""
+    assert syms["base"], "no symbols read from base (check where nm is)"
+    assert tb.contains(syms["e"], "fillRect"), "no fillRect in e; the check itself is wrong"
 
 
 @pytest.mark.parametrize("construct", list(FORBIDDEN))
@@ -76,8 +77,8 @@ def test_unused_features_are_not_linked(syms, construct):
         if tb.contains(names, f) and not tb.contains(base, f)
     ]
     assert not leaked, (
-        f"構成 {construct} に未使用の機能が載っている: {leaked}。"
-        " docs/CORE_DESIGN.ja.md §7.4 の R1〜R9 のどれかを破っている"
+        f"construct {construct} links unused features: {leaked}. "
+        "One of R1-R9 in docs/CORE_DESIGN.ja.md 7.4 is being broken"
     )
 
 
@@ -89,17 +90,17 @@ def test_no_float_no_division(syms, construct):
         f for f in COMMON_FORBIDDEN
         if tb.contains(names, f) and not tb.contains(base, f)
     ]
-    assert not leaked, f"構成 {construct} に載ってはいけないシンボル: {leaked}"
+    assert not leaked, f"construct {construct} links forbidden symbols: {leaked}"
 
 
 @pytest.mark.parametrize("construct", list(FORMAT_USED))
 def test_unused_font_formats_are_not_linked(syms, construct):
-    """**使っていないフォント形式のデコーダはリンクされないこと。**
+    """**A font format you do not use must not be linked.**
 
-    コアはフォント形式を知らず、フォント側が自分のデコーダを指す
-    （docs/CORE_DESIGN.ja.md §9）。include していない形式はどこからも
-    参照されないので落ちる。形式を増やしてもフットプリントは増えない、
-    という設計の実効的な担保。
+    The core knows nothing about font formats; a font points at its own decoder
+    (docs/CORE_DESIGN.ja.md 9). A format that is not included is referenced by
+    nothing and therefore drops. This is what actually holds up the claim that
+    adding formats does not grow the footprint.
     """
     names = syms[construct]
     used = FORMAT_USED[construct]
@@ -107,7 +108,7 @@ def test_unused_font_formats_are_not_linked(syms, construct):
     for key, sym in FORMAT_SYMBOLS.items():
         present = tb.contains(names, sym)
         if key in used and not present:
-            problems.append(f"{key} を使っているのにシンボルが無い（判定方法がおかしい）")
+            problems.append(f"{key} is in use but its symbol is missing (the check is wrong)")
         if key not in used and present:
-            problems.append(f"{key} を使っていないのにリンクされている")
-    assert not problems, f"構成 {construct}: " + "; ".join(problems)
+            problems.append(f"{key} is not used yet is linked")
+    assert not problems, f"construct {construct}: " + "; ".join(problems)

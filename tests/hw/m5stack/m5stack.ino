@@ -1,22 +1,29 @@
-// **実機の自動テスト。** M5Stack Core / BASIC を標準の検証機として使う。
+// **The hardware test.** An M5Stack Core / BASIC is the standard board for it.
 //
-// **実機で作った絵を、ホストで作ったゴールデンと突き合わせる。**
+// **What the hardware drew is compared against the host's golden.**
 //
-//   ホスト  tests/scene/      共通シーンを BusCapture で描く -> golden/scene.ppm
-//   実機    ここ              同じシーンを**実機の上で**描いて artifact で送る
-//   pytest  test_hw_m5stack   両者を突き合わせる
+//   host      tests/scene/      draws the shared scene through BusCapture
+//                               -> golden/scene.ppm
+//   hardware  here              draws the same scene **on the board** and sends
+//                               it as an artifact
+//   pytest    test_hw_m5stack   compares the two
 //
-// 絵の取り方は 2 通り。**M5Stack で使えるのは 1 だけ**（2 は 2026-08-28 実測で不可）。
+// There are two ways to get the picture. **Only the first works on an M5Stack**
+// (the second was measured impossible on 2026-08-28).
 //
-//   1. TinyGFXBusCapture で取る（常に使える）
-//      実機のコンパイラ・実機の int 幅・実機の PROGMEM を通った結果が見える。
-//      **パネルドライバのコマンド列まで**は本物。線から先は見ない
-//   2. パネルの GRAM から読み戻す（SDO が来ているパネルだけ）
-//      線から先も見られる。**M5Stack Core は SDO が GPIO19 に来ていないので不可**
+//   1. Through TinyGFXBusCapture (always available)
+//      Shows the result of the real compiler, the real int width and the real
+//      PROGMEM. Genuine **as far as the panel driver's command stream**;
+//      nothing past the wire is seen
+//   2. By reading the panel's GRAM back (only on panels where SDO is wired)
+//      Sees past the wire too. **Not possible on an M5Stack Core, where SDO
+//      does not reach GPIO19**
 //
-// シーンの定義は tgfx_scene.h の 1 箇所だけ。**片方だけ変わることがない。**
+// The scene is defined in exactly one place, tgfx_scene.h, so the two sides
+// **cannot drift apart.**
 //
-// シリアルの頭は取りこぼすので、ArduTest の HELLO で同期してから流す。
+// The first serial bytes get dropped, so everything is sent after
+// synchronising on ArduTest's HELLO.
 #include <ArduTest.h>
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
@@ -33,8 +40,9 @@ TinyGFXPanelILI9342 panel(bus, 320, 240, PIN_RST);
 TinyGFX lcd(panel);
 
 static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps};
-// **読み戻すのは上 2 行だけ。** 読み出しは 1 回ごとに線を張り替えるので、
-// 何十回も回すとボードが固まる（実測）。デバッグ用途なので小さく取る。
+// **Only the top strip is read back.** Every read turns the line around, and
+// running that dozens of times locks the board up (measured). Since this is for
+// debugging, keep it small.
 // Read-back costs about 150us a pixel, so the golden comparison takes the
 // top strip rather than the whole scene. 64x8 is ~75ms and still covers the
 // border, the three colour blocks and the circle.
@@ -48,7 +56,8 @@ static void hex2(char* out, uint8_t v) {
   out[1] = D[v & 15];
 }
 
-/// 読み戻しの線が繋がっているか。**ここが落ちたら以下は全部意味がない。**
+/// Is the read-back line connected at all? **If this fails, nothing below
+/// means anything.**
 /// Can this panel be read back at all? Reports, never judges - a panel that
 /// cannot read is not a failure, so pytest turns this into a skip.
 ///
@@ -92,11 +101,11 @@ TEST_CASE(test_readback_solid) {
   }
 }
 
-/// **回転が MADCTL に正しく降りているか。** 読み戻しでしか見られない。
+/// **Is the rotation reaching MADCTL correctly?** Only a read-back can tell.
 ///
-/// 素直に「回転 N のまま描いて回転 N のまま読む」では何も分からない。RAMRD は
-/// 書き込みと同じアドレスカウンタを通るので、MADCTL が間違っていても自己
-/// 無矛盾になって読めてしまう。
+/// The obvious approach - draw at rotation N and read at rotation N - shows
+/// nothing. RAMRD goes through the same address counter as the write, so a
+/// wrong MADCTL is self-consistent and reads back fine.
 /// Reading in the same rotation you drew in proves nothing: RAMRD goes through
 /// the same address counter as the write, so a wrong MADCTL reads back
 /// consistently wrong.
@@ -152,11 +161,12 @@ TEST_CASE(test_rotation_maps) {
   ArduTest.attachText("rotation_marks.txt", text);
 }
 
-/// **本命。** 実機の上で共通シーンを描き、そのまま送る。
+/// **The point.** Draws the shared scene on the hardware and sends it as is.
 ///
-/// 実機のコンパイラ・実機の int 幅・実機の PROGMEM を通った結果が見える。
-/// パネルドライバ（ILI9342）のコマンド列も本物で、それを BusCapture が
-/// 仮想 GRAM に組み直す。**線から先だけが範囲外。**
+/// Shows the result of the real compiler, the real int width and the real
+/// PROGMEM. The panel driver's (ILI9342's) command stream is genuine too, and
+/// BusCapture rebuilds it into a virtual GRAM. **Only what happens past the
+/// wire is out of scope.**
 TEST_CASE(test_capture_scene) {
   TinyGFXBusCapture cap(capBuf, TGFX_SCENE_W, TGFX_SCENE_H);
   TinyGFXPanelILI9342 capPanel(cap, TGFX_SCENE_W, TGFX_SCENE_H);
@@ -168,11 +178,11 @@ TEST_CASE(test_capture_scene) {
   tgfxGoldenScene(g);
 
   ArduTest.reportMetric("capture_pixels", (long)cap.pixelCount());
-  // RGB565 のリトルエンディアン（このボードのメモリの並びそのまま）
+  // RGB565, little endian - exactly how this board holds it in memory
   ArduTest.attachBinary("scene.rgb565", "application/octet-stream",
                         (const uint8_t*)capBuf, sizeof(capBuf));
 
-  // ついでに実物にも出しておく（目で見たいときのため）
+  // Put it on the real screen too, for when someone wants to look at it
   lcd.setFont(&digitsFont);
   lcd.setTextColor(TFT_WHITE);
   tgfxGoldenScene(lcd);
@@ -202,7 +212,7 @@ void setup() {
 
   SPI.begin();  // the sketch owns the bus; TinyGFX never begins it
   lcd.begin();
-  // **M5Stack はデータ線が 1 本**（SDA=GPIO23）。SPI の MISO(19) には何も来ていない
+  // **An M5Stack has one data line** (SDA=GPIO23); nothing reaches SPI MISO (19)
   bus.setReadPins(/*sck*/ 18, /*sda*/ 23);
   lcd.fillScreen(TFT_BLACK);
 
