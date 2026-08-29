@@ -195,6 +195,8 @@ RAM が足りなければ**帯**で描ける（1 ページ 128 B）。
 | --- | --- |
 | `setFont(const TinyGFXFontRef*)` / `getFont()` | |
 | `drawString(const char* s, x, y)` | 戻り値は進んだ幅 |
+| `drawCenterString(s, cx, y)` | `cx` を中心に。**+116 B**（呼ばなければ 0） |
+| `drawRightString(s, rx, y)` | 右端を `rx` に。**両方使って +232 B** |
 | `drawChar(uint16_t ch, x, y)` | |
 | `textWidth(const char* s)` | **これだけでも 1,044 B** |
 | `setTextColor(fg)` / `setTextColor(fg, bg)` | 2 引数版は背景セルを塗る |
@@ -248,10 +250,27 @@ LovyanGFX 系（[LGFXVirtualCanvas](https://github.com/tanakamasayuki/LGFXVirtua
 | `drawJpg` / `drawPng` / `drawBmp` / `drawQoi` | デコーダだけで基準機の FLASH を使い切る |
 | `pushImageRotateZoom` / `setPivot` | 回転拡大は浮動小数か固定小数の補間が要る |
 | `drawArc` / `drawEllipse` / `drawBezier` | 三角関数か媒介変数。要望が出たら実測してから |
-| `setTextDatum` / `drawCenterString` / `drawRightString` | **+188 B で足せる**（実測）。`textWidth` の上の算術だけ。要望次第 |
+| `setTextDatum` / `getTextDatum` | **入れない。** 揃えは `drawCenterString` / `drawRightString` で提供する（下記） |
 | `drawNumber` | **+168 B で足せる**（実測）。整数から文字列への変換 |
 | 1bpp ビットマップの描画 | **+120 B で足せる**（実測）。アイコン用途。モノクロパネルでは `pushImage`（16bpp）より素直 |
 | パレット・色深度の切り替え | コアに色深度の抽象を持たない（D4） |
 | `readPixel` | パネル側にある。`TinyGFXPanelDcs::readPixels()`。**1 画素 150us** のデバッグ用 |
 
-下 3 つは**測ってあるので、要ると分かったら足せる。** 測る前に足さない。
+下 2 つは**測ってあるので、要ると分かったら足せる。** 測る前に足さない。
+
+### `setTextDatum` を入れなかった理由
+
+LovyanGFX は文字の揃えを**2 通り**で提供している — `drawCenterString()` と、
+`setTextDatum(TC_DATUM)` + `drawString()`。同じことが 2 系統ある。
+
+TinyGFX は**明示関数だけ**にした。理由は値札で、CH32V003 での実測:
+
+| | 文字は描くが揃えは使わないスケッチ |
+| --- | ---: |
+| 揃え機能なし | 8,892 |
+| `setTextDatum` を持つ | 9,096（**+204**） |
+| `drawCenterString` / `drawRightString` を持つ（呼ばない） | 8,892（**+0**） |
+
+**datum は `drawString` が毎回参照する状態**なので、`drawString` が無条件に
+`textWidth` を引き込む。中央揃えを一度も使わない人まで払うことになる。
+明示関数はインラインのメンバなので、呼ばなければ生成すらされない。

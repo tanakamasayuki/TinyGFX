@@ -200,6 +200,8 @@ spec 12.2). Without that you get an ordering trap - "including the font before
 | --- | --- |
 | `setFont(const TinyGFXFontRef*)` / `getFont()` | |
 | `drawString(const char* s, x, y)` | returns how far the pen moved |
+| `drawCenterString(s, cx, y)` | centred on `cx`. **+116 B**, nothing if never called |
+| `drawRightString(s, rx, y)` | right edge at `rx`. **+232 B for both** |
 | `drawChar(uint16_t ch, x, y)` | |
 | `textWidth(const char* s)` | **1,044 B on its own** |
 | `setTextColor(fg)` / `setTextColor(fg, bg)` | the two-argument form paints the cell behind |
@@ -255,11 +257,29 @@ to not carry what will not fit on the reference board.
 | `drawJpg` / `drawPng` / `drawBmp` / `drawQoi` | the decoder alone would use up the reference board's flash |
 | `pushImageRotateZoom` / `setPivot` | rotate-and-scale needs floating point or fixed-point interpolation |
 | `drawArc` / `drawEllipse` / `drawBezier` | trigonometry or parametric curves. Measure first if someone asks |
-| `setTextDatum` / `drawCenterString` / `drawRightString` | **+188 B would buy it** (measured). Arithmetic on top of `textWidth` |
+| `setTextDatum` / `getTextDatum` | **deliberately absent.** Alignment is `drawCenterString` / `drawRightString` instead - see below |
 | `drawNumber` | **+168 B would buy it** (measured). Integer to string |
 | 1bpp bitmap drawing | **+120 B would buy it** (measured). For icons; more natural than a 16bpp `pushImage` on a monochrome panel |
 | Palettes, switchable colour depth | the core has no colour-depth abstraction (D4) |
 | `readPixel` | it lives on the panel: `TinyGFXPanelDcs::readPixels()`. **150us a pixel**, for debugging |
 
-The last three are **measured, so they can be added the moment they are wanted.**
+The last two are **measured, so they can be added the moment they are wanted.**
 Not before.
+
+### Why there is no `setTextDatum`
+
+LovyanGFX offers text alignment **twice** - as `drawCenterString()`, and as
+`setTextDatum(TC_DATUM)` followed by `drawString()`. Two families for one job.
+
+TinyGFX keeps only the calls. The reason is the price, measured on a CH32V003:
+
+| | a sketch that draws text but never aligns it |
+| --- | ---: |
+| no alignment feature at all | 8,892 |
+| with `setTextDatum` | 9,096 (**+204**) |
+| with `drawCenterString` / `drawRightString`, never called | 8,892 (**+0**) |
+
+**A datum is state that `drawString` has to consult every time**, so
+`drawString` drags `textWidth` in unconditionally - and everyone who never
+centres anything pays for it. The calls are inline members: never called, never
+emitted.

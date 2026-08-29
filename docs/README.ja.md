@@ -24,6 +24,7 @@ TinyGFX の設計文書。**たたき台だが、フットプリントの数字�
 | **API の形と内部構造を知る** | **[CORE_DESIGN.ja.md](CORE_DESIGN.ja.md)** |
 | **なぜそう設計したのかを知る／論点を潰す** | **[DECISIONS.ja.md](DECISIONS.ja.md)** |
 | **公開 API と、それぞれの値札を見る** | **[API.ja.md](API.ja.md)** |
+| **他の GFX ライブラリとの違いと、その理由を知る** | **[COMPARISON.ja.md](COMPARISON.ja.md)** |
 | フラッシュ・RAM の予算と実測値を見る | [FOOTPRINT.ja.md](FOOTPRINT.ja.md) |
 | これから削る余地と、その実測値を見る | [OPTIMIZE.ja.md](OPTIMIZE.ja.md) |
 | **フォントまわりの実測を知る**（形式そのものは外部仕様） | **[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md)** |
