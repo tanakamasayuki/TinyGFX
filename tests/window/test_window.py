@@ -50,3 +50,17 @@ def test_window(dut):
         assert (xs, ys) == (0, 0), f"オフセット無しのパネルで r={rot} が ({xs},{ys})"
 
     assert (r["clip_w"], r["clip_h"]) == (240, 135), "setRotation で width/height が入れ替わっていない"
+
+    # --- setter の呼び出し順に依存しないこと（2026-08-29 レビューの P0） ------
+    #
+    # setGramSize() / setOffset() は、どちらを先に呼んでも、begin() の前でも
+    # 後でも、その場で現在回転のオフセットを導出すること。以前は
+    # setRotation() の中でしか導出しておらず、回転しないスケッチでは
+    # オフセットが一生効かなかった。
+    for who, label in (("late", "begin() の後"),
+                       ("swap", "begin() の後・逆順"),
+                       ("early", "begin() の前")):
+        got = (r[f"{who}_xs"], r[f"{who}_ys"])
+        assert got == (52, 40), (
+            f"{label}に setGramSize/setOffset を呼んだのに窓が {got}"
+            "（setRotation を挟まないと反映されていない）")

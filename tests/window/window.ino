@@ -48,6 +48,46 @@ void setup() {
   tgfxReport("clip_h", (long)lcd.height());
   lcd.setRotation(0);
 
+  // --- setter の呼び出し順に依存しないこと --------------------------------
+  //
+  // **2026-08-29 の設計レビューで見つかった P0 の再発防止。**
+  // オフセットは setRotation() の中でしか導出しておらず、begin() の後に
+  // setGramSize() / setOffset() を呼んだだけでは反映されなかった。回転を
+  // 使わないスケッチでは一生反映されない。上の probe() は毎回
+  // setRotation() を通るので、この経路を素通りしていた。
+  {
+    TinyGFXPanelST7789 late(bus, 135, 240);
+    TinyGFX g(late);
+    g.begin();                     // ここで setRotation(0) 相当まで済む
+    late.setGramSize(240, 320);
+    late.setOffset(52, 40);
+    g.setAddrWindow(0, 0, 1, 1);   // **setRotation を挟まない**
+    tgfxReport("late_xs", (long)bus.windowXs());
+    tgfxReport("late_ys", (long)bus.windowYs());
+  }
+  {
+    // 逆順でも同じであること（どちらが後でも古い方の値で導出しない）
+    TinyGFXPanelST7789 swap(bus, 135, 240);
+    TinyGFX g(swap);
+    g.begin();
+    swap.setOffset(52, 40);
+    swap.setGramSize(240, 320);
+    g.setAddrWindow(0, 0, 1, 1);
+    tgfxReport("swap_xs", (long)bus.windowXs());
+    tgfxReport("swap_ys", (long)bus.windowYs());
+  }
+  {
+    // begin() の前に呼んでも効くこと（バスに触らないので順序自由）
+    TinyGFXPanelST7789 early(bus, 135, 240);
+    TinyGFX g(early);
+    early.setGramSize(240, 320);
+    early.setOffset(52, 40);
+    g.begin();
+    g.setAddrWindow(0, 0, 1, 1);
+    tgfxReport("early_xs", (long)bus.windowXs());
+    tgfxReport("early_ys", (long)bus.windowYs());
+  }
+
   tgfxTestDone();
 }
 void loop() {}

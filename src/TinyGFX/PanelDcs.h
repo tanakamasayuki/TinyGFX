@@ -37,14 +37,26 @@ class TinyGFXPanelDcs : public TinyGFXPanel {
  public:
   /// The module's GRAM origin offset. Give the value for rotation 0; the
   /// offsets for rotations 1-3 are derived from this and setGramSize().
-  void setOffset(int16_t x, int16_t y) { _offX0 = x; _offY0 = y; }
+  ///
+  /// **Call in any order, before or after begin().** Both setters re-derive
+  /// the current rotation's offset on the spot, so neither leaves the other
+  /// stale. They touch no bus, so calling them before begin() is fine too.
+  void setOffset(int16_t x, int16_t y) {
+    _offX0 = x;
+    _offY0 = y;
+    deriveOffsets();
+  }
 
   /// The controller's GRAM size; defaults to the panel size.
   /// On a module with an offset, rotations 2 and 3 land in the wrong place
   /// unless this is set.
   /// For example: a 240x240 ST7789 wants setGramSize(240, 320), and a
   /// 135x240 one wants setGramSize(240, 320) plus setOffset(52, 40).
-  void setGramSize(int16_t w, int16_t h) { _gramW = w; _gramH = h; }
+  void setGramSize(int16_t w, int16_t h) {
+    _gramW = w;
+    _gramH = h;
+    deriveOffsets();
+  }
 
   /// Colour order. Set the other way if red and blue come out swapped.
   void setRgbOrder(bool bgr) { _bgr = bgr; }
@@ -141,7 +153,10 @@ class TinyGFXPanelDcs : public TinyGFXPanel {
   int16_t _offX0 = 0, _offY0 = 0;  // offset at rotation 0
   int16_t _gramW = 0, _gramH = 0;  // 0 means "same as the panel"
   int16_t _offX = 0, _offY = 0;    // offset at the current rotation
+  void deriveOffsets();
+
   int8_t _rst;
+  uint8_t _rot = 0;
   uint8_t _flip = 0;
   bool _bgr;
   bool _invert;
@@ -185,9 +200,14 @@ inline bool TinyGFXPanelDcs::init() {
   return true;
 }
 
-inline void TinyGFXPanelDcs::setRotation(uint8_t r) {
-  r = (uint8_t)(r & 3);
-  uint8_t madctl;
+/// Work out where the picture sits in GRAM for the rotation now in force.
+///
+/// Kept apart from setRotation() so that setOffset() and setGramSize() can
+/// re-run it without touching the bus. Otherwise whichever of them was called
+/// second would leave _offX / _offY derived from the older pair, and a module
+/// with an offset would draw in the wrong place until the next setRotation() -
+/// which for a sketch that never rotates is never.
+inline void TinyGFXPanelDcs::deriveOffsets() {
   // The offset measured from the far side. This matters on modules whose
   // GRAM is larger than the panel.
   const int16_t gw = (_gramW > 0) ? _gramW : _natW;
@@ -196,16 +216,24 @@ inline void TinyGFXPanelDcs::setRotation(uint8_t r) {
   int16_t rs2 = (int16_t)(gh - _natH - _offY0);
   if (cs2 < 0) cs2 = 0;
   if (rs2 < 0) rs2 = 0;
-  switch (r) {
-    case 0: madctl = 0; _width = _natW; _height = _natH;
-            _offX = _offX0; _offY = _offY0; break;
-    case 1: madctl = (uint8_t)(MADCTL_MV | MADCTL_MX); _width = _natH; _height = _natW;
-            _offX = _offY0; _offY = cs2; break;
-    case 2: madctl = (uint8_t)(MADCTL_MX | MADCTL_MY); _width = _natW; _height = _natH;
-            _offX = cs2; _offY = rs2; break;
-    default: madctl = (uint8_t)(MADCTL_MV | MADCTL_MY); _width = _natH; _height = _natW;
-             _offX = rs2; _offY = _offX0; break;
+  switch (_rot) {
+    case 0:  _offX = _offX0; _offY = _offY0; break;
+    case 1:  _offX = _offY0; _offY = cs2;    break;
+    case 2:  _offX = cs2;    _offY = rs2;    break;
+    default: _offX = rs2;    _offY = _offX0; break;
   }
+}
+
+inline void TinyGFXPanelDcs::setRotation(uint8_t r) {
+  _rot = (uint8_t)(r & 3);
+  uint8_t madctl;
+  switch (_rot) {
+    case 0: madctl = 0; _width = _natW; _height = _natH; break;
+    case 1: madctl = (uint8_t)(MADCTL_MV | MADCTL_MX); _width = _natH; _height = _natW; break;
+    case 2: madctl = (uint8_t)(MADCTL_MX | MADCTL_MY); _width = _natW; _height = _natH; break;
+    default: madctl = (uint8_t)(MADCTL_MV | MADCTL_MY); _width = _natH; _height = _natW; break;
+  }
+  deriveOffsets();
   madctl ^= _flip;
   if (_bgr) madctl |= MADCTL_BGR;
   _bus->beginTransaction();
