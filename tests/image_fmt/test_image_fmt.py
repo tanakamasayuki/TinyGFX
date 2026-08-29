@@ -42,6 +42,40 @@ def test_image_fmt(dut):
     assert r["offscreen_pixels"] == 0, (
         f"完全に画面外の画像で {r['offscreen_pixels']} 画素送っている")
 
+    # --- raw565 は 1 行に窓を 1 つしか開かない ---------------------------------
+    #
+    # 写真は連長が 1 なので、連ごとに fillRect を呼ぶと**画素ごとに窓が開く**。
+    # 実測でそうなっていた: 32x32 の雑音で **1,024 画素に対しコマンド 3,072 個**、
+    # 1 画素 13 バイト。1 行 1 窓にして 96 個になった（docs/IMAGE_FORMAT.ja.md）。
+    #
+    # コマンドは窓 1 つにつき 3 個（CASET / RASET / RAMWR）。
+    assert r["photo_pixels"] == W * H, (
+        f"64x64 を 32x32 に描いて {r['photo_pixels']} 画素。{W*H} のはず")
+    assert r["photo_cmds"] == 3 * H, (
+        f"窓が {r['photo_cmds'] / 3:.0f} 個。行数 {H} と同じでなければならない")
+
+    # 左上へはみ出しても同じ。自前でクリップする経路なので、**画面外に書かない**
+    # ことと画素数が変わらないことを見る。
+    assert r["photo_off_pixels"] == W * H, (
+        f"はみ出させて {r['photo_off_pixels']} 画素。{W*H} のはず")
+    assert r["photo_off_cmds"] == 3 * H
+
+    # クリップ内はクリップ無しと 1 画素も違わず、外は 1 画素も触られないこと。
+    assert r["photo_clip_in_diff"] == 0, (
+        f"クリップ内が {r['photo_clip_in_diff']} 画素違う")
+    assert r["photo_clip_out_lit"] == 0, (
+        f"クリップの外に {r['photo_clip_out_lit']} 画素描いている")
+    assert r["photo_clip_pixels"] == 16 * 16, (
+        f"16x16 のクリップで {r['photo_clip_pixels']} 画素送っている")
+    assert r["photo_clip_cmds"] == 3 * 16
+
+    # 極端な座標では 1 画素も送らないこと。`clipX0 - x` の桁溢れで c0 が負に
+    # 化けると、**画像データの手前を読んで**画面に出る。
+    assert r["photo_extreme_pixels"] == 0, (
+        f"完全に画面外なのに {r['photo_extreme_pixels']} 画素送っている")
+    assert r["photo_extreme_cmds"] == 0, (
+        f"完全に画面外なのに窓を {r['photo_extreme_cmds'] / 3:.0f} 個開いている")
+
     # --- 透過 -----------------------------------------------------------------
     #
     # 同じ画像を透過あり／無しで描く。**透過色の画素だけが下地を残し、

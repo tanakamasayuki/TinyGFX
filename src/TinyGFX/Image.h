@@ -201,31 +201,80 @@ inline void drawRlePal4(TinyGFX& g, const CellImage* im, int16_t x, int16_t y) {
 
 // ---- 生 RGB565 -----------------------------------------------------------
 
+/// Pixel `c` of a raw565 row. Big endian, read through tinygfx_rd8 so the
+/// data may sit in PROGMEM.
+inline uint16_t px(const uint8_t* row, int16_t c) {
+  return (uint16_t)(((uint16_t)tinygfx_rd8(&row[c * 2]) << 8) | tinygfx_rd8(&row[c * 2 + 1]));
+}
+
+
 /// 写真など、圧縮が効かない絵向け。**基準機では 64x64 で 8KB なので現実的
 /// ではない** - ESP32 のような余裕のある環境用。
+///
+/// This one does not go through fillRect, and that is the whole point.
+///
+/// Every other decoder here emits runs, and a run through fillRect costs one
+/// window (CASET + RASET + RAMWR = 11 bytes) plus the pixels. That is the
+/// right trade when runs are long, which is exactly what an RLE format
+/// guarantees. raw565 guarantees the opposite: a photograph has runs of one.
+/// Measured on a 32x32 of pure noise, the run form sent **3,072 commands for
+/// 1,024 pixels** - 13 bytes a pixel to move a 2,048-byte image.
+///
+/// So this opens one window per span and streams into it. Same picture, and
+/// the same 32x32 costs one window a row.
+///
+/// A span ends where a transparent pixel starts, because a window has to be
+/// filled completely once it is open - skipping a pixel inside one would shift
+/// everything after it. With no transparent colour the span is the whole row.
+///
+/// The window path does not clip, so the clipping is done here, against
+/// g.clipX0() and friends.
 inline void drawRaw565(TinyGFX& g, const CellImage* im, int16_t x, int16_t y) {
   const Head d = head(im);
   if (d.data == nullptr || d.w <= 0 || d.h <= 0) return;
+  // The surviving column span. The same for every row, so it is found once.
+  //
+  // In 32 bits, because clipX0 - x overflows int16_t for coordinates that are
+  // still perfectly legal to pass: x = -32768 makes the difference 32768.
+  // Taking coordinates from outside the screen and clipping them is part of
+  // the contract (see TinyGFX::fillRect). Both are back inside int16_t by the
+  // time they are used, because the clip rectangle is.
+  int32_t c0 = 0, c1 = (int32_t)d.w - 1;
+  if ((int32_t)x + c0 < g.clipX0()) c0 = (int32_t)g.clipX0() - x;
+  if ((int32_t)x + c1 > g.clipX1()) c1 = (int32_t)g.clipX1() - x;
+  if (c0 > c1 || c1 < 0 || c0 >= (int32_t)d.w) return;
   g.startWrite();
   for (int16_t r = 0; r < d.h; ++r) {
+    const int32_t py32 = (int32_t)y + r;
+    if (py32 < g.clipY0() || py32 > g.clipY1()) continue;
+    const int16_t py = (int16_t)py32;
     const uint8_t* s = d.data + (int32_t)r * d.w * 2;
-    int16_t runStart = 0;
-    uint16_t cur = (uint16_t)((tinygfx_rd8(s) << 8) | tinygfx_rd8(&s[1]));
-    for (int16_t c = 1; c < d.w; ++c) {
-      const uint16_t col = (uint16_t)((tinygfx_rd8(&s[c * 2]) << 8) |
-                                      tinygfx_rd8(&s[c * 2 + 1]));
-      if (col != cur) {
-        if (!(d.hasTransparent && cur == d.transparent)) {
-          g.fillRect((int16_t)(x + runStart), (int16_t)(y + r),
-                     (int16_t)(c - runStart), 1, cur);
-        }
-        runStart = c;
-        cur = col;
+    int16_t c = (int16_t)c0;
+    const int16_t cEnd = (int16_t)c1;
+    while (c <= cEnd) {
+      uint16_t col = px(s, c);
+      if (d.hasTransparent && col == d.transparent) { ++c; continue; }
+      // How far the opaque span reaches.
+      int16_t e = (int16_t)(c + 1);
+      while (e <= cEnd) {
+        const uint16_t n = px(s, e);
+        if (d.hasTransparent && n == d.transparent) break;
+        ++e;
       }
-    }
-    if (!(d.hasTransparent && cur == d.transparent)) {
-      g.fillRect((int16_t)(x + runStart), (int16_t)(y + r),
-                 (int16_t)(d.w - runStart), 1, cur);
+      g.setAddrWindow((int16_t)(x + c), py, (int16_t)(e - c), 1);
+      // Equal neighbours still collapse into one writeColor - free here, and
+      // it is what makes a flat area cheap without a second code path.
+      uint16_t cur = col;
+      uint16_t run = 1;
+      for (int16_t i = (int16_t)(c + 1); i < e; ++i) {
+        const uint16_t n = px(s, i);
+        if (n == cur) { ++run; continue; }
+        g.writeColor(cur, run);
+        cur = n;
+        run = 1;
+      }
+      g.writeColor(cur, run);
+      c = e;
     }
   }
   g.endWrite();

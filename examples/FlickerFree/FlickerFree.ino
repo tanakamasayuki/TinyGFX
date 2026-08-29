@@ -39,12 +39,6 @@ struct Ball {
 };
 static Ball ball = {40, 40, 3, 2};
 
-// Runs once per band. Anything expensive in here runs that many times.
-static void drawScene(TinyGFX& g, void* ctx) {
-  const Ball* b = (const Ball*)ctx;
-  g.drawRect(0, 0, WIDTH, HEIGHT, TFT_DARKGREY);
-  g.fillCircle(b->x, b->y, 16, TFT_CYAN);
-}
 
 void setup() {
   canvas.begin();
@@ -57,6 +51,15 @@ void loop() {
   if (ball.x < 17 || ball.x > WIDTH - 18) ball.dx = -ball.dx;
   if (ball.y < 17 || ball.y > HEIGHT - 18) ball.dy = -ball.dy;
 
-  canvas.render(drawScene, &ball);
+  // Runs once per band. Anything expensive in here runs that many times.
+  //
+  // A lambda can just read `ball`; nothing has to be packed behind a void*.
+  // The other form, canvas.render(fn, &ctx) with
+  // `void fn(TinyGFX&, void*)`, is still there for code that would rather
+  // have a named function. They cost the same.
+  canvas.render([&](TinyGFX& g) {
+    g.drawRect(0, 0, WIDTH, HEIGHT, TFT_DARKGREY);
+    g.fillCircle(ball.x, ball.y, 16, TFT_CYAN);
+  });
   delay(16);
 }

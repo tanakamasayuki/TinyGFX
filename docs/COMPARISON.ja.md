@@ -113,6 +113,11 @@ TinyGFX はどちらの重複も持たない。
 - **draw / write の二重系**: `startWrite()` / `endWrite()` は**入れ子を数える**
   ので、外側で 1 回開けば内側の描画がそのまま入れ子になる。関数を 2 系統
   用意する必要がない
+- **UTF-8**: U8g2 はここでも 2 系統で、`drawStr`（バイト単位）と
+  `drawUTF8` が別関数になっている。TinyGFX は `drawString` 1 本で
+  **既定が UTF-8**（[DECISIONS.ja.md](DECISIONS.ja.md) D26）。
+  バイト単位が要るなら `TINYGFX_FONT_UTF8=0` で切り替える —— **関数ではなく
+  ビルドの選択にした**ので、呼び分けを間違えようがない
 
 ### 4.5 「2 系統」に見えて違うもの
 
@@ -265,6 +270,7 @@ CellFont は生のビットマップなので、こちらのデコーダはビ�
 | 画像デコーダ（JPG / PNG / BMP / QOI） | デコーダだけで基準機の FLASH を使い切る |
 | アンチエイリアス（TFT_eSPI / LovyanGFX） | 中間色が要る。1bpp では成立せず、色深度の抽象が要る |
 | タッチ（LovyanGFX は 11 種） | 責務の外（[REQUIREMENTS.ja.md](REQUIREMENTS.ja.md) §5） |
+| `setSwapBytes`（**全社が持っている**） | 実行時のモードは「使わないスケッチにも +44 B / RAM +4 B」（画素ごとの分岐）。`tinygfx_swapBytes565()` を呼ぶ形にした —— **呼ばなければ 0 B**（D29） |
 
 ## この調査で見つかった自分の穴
 

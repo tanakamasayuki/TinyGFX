@@ -115,6 +115,11 @@ TinyGFX has neither duplication.
 - **draw / write pairs**: `startWrite()` / `endWrite()` **count their nesting**,
   so opening one on the outside simply nests the drawing inside it. No second
   family needed
+- **UTF-8**: U8g2 splits here too - `drawStr` reads bytes, `drawUTF8` decodes.
+  TinyGFX has one `drawString` and **UTF-8 is the default**
+  ([DECISIONS.ja.md](DECISIONS.ja.md) D26). Byte-per-character is
+  `TINYGFX_FONT_UTF8=0`: **a build choice rather than a second function**, so
+  there is no pair of calls to pick wrongly between
 
 ### 4.5 What looks like two families but is not
 
@@ -270,6 +275,7 @@ other libraries have it, so compatibility argues for it too.
 | Image decoders (JPG / PNG / BMP / QOI) | the decoder alone would use up the reference board's flash |
 | Anti-aliasing (TFT_eSPI, LovyanGFX) | needs intermediate shades. Meaningless at 1bpp, and needs the depth abstraction |
 | Touch (LovyanGFX has 11 controllers) | out of scope ([REQUIREMENTS.ja.md](REQUIREMENTS.ja.md) 5) |
+| `setSwapBytes` (**every library has it**) | a runtime mode costs **+44 B and +4 B of RAM to sketches that never swap** (a branch per pixel). `tinygfx_swapBytes565()` is called instead - **0 B unless called** (D29) |
 
 ## Holes this survey found in TinyGFX
 

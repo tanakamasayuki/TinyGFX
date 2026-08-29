@@ -16,6 +16,7 @@
 #include "mono_h.h"
 #include "mono_v.h"
 #include "trans_icon.h"
+#include "photo64.h"
 
 static const int W = 32, H = 32;
 static uint16_t gram[W * H];
@@ -84,6 +85,58 @@ void setup() {
   lcd.drawImage(&same_rlepal4Ref, -40, -40);
   lcd.drawImage(&same_rlepal4Ref, 40, 40);
   tgfxReport("offscreen_pixels", (long)bus.pixelCount());
+
+  // --- raw565 は 1 行に窓を 1 つしか開かない ---------------------------------
+  //
+  // 写真は連長が 1 なので、連ごとに fillRect を呼ぶと**画素ごとに窓を開く**
+  // ことになる（CASET + RASET + RAMWR で 11 バイト、画素は 2 バイト）。
+  // 64x64 の写真を 32x32 の画面に描くと、見えるのは 32 行。
+  // **窓は 1 行に 1 つ = コマンド 96 個**でなければならない。
+  reset();
+  lcd.drawImage(&img_photo64Ref, 0, 0);
+  tgfxReport("photo_cmds", (long)bus.commandCount());
+  tgfxReport("photo_pixels", (long)bus.pixelCount());
+  snap();
+  tgfxShot("photo", gram, W, H);
+
+  // 左上をはみ出させても同じ。**窓の外を数えないこと**（自前でクリップする
+  // 経路なので、ここを間違えると画面外に書く）。
+  reset();
+  lcd.drawImage(&img_photo64Ref, -8, -8);
+  tgfxReport("photo_off_cmds", (long)bus.commandCount());
+  tgfxReport("photo_off_pixels", (long)bus.pixelCount());
+
+  // クリップ内はクリップ無しと 1 画素も違わず、外は 1 画素も触られないこと。
+  reset();
+  lcd.setClipRect(8, 8, 16, 16);
+  lcd.drawImage(&img_photo64Ref, 0, 0);
+  lcd.clearClipRect();
+  {
+    long inDiff = 0, outLit = 0;
+    for (int y = 0; y < H; ++y) {
+      for (int x = 0; x < W; ++x) {
+        const bool inside = (x >= 8 && x < 24 && y >= 8 && y < 24);
+        if (inside) { if (gram[y * W + x] != ref[y * W + x]) ++inDiff; }
+        else if (gram[y * W + x] != 0) ++outLit;
+      }
+    }
+    tgfxReport("photo_clip_in_diff", inDiff);
+    tgfxReport("photo_clip_out_lit", outLit);
+    tgfxReport("photo_clip_cmds", (long)bus.commandCount());
+    tgfxReport("photo_clip_pixels", (long)bus.pixelCount());
+  }
+
+  // 極端な座標。**`clipX0 - x` は int16_t で桁溢れする** —— x = -32768 で
+  // 差が 32768 になる。画面の外の座標を渡してクリップさせるのは契約のうち
+  // なので（tests/clip の「極端な座標」と同じ）、ここで踏んでおく。
+  // 溢れると c0 が負に化けて、**画像データの手前を読む。**
+  reset();
+  lcd.drawImage(&img_photo64Ref, -32768, 0);
+  lcd.drawImage(&img_photo64Ref, 32767, 0);
+  lcd.drawImage(&img_photo64Ref, 0, -32768);
+  lcd.drawImage(&img_photo64Ref, 0, 32767);
+  tgfxReport("photo_extreme_pixels", (long)bus.pixelCount());
+  tgfxReport("photo_extreme_cmds", (long)bus.commandCount());
 
   // --- 透過 -----------------------------------------------------------------
   //

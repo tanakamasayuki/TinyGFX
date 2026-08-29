@@ -27,6 +27,14 @@ static void scene(TinyGFX& g, void* ctx) {
 
 static const int ROWS[] = {1, 2, 3, 5, 7, 8};
 
+static uint16_t ref[W * H];
+static void snapshot() { for (int i = 0; i < W * H; ++i) ref[i] = gram[i]; }
+static long diffFromSnapshot() {
+  long d = 0;
+  for (int i = 0; i < W * H; ++i) { if (gram[i] != ref[i]) ++d; }
+  return d;
+}
+
 void setup() {
   Serial.begin(115200);
   tgfxTestBegin("tile");
@@ -57,6 +65,32 @@ void setup() {
     tgfxReport2(key, "ok", ok ? 1 : 0);
     tgfxReport2(key, "pixels", (long)bus.pixelCount());
     tgfxShot(name, gram, W, H);
+  }
+
+  // ラムダで渡しても、関数ポインタ + void* とまったく同じ絵になること。
+  // 中を通る道が違う（トランポリンを 1 枚挟む）ので、ここで固定しておく。
+  {
+    TinyGFXTileCanvas c(panel, band, (uint32_t)(W * 4));
+    c.setBackgroundColor(BG);
+    c.begin();
+    bus.fill(0);
+    bus.resetCounters();
+    c.render(scene);
+    tgfxReport("fnptr_pixels", (long)bus.pixelCount());
+    snapshot();
+
+    // 捕捉つき。呼ばれた回数も数えて、帯の数と合うことを見る。
+    int bands = 0;
+    TinyGFXTileCanvas c2(panel, band, (uint32_t)(W * 4));
+    c2.setBackgroundColor(BG);
+    c2.begin();
+    bus.fill(0);
+    bus.resetCounters();
+    c2.render([&](TinyGFX& g) { ++bands; scene(g, nullptr); });
+    tgfxReport("lambda_pixels", (long)bus.pixelCount());
+    tgfxReport("lambda_diff", diffFromSnapshot());
+    tgfxReport("lambda_bands", (long)bands);
+    tgfxReport("lambda_tilerows", (long)c2.tileRows());
   }
 
   // 1 行ぶんも無いバッファでは描けない

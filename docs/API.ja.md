@@ -36,8 +36,8 @@
 | `fillRoundRect` | 612 | |
 | `fillTriangle` | **832** | 走査線の並べ替えが要る |
 | `drawRoundRect` | **868** | **`fillRoundRect` より重い。** 弧を 4 つ描くため |
-| 文字（`drawChar` / `drawString` / `textWidth`） | **1,028〜1,132** | 下記 |
-| `TinyGFXPrint` + `print(long)` | +280 | 文字の上に |
+| 文字（`drawChar` / `drawString` / `textWidth`） | **1,192〜1,296** | 下記。**UTF-8 の 164 B 込み** |
+| `TinyGFXPrint` + `print(long)` | +404 | 文字の上に。うち 128 B は UTF-8 の状態機械 |
 | `print(float)` | **載らない** | 下記 |
 
 ### 表の読み方
@@ -51,9 +51,10 @@
 - **`drawRoundRect` が `fillRoundRect` より重い**（868 対 612）。塗りは走査線で
   済むが、枠は弧を 4 つ別々に描くため。角丸の枠が要るだけなら、塗りで下地を
   作って内側を背景色で塗るほうが小さいことがある
-- **文字は 1,028 B から。** 内訳のほとんどは CellFont のデコーダで、
+- **文字は 1,192 B から。** 内訳のほとんどは CellFont のデコーダで、
   `textWidth` を呼ぶだけでも 1,044 B かかる（索引と連鎖の走査が要るため）。
-  **1 文字でも描くなら全部載る**ので、そこから先は誤差
+  **1 文字でも描くなら全部載る**ので、そこから先は誤差。
+  164 B は UTF-8 の復号で、`-DTINYGFX_FONT_UTF8=0` で丸ごと戻る
 
 ### 載らないもの
 
@@ -61,7 +62,7 @@
 CH32V003 で **FLASH が 2,724 バイト溢れる**（実測）。AVR や ESP32 では載るが、
 基準機で通らないものを API として勧めることはしない。
 
-整数を出したいだけなら `print(long)` が +280 B で済む。小数が要るなら
+整数を出したいだけなら `print(long)` が +404 B で済む。小数が要るなら
 自分で整数に直して桁を入れる（`v / 100` と `v % 100`）ほうが、どの環境でも
 確実に小さい。
 
@@ -143,6 +144,19 @@ RAM が足りなければ**帯**で描ける（1 ページ 128 B）。
 | `void setRotation(uint8_t r)` / `uint8_t getRotation()` | 0..3。1 と 3 で幅高さが入れ替わる |
 | `static constexpr uint16_t color565(r, g, b)` | コンパイル時に畳まれる |
 
+#### 色定数
+
+**2 つの綴りがあります。どちらもマクロなので 0 バイトです。**
+
+| 綴り | 例 | 性質 |
+| --- | --- | --- |
+| `TFT_*` | `TFT_RED` | TFT_eSPI / LovyanGFX と同じ名前。**1 つずつ `#ifndef` で囲ってある**ので、先に定義しているライブラリがあればそちらが勝つ |
+| `TINYGFX_*` | `TINYGFX_RED` | 無条件。**奪われない名前**が要るときに（D30） |
+
+16 色（`BLACK` `NAVY` `DARKGREEN` `MAROON` `PURPLE` `OLIVE` `DARKGREY` `BLUE`
+`GREEN` `CYAN` `RED` `MAGENTA` `YELLOW` `WHITE` `ORANGE` `PINK`）。
+それ以外は `color565(r, g, b)` で作れます（コンパイル時に畳まれます）。
+
 ### 図形
 
 すべて `uint16_t color` を最後に取る。座標は `int16_t`。
@@ -163,6 +177,7 @@ RAM が足りなければ**帯**で描ける（1 ページ 128 B）。
 | --- | --- |
 | `setClipRect(x, y, w, h)` | |
 | `resetClipRect()` / `clearClipRect()` | 同じもの。`clearClipRect` は別名 |
+| `clipX0()` / `clipY0()` / `clipX1()` / `clipY1()` | **復号器のため。** 両端を含む。自分で窓を開く復号器（`setAddrWindow` は**クリップしない**）が自前でクリップするのに使う。普通の描画には要らない |
 
 ### 画像
 
@@ -171,9 +186,15 @@ RAM が足りなければ**帯**で描ける（1 ページ 128 B）。
 | `pushImage(x, y, w, h, const uint16_t* data)` | RGB565、行優先 |
 | `pushImage(x, y, w, h, data, uint16_t transparent)` | その色は飛ばす |
 | `drawBitmap(x, y, const uint8_t* bitmap, w, h, color)` | **1bpp。アイコン用。+284 B** |
+| `tinygfx_swapBytes565(uint16_t* data, uint32_t count)` | RGB565 のバイト順をその場で入れ替える。**`setSwapBytes` の代わり。呼ばなければ 0 B** |
 
-`pushImage` のデータは **RAM に置くこと。** AVR の PROGMEM 画像には未対応
-（[DECISIONS.ja.md](DECISIONS.ja.md) Q6）。
+`pushImage` のデータは **RAM に置くこと**（[DECISIONS.ja.md](DECISIONS.ja.md) D27）。
+
+**この制限があるのは AVR だけです。** CH32V003 や ESP32 はフラッシュが
+アドレス空間に見えているので、`static const uint16_t img[] = {...}` を
+そのまま渡せます。AVR でフラッシュに置きたいときは `drawImage`（次節）を
+使ってください —— 変換ツールの出す raw565 が同じ生 RGB565 で、
+**PROGMEM から読みます。**
 
 `drawBitmap` は逆で、**フォントと同じ読み方（`tinygfx_rd8`）をするので
 AVR では PROGMEM に置くこと。** ビットは MSB first、**各行がバイト境界から
@@ -268,6 +289,26 @@ lcd.pushImage(10, 50, 16, 16, sprBuf, TFT_BLACK);       // 黒を透過して貼
 画面全体を持ちたいだけなら、スプライトではなく
 [`TinyGFX/TileCanvas.h`](../src/TinyGFX/TileCanvas.h) の帯描画を使う。
 
+### 帯で描く（ちらつき対策）
+
+`#include <TinyGFX/TileCanvas.h>`。**+944 B / RAM は帯のぶんだけ。**
+
+| | |
+| --- | --- |
+| `TinyGFXTileCanvas(TinyGFXPanel& target, uint16_t* buffer, uint32_t bufferPixels)` | バッファは呼び出し側のもの |
+| `bool begin()` / `setRotation(r)` | |
+| `TinyGFX& gfx()` | フォントや色をここで設定する。`render()` をまたいで残る |
+| `render(callable)` | **任意の callable**（ラムダなど）。引数は `TinyGFX&` 1 つ |
+| `render(void (*fn)(TinyGFX&, void*), void* ctx = nullptr)` | 関数ポインタ版。**同じ大きさ**（D28） |
+| `setBackgroundColor(c)` / `setAutoClear(bool)` | |
+| `int16_t tileRows()` | 1 帯の行数。バッファが 1 行に足りなければ 0 |
+
+**描画関数は帯の数だけ呼ばれる。** 座標は画面全体のもので、
+オフセットとクリップはこちらで面倒を見る。
+
+**行数を変えても絵は 1 画素も変わらない**（`tests/tile/` が検査）。
+速度と RAM の交換にしかならない。
+
 ### 文字
 
 `#include <TinyGFX/FontCell.h>` が要る。**書かなければデコーダは載らない**
@@ -292,8 +333,9 @@ lcd.pushImage(10, 50, 16, 16, sprBuf, TFT_BLACK);       // 黒を透過して貼
 | `drawString(const char* s, x, y)` | 戻り値は進んだ幅 |
 | `drawCenterString(s, cx, y)` | `cx` を中心に。**+116 B**（呼ばなければ 0） |
 | `drawRightString(s, rx, y)` | 右端を `rx` に。**両方使って +232 B** |
-| `drawChar(uint16_t ch, x, y)` | |
+| `drawChar(uint16_t ch, x, y)` | 引数は**コードポイント**（バイトではない） |
 | `textWidth(const char* s)` | **これだけでも 1,044 B** |
+| `TinyGFX::nextCode(const char*& p)` | 静的。1 文字進めてコードポイントを返す。**呼ばなければ 0 B** |
 | `setTextColor(fg)` / `setTextColor(fg, bg)` | 2 引数版は背景セルを塗る |
 | `setTextSize(uint8_t)` / `getTextSize()` | 整数倍のみ |
 | `setCursor(x, y)` / `getCursorX()` / `getCursorY()` | `TinyGFXPrint` 用 |
@@ -304,6 +346,40 @@ lcd.pushImage(10, 50, 16, 16, sprBuf, TFT_BLACK);       // 黒を透過して貼
 
 収録外の文字は U+FFFD に退避する。フォントが U+FFFD を持っていなければ
 何も描かない（豆腐は出ない）。
+
+#### 文字列は UTF-8
+
+`drawString` / `textWidth` / `TinyGFXPrint` の `print` は **`char*` を UTF-8 として
+読む**。誰かが選んだわけではなく、**そう保存されているから**である。Arduino IDE は
+スケッチを UTF-8 で保存するので、`"25°C"` はソースの時点で 4 バイトではなく
+5 バイトになっている。バイトを 1 文字として読むと、度記号 1 つが 2 文字、
+仮名 1 つが 3 文字になり、しかも**黙って**そうなる。
+
+| 入力 | 結果 |
+| --- | --- |
+| U+0000〜U+FFFF | そのコードポイント |
+| U+FFFF 超（絵文字など） | **U+FFFD。ただし 4 バイトすべて消費する**（後ろがずれない） |
+| 途中で切れた列 | U+FFFD。**壊れたバイトの手前で止まる**（終端を飛び越えない） |
+| 先導のない継続バイト・0xFE・0xFF | U+FFFD。1 バイトだけ消費 |
+| 冗長符号化（overlong） | **拒否せず復号する。** 指しているのは元々描ける文字なので、ここで弾いても得るものがない |
+
+U+FFFF を超えられないのは、フォント側の入口が `uint16_t` だから
+（`TinyGFXFontOps::draw`）。
+
+`nextCode` を公開しているのは、**折り返しや部分幅を自分で計算するコードが
+同じ歩き方をしないと答えが合わない**ため。
+
+```cpp
+const char* p = s;
+while (*p) {
+  const char* start = p;
+  uint16_t cp = TinyGFX::nextCode(p);   // p が 1 文字進む
+  ...
+}
+```
+
+`TINYGFX_FONT_UTF8` を 0 にするとバイト単位（Latin-1）に戻る。**バイト単位で
+測ったサイズに 1 バイトの差もなく戻る**（実測）。
 
 ### 生のウィンドウ
 
@@ -324,6 +400,7 @@ lcd.pushImage(10, 50, 16, 16, sprBuf, TFT_BLACK);       // 黒を透過して貼
 | `TINYGFX_FONT_BG` | 1 | `setTextColor` の第 2 引数が効かなくなる | −108 |
 | `TINYGFX_FONT_SCALE` | 1 | `setTextSize(2)` 以上が効かなくなる | −116 |
 | `TINYGFX_FONT_CHAIN` | 1 | `CellFont::next` の連鎖を辿らない | −16 |
+| `TINYGFX_FONT_UTF8` | 1 | 文字列をバイト単位（Latin-1）で読む | **−148**（`TinyGFXPrint` も使っていれば −292） |
 | `TINYGFX_FONT_SPARSE` | 1 | 疎索引のフォントが**描けなくなる** | フォント次第 |
 | `TINYGFX_FONT_RECORDS` | 1 | 可変ピッチのフォントが**描けなくなる** | フォント次第 |
 | `TINYGFX_MONO_FAST_FILL` | 1 | モノクロの塗りが 1 画素ずつになる | −428 |
@@ -336,7 +413,7 @@ lcd.pushImage(10, 50, 16, 16, sprBuf, TFT_BLACK);       // 黒を透過して貼
 ## 入れていないもの
 
 LovyanGFX 系（[LGFXVirtualCanvas](https://github.com/tanakamasayuki/LGFXVirtualCanvas)）
-には約 150 の API があり、TinyGFX には 51 しかない。**足りないのではなく、
+には約 150 の API があり、TinyGFX には 58 しかない。**足りないのではなく、
 基準機に載らないものを最初から持たない**という選択。
 
 | 無いもの | 理由 |
@@ -346,6 +423,8 @@ LovyanGFX 系（[LGFXVirtualCanvas](https://github.com/tanakamasayuki/LGFXVirtua
 | `pushImageRotateZoom` / `setPivot` | 回転拡大は浮動小数か固定小数の補間が要る |
 | `drawArc` / `drawEllipse` / `drawBezier` | 三角関数か媒介変数。要望が出たら実測してから |
 | `setTextDatum` / `getTextDatum` | **入れない。** 揃えは `drawCenterString` / `drawRightString` で提供する（下記） |
+| 糖衣クラス（`TinyGFX_ST7789_SoftSPI` のようなもの） | **入れない。** 大きさは変わらない（実測 ±0）が、**バスを利用者が持っていることがこのライブラリの売り**で、糖衣クラスは中でバスを作ってしまう（D31） |
+| `setSwapBytes` | **入れない。** 実行時のモードは「使わないスケッチにも +44 B / RAM +4 B」（画素ごとの分岐）。代わりに `tinygfx_swapBytes565(data, count)` を呼ぶ。**呼ばなければ 0 B、呼べば +32 B**（D29） |
 | `drawNumber` | **+168 B で足せる**（実測）。整数から文字列への変換 |
 | パレット・色深度の切り替え | コアに色深度の抽象を持たない（D4） |
 | `readPixel` | パネル側にある。`TinyGFXPanelDcs::readPixels()`。**1 画素 150us** のデバッグ用 |

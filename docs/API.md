@@ -37,8 +37,8 @@ increment over a sketch that already has the panel, the bus and `fillRect`**
 | `fillRoundRect` | 612 | |
 | `fillTriangle` | **832** | the scanlines have to be sorted |
 | `drawRoundRect` | **868** | **dearer than filling one.** Four arcs to draw |
-| Text (`drawChar` / `drawString` / `textWidth`) | **1,028-1,132** | see below |
-| `TinyGFXPrint` + `print(long)` | +280 | on top of text |
+| Text (`drawChar` / `drawString` / `textWidth`) | **1,192-1,296** | see below. **UTF-8's 164 B is in there** |
+| `TinyGFXPrint` + `print(long)` | +404 | on top of text; 128 B of it is the UTF-8 state machine |
 | `print(float)` | **does not fit** | see below |
 
 ### How to read it
@@ -53,10 +53,11 @@ Two entries are worth remembering.
   is scanlines; an outline is four arcs drawn separately. If all you want is a
   rounded frame, filling one and painting the inside in the background colour
   can come out smaller.
-- **Text starts at 1,028 B.** Nearly all of that is the CellFont decoder, and
+- **Text starts at 1,192 B.** Nearly all of that is the CellFont decoder, and
   `textWidth` alone pulls in 1,044 B because it still has to walk the index and
   the chain. **Draw one character and you have paid for all of it**; everything
-  after that is rounding error.
+  after that is rounding error. 164 B is UTF-8 decoding, which
+  `-DTINYGFX_FONT_UTF8=0` gives back in full.
 
 ### What will not fit
 
@@ -65,7 +66,7 @@ On a CH32V003 the flash region **overflows by 2,724 bytes** (measured). They fit
 on AVR and ESP32, but an API that does not fit on the reference board is not one
 this library will recommend.
 
-If you only need an integer, `print(long)` costs +280 B. If you need a decimal
+If you only need an integer, `print(long)` costs +404 B. If you need a decimal
 point, splitting the value yourself (`v / 100` and `v % 100`) is smaller
 everywhere, on every core.
 
@@ -147,6 +148,19 @@ When that will not fit, draw a band at a time instead - 128 B for one page.
 | `void setRotation(uint8_t r)` / `uint8_t getRotation()` | 0..3; 1 and 3 swap width and height |
 | `static constexpr uint16_t color565(r, g, b)` | folded at compile time |
 
+#### Colour constants
+
+**Two spellings, both macros, both free.**
+
+| Spelling | Example | Behaviour |
+| --- | --- | --- |
+| `TFT_*` | `TFT_RED` | the name TFT_eSPI and LovyanGFX use. **Each one is individually `#ifndef`-guarded**, so a library that got there first keeps its definition |
+| `TINYGFX_*` | `TINYGFX_RED` | unconditional. For when you need a name **that cannot be taken** (D30) |
+
+Sixteen colours (`BLACK` `NAVY` `DARKGREEN` `MAROON` `PURPLE` `OLIVE` `DARKGREY`
+`BLUE` `GREEN` `CYAN` `RED` `MAGENTA` `YELLOW` `WHITE` `ORANGE` `PINK`).
+Anything else comes from `color565(r, g, b)`, which folds at compile time.
+
 ### Shapes
 
 All take `uint16_t color` last; coordinates are `int16_t`.
@@ -167,6 +181,7 @@ All take `uint16_t color` last; coordinates are `int16_t`.
 | --- | --- |
 | `setClipRect(x, y, w, h)` | |
 | `resetClipRect()` / `clearClipRect()` | the same thing; the second is an alias |
+| `clipX0()` / `clipY0()` / `clipX1()` / `clipY1()` | **for decoders.** Inclusive on both edges. A decoder that opens its own window (`setAddrWindow` **does not clip**) needs these to clip itself. Ordinary drawing never does |
 
 ### Images
 
@@ -175,9 +190,14 @@ All take `uint16_t color` last; coordinates are `int16_t`.
 | `pushImage(x, y, w, h, const uint16_t* data)` | RGB565, row major |
 | `pushImage(x, y, w, h, data, uint16_t transparent)` | that colour is skipped |
 | `drawBitmap(x, y, const uint8_t* bitmap, w, h, color)` | **1bpp, for icons. +284 B** |
+| `tinygfx_swapBytes565(uint16_t* data, uint32_t count)` | swaps RGB565 byte order in place. **What stands in for `setSwapBytes`. 0 B unless called** |
 
-`pushImage` data must be **in RAM**. PROGMEM images on AVR are not supported
-([DECISIONS.ja.md](DECISIONS.ja.md) Q6).
+`pushImage` data must be **in RAM** ([DECISIONS.ja.md](DECISIONS.ja.md) D27).
+
+**Only AVR is affected.** On a CH32V003 or an ESP32 flash is part of the address
+space, so `static const uint16_t img[] = {...}` can be handed straight to
+`pushImage`. To keep an image in flash on AVR, use `drawImage` (below) - the
+converter's raw565 is the same raw RGB565 and **reads from PROGMEM**.
 
 `drawBitmap` is the other way round: it **reads the way font data is read**
 (`tinygfx_rd8`), so on AVR it must be **in PROGMEM**. Bits are MSB first and
@@ -277,6 +297,26 @@ of RAM) 16x16 is 512 B and **32x32 does not fit at 2,048 B** (measured). If what
 you want is a whole screen without flicker, use the band rendering in
 [`TinyGFX/TileCanvas.h`](../src/TinyGFX/TileCanvas.h) instead of a sprite.
 
+### Drawing in bands (flicker-free)
+
+`#include <TinyGFX/TileCanvas.h>`. **+944 B, plus whatever the band costs.**
+
+| | |
+| --- | --- |
+| `TinyGFXTileCanvas(TinyGFXPanel& target, uint16_t* buffer, uint32_t bufferPixels)` | the buffer is yours |
+| `bool begin()` / `setRotation(r)` | |
+| `TinyGFX& gfx()` | set the font and colours here; they survive across `render()` calls |
+| `render(callable)` | **any callable** - a lambda, say - taking one `TinyGFX&` |
+| `render(void (*fn)(TinyGFX&, void*), void* ctx = nullptr)` | the function-pointer form. **Same size** (D28) |
+| `setBackgroundColor(c)` / `setAutoClear(bool)` | |
+| `int16_t tileRows()` | rows in one band; 0 when the buffer cannot hold even one |
+
+**The drawing runs once per band.** Coordinates stay whole-screen; the offset
+and the clip are handled in here.
+
+**Changing the row count does not change a single pixel** (`tests/tile/`
+enforces it). It trades speed against RAM and nothing else.
+
 ### Text
 
 Needs `#include <TinyGFX/FontCell.h>`. **Leave it out and the decoder is not
@@ -302,8 +342,9 @@ spec 12.2). Without that you get an ordering trap - "including the font before
 | `drawString(const char* s, x, y)` | returns how far the pen moved |
 | `drawCenterString(s, cx, y)` | centred on `cx`. **+116 B**, nothing if never called |
 | `drawRightString(s, rx, y)` | right edge at `rx`. **+232 B for both** |
-| `drawChar(uint16_t ch, x, y)` | |
+| `drawChar(uint16_t ch, x, y)` | takes a **code point**, not a byte |
 | `textWidth(const char* s)` | **1,044 B on its own** |
+| `TinyGFX::nextCode(const char*& p)` | static. Steps one character and returns its code point. **0 B unless called** |
 | `setTextColor(fg)` / `setTextColor(fg, bg)` | the two-argument form paints the cell behind |
 | `setTextSize(uint8_t)` / `getTextSize()` | whole multiples only |
 | `setCursor(x, y)` / `getCursorX()` / `getCursorY()` | for `TinyGFXPrint` |
@@ -314,6 +355,41 @@ spec 12.2). Without that you get an ordering trap - "including the font before
 
 A character the font does not cover falls back to U+FFFD. If the font has no
 U+FFFD either, nothing is drawn - there is no built-in tofu box.
+
+#### Strings are UTF-8
+
+`drawString`, `textWidth` and `TinyGFXPrint::print` read `char*` **as UTF-8**.
+Not because anyone chose that, but because that is what the bytes already are:
+the Arduino IDE saves sketches as UTF-8, so `"25°C"` is five bytes in the source
+file, not four. Read a byte at a time, one degree sign becomes two characters
+and one kana becomes three - **silently**.
+
+| Input | Result |
+| --- | --- |
+| U+0000-U+FFFF | that code point |
+| above U+FFFF (emoji and friends) | **U+FFFD, but all four bytes are consumed** - nothing after it shifts |
+| a sequence cut short | U+FFFD, stopping **on** the byte that broke it. Never reads past the terminator |
+| a continuation byte with no lead, 0xFE, 0xFF | U+FFFD, one byte consumed |
+| an overlong encoding | **decoded, not rejected.** It names a character that was drawable anyway, so refusing it buys nothing here |
+
+U+FFFF is the ceiling because the font interface takes a `uint16_t`
+(`TinyGFXFontOps::draw`).
+
+`nextCode` is public because **anything that lays out text itself - wrapping at
+a width, measuring a substring - has to walk strings the same way to get the
+same answer.**
+
+```cpp
+const char* p = s;
+while (*p) {
+  const char* start = p;
+  uint16_t cp = TinyGFX::nextCode(p);   // p moves on by one character
+  ...
+}
+```
+
+Setting `TINYGFX_FONT_UTF8` to 0 goes back to a byte per character (Latin-1),
+and **returns to the byte-for-byte size it had before UTF-8 existed** (measured).
 
 ### The raw window
 
@@ -335,6 +411,7 @@ Everything defaults to on. **Define nothing and nothing changes.**
 | `TINYGFX_FONT_BG` | 1 | the second argument of `setTextColor` stops working | −108 |
 | `TINYGFX_FONT_SCALE` | 1 | `setTextSize(2)` and above stop working | −116 |
 | `TINYGFX_FONT_CHAIN` | 1 | `CellFont::next` is not followed | −16 |
+| `TINYGFX_FONT_UTF8` | 1 | strings are read a byte at a time (Latin-1) | **−148** (−292 if `TinyGFXPrint` is in too) |
 | `TINYGFX_FONT_SPARSE` | 1 | a sparse font **cannot be drawn** | font dependent |
 | `TINYGFX_FONT_RECORDS` | 1 | a variable-pitch font **cannot be drawn** | font dependent |
 | `TINYGFX_MONO_FAST_FILL` | 1 | monochrome fills go back to one pixel at a time | −428 |
@@ -348,7 +425,7 @@ line in a generated header is the only clue.
 
 The LovyanGFX family
 ([LGFXVirtualCanvas](https://github.com/tanakamasayuki/LGFXVirtualCanvas)) has
-around 150 calls where TinyGFX has 51. **Not a gap to be filled** - the point is
+around 150 calls where TinyGFX has 58. **Not a gap to be filled** - the point is
 to not carry what will not fit on the reference board.
 
 | Absent | Why |
@@ -358,6 +435,8 @@ to not carry what will not fit on the reference board.
 | `pushImageRotateZoom` / `setPivot` | rotate-and-scale needs floating point or fixed-point interpolation |
 | `drawArc` / `drawEllipse` / `drawBezier` | trigonometry or parametric curves. Measure first if someone asks |
 | `setTextDatum` / `getTextDatum` | **deliberately absent.** Alignment is `drawCenterString` / `drawRightString` instead - see below |
+| A one-object convenience class (`TinyGFX_ST7789_SoftSPI` and friends) | **deliberately absent.** It measures the same size (±0), but **the bus being yours is the point of this library**, and a convenience class constructs it for you (D31) |
+| `setSwapBytes` | **deliberately absent.** A runtime mode costs **+44 B and +4 B of RAM to sketches that never swap anything** (a branch per pixel). Call `tinygfx_swapBytes565(data, count)` instead: **0 B unless called, +32 B when it is** (D29) |
 | `drawNumber` | **+168 B would buy it** (measured). Integer to string |
 | Palettes, switchable colour depth | the core has no colour-depth abstraction (D4) |
 | `readPixel` | it lives on the panel: `TinyGFXPanelDcs::readPixels()`. **150us a pixel**, for debugging |

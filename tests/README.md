@@ -53,7 +53,10 @@ tests/
   tile/               tile height never changes the image (invariant)
   text/               text: return value, scaling, missing glyphs, background, transparency
   fontchain/          CellFont chaining, U+FFFD fallback, baseline alignment
-  image/              pushImage placement, cropping, transparency
+  utf8/               UTF-8 decoding: code point and bytes consumed, per sequence
+  image/              pushImage placement, cropping, transparency, byte swapping
+  image_fmt/          every encoding of one picture draws the same pixels
+  image_oracle/       converter output vs the converter's own expected image
   hostbus/            captures the bytes the real SPI bus emitted and rebuilds the image
   fillchunk/          block-writing must not change a single byte on the wire
   clifont/            a CellFont header **from the real generator** must render
@@ -62,6 +65,7 @@ tests/
   u8g2/               u8g2-format font decoding
   i2c/                I2C + SSD1306 (monochrome, page transfer, dirty pages)
   monospi/            SPI + SSD1306 / SH1106: transaction and CS etiquette
+  softi2c/            the bit-banged I2C waveform, decoded back into bytes
   sh1106/             SH1106 wiring: the same picture an SSD1306 gives
   build_matrix/       examples compile for ch32v003 / uno / esp32 / m5stack (never run)
   manual/m5stack/     **hardware check sketch.** Not run by pytest (only compiled)

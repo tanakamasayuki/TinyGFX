@@ -37,7 +37,7 @@ void setup() {
   lcd.setFont(&u8g2CjkFont);
   bus.fill(0);
   bus.resetCounters();
-  tgfxReport("cjk_width", (long)tgfxDrawUtf8(lcd, "日本語表示", 2, 4));
+  tgfxReport("cjk_width", (long)lcd.drawString("日本語表示", 2, 4));
   tgfxShot("cjk", gram, W, H);
 
   // 収録外の文字は何も描かず 0
