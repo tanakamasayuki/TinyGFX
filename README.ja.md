@@ -32,6 +32,7 @@ CH32V003（フラッシュ 16KB / RAM 2KB）で、**全機能を使っても +6.
 | **使わない機能は 0 バイト** | `fillScreen` しか呼ばないスケッチに円や文字は載りません。**テストで機械的に検査しています** |
 | **フレームバッファ不要** | 画面へ直接流します。要るときだけ帯レンダリング（下記）で持ちます |
 | **動的確保なし** | `malloc` / `new` / `String` を使いません。バッファは利用者が渡します |
+| **バスを勝手に初期化しません** | `SPI.begin()` も `Wire.begin()` も呼ばず、ピンも選びません。**設定済みのバスを渡してもらう**ので、あなたの設定が壊れません |
 | **バス・パネル・フォント形式が差し替え可能** | しかも**使っていない実装はリンクされません** |
 | **数字で決めている** | 設計判断はすべて CH32V003 の実測値が根拠です（[docs/FOOTPRINT.ja.md](docs/FOOTPRINT.ja.md)） |
 
@@ -159,6 +160,112 @@ drawChar  drawString  drawCenterString  drawRightString  textWidth  fontHeight
 「この API がいくらか」を実測で載せてあるので、予算を組むときはそちらを。
 
 名前は決めの問題でしかないところを LovyanGFX に寄せてあります。**互換レイヤではありません。**
+
+## 移植性と、速さの話
+
+### バスを勝手に初期化しません
+
+**これは地味ですが実害を防ぎます。** 初期化を自分でやるライブラリは珍しく
+なく、そういうものが
+
+```cpp
+Wire.begin(21, 22, 400000);   // 自分のピンと速度で用意した
+display.begin();              // ← この中で Wire.begin() を呼ばれると
+```
+
+**あなたの設定が上書きされます。** ピンが既定に戻り、クロックが落ち、同じ
+バスに乗っている他のセンサが動かなくなる —— しかも黙って起きます。
+
+TinyGFX は `SPI.begin()` も `Wire.begin()` も呼ばず、ピンも選びません。
+**用意済みのインスタンスを受け取るだけ**です。
+
+```cpp
+Wire.begin(21, 22, 400000);            // あなたのもの。TinyGFX は触りません
+TinyGFXBusI2C bus(Wire, 0x3C);
+```
+
+TinyGFX が触るのは、**そのパネル専用の DC と CS のピンだけ**です。転送は
+Arduino の作法どおり `beginTransaction` / `endTransaction` で包むので、
+同じ線に SD カードが乗っていても共存します。
+
+**ページ方式のモノクロパネルがこれを通っていない不具合が 2026-08-29 に
+見つかり、修正しました。** I2C は転送ごとに開始と停止をするので露見せず、
+SPI のテストが無かったのが原因です。いまは `tests/monospi/` が
+「1 バイトもトランザクションの外に出ないこと」を検査しています。
+
+### 標準 Arduino API しか使いません
+
+`src/` 全体が触る Arduino API はこれだけです。
+
+```
+pinMode  digitalWrite  digitalRead  delay  delayMicroseconds
+SPI（<TinyGFX/BusSPI.h> を include したときだけ）
+Wire（<TinyGFX/BusI2C.h> を include したときだけ）
+```
+
+ベンダ SDK もレジスタ直叩きも、プラットフォーム別の `#ifdef` もありません
+（PROGMEM の読み出しだけは AVR で分岐しますが、他は素の参照になります）。
+**描画コアは `Arduino.h` すら参照していません** —— 触るのはバスの実装だけです。
+
+だから `library.properties` は `architectures=*` で、**Arduino が動く板なら
+だいたい動きます。** 実測で確認しているのは CH32V003 / Arduino Uno R3 /
+ESP32 / ホストです。
+
+### その代わり速くはありません
+
+移植性は**素の GPIO と `SPI.transfer()` しか使わないこと**で買っています。
+DMA も、レジスタ直書きも、プラットフォーム別の速い経路もありません。
+実測（M5Stack Core 320x240、24MHz SPI、**`TINYGFX_FILL_CHUNK` を切った状態**）:
+
+| | |
+| --- | --- |
+| `fillScreen` | 178 ms |
+| `fillRect` 100x100 | 23 ms |
+| `fillCircle` r100 | 89 ms |
+| `drawString` 10 文字（倍角） | 3 ms |
+| `TileCanvas` 全画面 1 枚 | 194 ms |
+
+**`TINYGFX_FILL_CHUNK` を 1 以上にすると塗りが速くなります**（Arduino の
+まとめ書き `SPI.transfer(buf, len)` を使う。RAM はスタックに `size * 2`
+バイトだけ）。上の数字はそれを切った下限値で、`fillRect` シームを入れる
+前のものなので、いまはもう少し速いはずです。
+
+**それでも滑らかなアニメーションには向きません。** 計器・時計・設定画面のように、
+変わったところだけ描き直す用途を想定しています。
+
+### 速くしたいなら、バスを自分で書けます
+
+`TinyGFXBus` を継承するだけです。**ライブラリには一切手を入れません。**
+
+```cpp
+class MyDmaBus : public TinyGFXBus {
+ public:
+  void init() override { /* ピンとペリフェラルの用意 */ }
+  void beginTransaction() override { /* CS を落とす */ }
+  void endTransaction() override { /* CS を上げる */ }
+  void writeCommand(uint8_t c) override { /* DC を落として 1 バイト */ }
+  void writeData(const uint8_t* d, size_t n) override { /* n バイト */ }
+
+  // **ここが速くする口。** 同じ色を count 個
+  void writeColor(uint16_t color, uint32_t count) override { /* DMA でも */ }
+  // **ここも。** 画素の並びをそのまま
+  void writePixels(const uint16_t* d, uint32_t count) override { /* DMA でも */ }
+};
+
+MyDmaBus bus;
+TinyGFXPanelST7789 panel(bus, 240, 240, /*rst*/2);
+TinyGFX lcd(panel);
+```
+
+`writeColor` と `writePixels` が一括転送の入口で、塗りも画像も文字も
+最後はここを通ります。**描画側のコードは 1 行も変わりません。**
+
+パネル側にも口があります。`fillRect` を上書きすれば、窓プロトコルを
+通さずに直接塗れます（モノクロパネルがそうしています）。
+
+**同じ絵が出ることをテストで守れます** —— `TinyGFXBusCapture` が実際に
+流れたバイト列を仮想 GRAM に組み直すので、速いバスと素のバスで画が
+一致するかを、実機なしで比べられます（`tests/hostbus/` がその形）。
 
 ## フットプリント（CH32V003 / `-Os` / 実測）
 
