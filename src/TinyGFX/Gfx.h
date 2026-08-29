@@ -294,6 +294,17 @@ class TinyGFX {
     endWrite();
   }
 
+  /// Draw a generated image. See TinyGFX/Image.h.
+  ///
+  /// Declared here rather than there so a sketch calls it on the TinyGFX it
+  /// already has. The struct types live in Image.h, so this is a template on
+  /// the reference type - which costs nothing and keeps Gfx.h from having to
+  /// know what an image is.
+  template <class Ref>
+  void drawImage(const Ref* img, int16_t x, int16_t y) {
+    if (img != nullptr && img->ops != nullptr) img->ops->draw(*this, img->image, x, y);
+  }
+
   // ---- 1bpp bitmaps ----------------------------------------------------
   /// Draw a 1bpp bitmap - an icon, a logo, a sprite sheet cell.
   ///
