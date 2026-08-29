@@ -14,7 +14,7 @@ TinyGFX の設計文書。**たたき台だが、フットプリントの数字�
 | 使う人が読むもの | 日英 | `../README.ja.md`、`GUIDE.ja.md`、[API.ja.md](API.ja.md)、`../examples/README.ja.md`、`../tests/README.ja.md` |
 | 内部の記録・作業メモ | 日本語のみ | [REQUIREMENTS.ja.md](REQUIREMENTS.ja.md)、[CORE_DESIGN.ja.md](CORE_DESIGN.ja.md)、[DECISIONS.ja.md](DECISIONS.ja.md)、[FOOTPRINT.ja.md](FOOTPRINT.ja.md)、[OPTIMIZE.ja.md](OPTIMIZE.ja.md)、[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md)、[IMAGE_FORMAT.ja.md](IMAGE_FORMAT.ja.md)、[IMAGE_TOOL.ja.md](IMAGE_TOOL.ja.md)、[TEST_PLAN.ja.md](TEST_PLAN.ja.md)、[DEVELOPMENT_PLAN.ja.md](DEVELOPMENT_PLAN.ja.md)、[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md)、[MANUAL_TEST.ja.md](MANUAL_TEST.ja.md) |
 
-利用者向け文書（README / GUIDE / API）は **API が固まってから**書く。今は内部文書だけ。
+利用者向け文書のうち README と [API.ja.md](API.ja.md) は**書いた**。`GUIDE`（配線の手引き）だけ実機待ち。
 
 ## 読む順
 
