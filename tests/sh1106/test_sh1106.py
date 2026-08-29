@@ -53,3 +53,20 @@ def test_sh1106(dut):
     # 取り出した絵が SSD1306 と一致するはず。ここが 0 なら
     # setColumnOffset() が繋がっていない。
     assert r["offset0_matches_ssd"] == 1, "setColumnOffset() が効いていない"
+
+    # --- 縦詰めビットマップの速い経路 ----------------------------------------
+    #
+    # **ページ境界に揃った縦詰めは、このパネルのバッファそのもの。**
+    # `pushVBitmap()` が memcpy 相当で貼る。速いだけの経路であって別物では
+    # ないことを、汎用の `drawImage()` と突き合わせて固定する。
+    #
+    # 揃っていないときは**描かずに false を返す**こと。黙って間違った位置に
+    # 描くより、呼び手が汎用経路に落とせるほうがいい。
+    assert r["vblit_taken"] == 1, "揃っているのに速い経路に入っていない"
+    assert 0 < r["vblit_lit"] < 128 * 64, f"絵が単色（点灯 {r['vblit_lit']}）"
+    assert r["vblit_diff"] == 0, (
+        f"速い経路と汎用経路で {r['vblit_diff']} バイト違う")
+
+    assert r["vblit_unaligned"] == 0, "ページ境界に揃っていないのに受けている"
+    assert r["vblit_offpanel"] == 0, "パネルからはみ出しているのに受けている"
+    assert r["vblit_rotated"] == 0, "回転しているのに受けている"

@@ -165,56 +165,62 @@ ENCODERS = [
 ]
 
 
-# デコーダの実費（CH32V003、-Os、**src/TinyGFX/Image.h の本実装で実測**、
-# 2026-08-29）。使い捨ての実験実装より 60〜90 B 高い —— PROGMEM 経由の
-# ヘッダ読み、透過の判定、ops の間接呼び出しぶん。**どれも 383〜400 の
-# 範囲に収まるので、形式は実質データ量だけで決まる。**
+# デコーダの実費。**src/TinyGFX/Image.h の本実装で実測**（2026-08-29、-Os）。
 #
-# **データ量だけで選ぶと間違える。** CellFont 仕様 §13.4 と同じ話で、
-# 「データ + デコーダ」で比べないと総量が最小にならない。実例:
-# 128x64 のスプラッシュは rlepal4 が 816 B、bitmap1v が 1,028 B だが、
-# **bitmap1v はページ方式パネルのフレームバッファそのもの**なので
-# memcpy で貼れてデコーダが要らず、総量では bitmap1v が勝つ。
-# デコーダの実費（CH32V003、-Os、**src/TinyGFX/Image.h の本実装で実測**、
-# 2026-08-29）。使い捨ての実験実装より 60〜90 B 高い —— PROGMEM 経由の
-# ヘッダ読み、透過の判定、ops の間接呼び出しぶん。**どれも 383〜400 の
-# 範囲に収まるので、形式は実質データ量だけで決まる。**
+# **アーキテクチャで順位が入れ替わる。** AVR は 8 ビットなので 16 ビットの
+# 演算が高く、ESP32 は逆にビット取り出しのループが高い。だから --mcu が要る。
 #
-# **データ量だけで選ぶと間違える。** CellFont 仕様 §13.4 と同じ話で、
-# 「データ + デコーダ」で比べないと総量が最小にならない。
+#                ch32v003   avr  esp32
+#   raw565            400   638    492   ← AVR ではこれが最安
+#   rle565            387   663    467   ← ch32 / esp32 ではこれが最安
+#   rlepal4           395   679    483
+#   bitmap1h          400   654    592
+#   bitmap1v          392   690    592
 #
-# **しかもデコーダ代は画像ごとではなく形式ごとに 1 回。** 画像を 1 枚ずつ
-# 最小化すると形式が散らばってデコーダを何本も積むことになる。だから
+# 「データ + デコーダ」で比べないと総量が最小にならない（CellFont 仕様
+# §13.4 と同じ話）。**しかもデコーダ代は画像ごとではなく形式ごとに 1 回**
+# なので、画像を 1 枚ずつ最小化すると形式が散らばって損をする。
 # --batch では「使う形式の組み合わせ」を総当たりする。
 DECODER_BYTES = {
-    "raw565": 400, "rle565": 383, "rlepal4": 391,
-    "bitmap1h": 400, "bitmap1v": 392,
+    "ch32v003": {"raw565": 400, "rle565": 387, "rlepal4": 395,
+                 "bitmap1h": 400, "bitmap1v": 392},
+    "avr":      {"raw565": 638, "rle565": 663, "rlepal4": 679,
+                 "bitmap1h": 654, "bitmap1v": 690},
+    "esp32":    {"raw565": 492, "rle565": 467, "rlepal4": 483,
+                 "bitmap1h": 592, "bitmap1v": 592},
 }
 
 # **同じデコーダを共有する形式の組。** 1bpp の横詰めと縦詰めは、ビットの
-# 取り出し方が 1 行違うだけの同じループなので 1 本にまとめられる。実測:
+# 取り出し方が 1 行違うだけの同じループなので 1 本にまとめられる。向きは
+# 呼び出し側で定数（生成ヘッダが形式を知っている）なので、片方しか使わな
+# ければ片方ぶんの代金しか出ない。**「両対応にすると無駄」は起きない。**
+SHARED = {
+    "ch32v003": {("bitmap1h", "bitmap1v"): 504},
+    "avr":      {("bitmap1h", "bitmap1v"): 864},
+    "esp32":    {("bitmap1h", "bitmap1v"): 696},
+}
+
+# ページ境界に揃った縦詰めは、ページ方式パネルのバッファそのものなので
+# TinyGFXPanelPaged::pushVBitmap() がバイト複写で貼れる。**汎用経路の
+# 代わりではなく追加の速い経路。**
 #
-#   横のみ 400 / 縦のみ 392 / 両方使う 504（別々に足すと 792、288 B 損）
-#
-# 呼び出し側で向きがコンパイル時定数なので、片方しか使わなければ
-# 片方ぶんの代金しか出ない。**「両対応にすると無駄」は起きない。**
-SHARED = {("bitmap1h", "bitmap1v"): 504}
-
-# ページ境界に揃った全幅の縦詰めは、ページ方式パネルのフレームバッファ
-# そのものなので memcpy で貼れる。**汎用経路の代わりではなく追加の速い
-# 経路**なので、下の表には入れない（--aligned で見積もりを差し替える）。
-ALIGNED_VBLIT = 24
+# **244 B（CH32V003 実測）。** 「memcpy だけだから 24 B 程度」と見積もって
+# いたが本実装では 10 倍だった —— ページ境界・回転・帯・パネル外の判定と
+# dirty の追跡が残るため。汎用経路が 408 B なので**縮むのは 164 B だけ**で、
+# サイズでは rlepal4 に負けることがある。**速い経路の価値はサイズではなく
+# 速度**（ラン展開ではなくバイト複写）。
+ALIGNED_VBLIT = {"ch32v003": 244, "avr": 244, "esp32": 244}
 
 
-def group_cost(formats):
+def group_cost(formats, mcu):
     """使う形式の集合に対するデコーダ総額。共有する組は 1 本ぶんにまとめる。"""
     rest, total = set(formats), 0
-    for combo, cost in SHARED.items():
+    for combo, cost in SHARED[mcu].items():
         hit = rest & set(combo)
         if len(hit) > 1:
             total += cost
             rest -= hit
-    return total + sum(DECODER_BYTES[f] for f in rest)
+    return total + sum(DECODER_BYTES[mcu][f] for f in rest)
 
 
 def encode_all(w, h, rows):
@@ -242,12 +248,17 @@ def carray(name, data, per_line=16, typ="uint8_t"):
 def emit(name, w, h, fmt, data, pal, uniq, argv, transparent=None):
     ops = {"raw565": "Raw565", "rle565": "Rle565", "rlepal4": "Rlepal4",
            "bitmap1h": "Bitmap1h", "bitmap1v": "Bitmap1v"}[fmt]
+    # 透過は ops ではなく構造体の値で表す（形式とは扱いが違う）。理由は
+    # src/TinyGFX/Image.h の CellImage::transparent のコメントにある実測。
     L = []
     L.append(f"// {name} — TinyGFX 画像\n//")
     L.append("// tools/img2h.py が生成（**実験用**。正式なツールに置き換わる）")
     L.append(f"// 形式   : {fmt}")
     L.append(f"// 寸法   : {w}x{h}")
     L.append(f"// 色数   : {len(uniq)}")
+    if transparent is not None:
+        L.append(f"// 透過   : 0x{transparent:04X}"
+                 + ("（パレット索引）" if pal else "（色）"))
     L.append(f"// データ : {len(data)} バイト" + (f" + パレット {len(pal)*2}" if pal else ""))
     L.append(f"//\n// 再生成:\n//   python3 tools/img2h.py {' '.join(argv)}\n")
     L.append("#pragma once")
@@ -313,10 +324,9 @@ def pick_set(per_image, dec):
 def batch(a):
     """フォルダを一括で処理する。"""
     def dec(fs):
-        c = group_cost(fs)
         if a.aligned and set(fs) == {"bitmap1v"}:
-            c = ALIGNED_VBLIT          # 揃った全幅なら memcpy で済む
-        return c
+            return ALIGNED_VBLIT[a.mcu]     # 揃った全幅ならバイト複写で済む
+        return group_cost(fs, a.mcu)
 
     files = sorted(p for p in Path(a.batch).iterdir()
                    if p.suffix.lower() in (".png", ".bmp", ".gif", ".jpg", ".jpeg"))
@@ -335,7 +345,7 @@ def batch(a):
     choice, total, used = pick_set(per_image, dec)
     set_data = total - dec(used)
 
-    print(f"画像 {len(files)} 枚"
+    print(f"MCU: {a.mcu}   画像 {len(files)} 枚"
           + (f"   （--mono {a.mono} で 2 値化）" if a.mono is not None else "")
           + ("   （--aligned）" if a.aligned else ""))
     print()
@@ -370,10 +380,15 @@ def main():
     ap.add_argument("image", nargs="?")
     ap.add_argument("--batch", metavar="フォルダ",
                     help="フォルダを一括処理し、**形式をまとめて**最小化する")
+    ap.add_argument("--mcu", choices=["ch32v003", "avr", "esp32"], default="ch32v003",
+                    help="デコーダ代はアーキテクチャで変わる。**順位まで入れ替わる**")
     ap.add_argument("--aligned", action="store_true",
                     help="縦詰めをページ境界の全幅にだけ貼る前提にする。"
                          "ページ方式パネルなら memcpy で済むのでデコーダが 24 B になる")
     ap.add_argument("--prefix", default="", help="一括出力のシンボル接頭辞")
+    ap.add_argument("--transparent", metavar="RRGGBB",
+                    help="この色を透過にする（16 進 6 桁）。**透過の無い画像しか"
+                         "使わないなら指定しないこと** — 判定のコードが要らなくなる")
     ap.add_argument("--name", default="image")
     ap.add_argument("--out")
     ap.add_argument("--format", choices=[n for n, _ in ENCODERS],
@@ -398,7 +413,7 @@ def main():
         note = f"（--mono {a.mono} で 2 値化）" if a.mono is not None else ""
         print(f"{Path(a.image).name}  {w}x{h}  色数 {len(uniq)}{note}")
         print(f"  {'形式':<10} {'データ':>8} {'デコーダ':>8} {'総量':>8}")
-        dec = DECODER_BYTES
+        dec = DECODER_BYTES[a.mcu]
         best_d = min(v[2] for v in enc.values())
         best_t = min(v[2] + dec[k] for k, v in enc.items())
         for name, _ in ENCODERS:
@@ -425,7 +440,16 @@ def main():
     if fmt not in enc:
         sys.exit(f"{fmt} では符号化できない（色数 {len(uniq)}）")
     data, pal, total = enc[fmt]
-    text = emit(a.name, w, h, fmt, data, pal, uniq, sys.argv[1:])
+    tr = None
+    if a.transparent:
+        c565 = to565(tuple(int(a.transparent[i:i+2], 16) for i in (0, 2, 4)))
+        if pal:
+            if c565 not in pal:
+                sys.exit(f"透過色 {a.transparent} が画像に無い")
+            tr = pal.index(c565)
+        else:
+            tr = c565
+    text = emit(a.name, w, h, fmt, data, pal, uniq, sys.argv[1:], tr)
     if a.out:
         Path(a.out).write_text(text)
         print(f"{a.out}  {fmt}  {total} B  ({w}x{h}, 色数 {len(uniq)})")

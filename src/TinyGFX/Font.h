@@ -24,6 +24,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "Progmem.h"
+
 class TinyGFX;
 
 /// The entry point for one format. Everything returns -1 for "not covered".
@@ -47,34 +49,12 @@ struct TinyGFXFontRef {
   const TinyGFXFontOps* ops;
 };
 
-// ---------------------------------------------------------------------------
-// Reading font data (for formats other than CellFont)
+// Reading font data
 //
-// AVR keeps flash and data in separate address spaces, so anything in PROGMEM
-// can only be read through pgm_read_*. On every other architecture these
-// expand to a plain dereference and cost not a single instruction.
-//
-// Every last piece of font data belongs in PROGMEM. The decoders always read
-// it through tinygfx_rd*, so leaving the attribute off any one of them
-// produces garbage on AVR - pgm_read_* would be reading a RAM address out of
-// program space. That is the generator's responsibility.
+// Every last piece of font data belongs in PROGMEM, and the decoders read it
+// through tinygfx_rd* (TinyGFX/Progmem.h). Leaving the attribute off any one
+// of them produces garbage on AVR. That is the generator's responsibility.
 //
 // TinyGFXFontRef and TinyGFXFontOps go the other way: plain const (RAM on
 // AVR), read by plain dereference. Together they are 6-12 bytes per font, and
 // in exchange the dispatch path stays cheap.
-//
-// CellFont has its own spec-mandated spelling of the same thing,
-// CELLFONT_READ_*, which lives in CellFont.h and does not depend on TinyGFX.
-// ---------------------------------------------------------------------------
-#if defined(__AVR__)
-#include <avr/pgmspace.h>
-#define TINYGFX_FONT_PROGMEM PROGMEM
-inline uint8_t tinygfx_rd8(const void* p) { return pgm_read_byte(p); }
-inline uint16_t tinygfx_rd16(const void* p) { return pgm_read_word(p); }
-inline const void* tinygfx_rdptr(const void* p) { return (const void*)pgm_read_ptr(p); }
-#else
-#define TINYGFX_FONT_PROGMEM
-inline uint8_t tinygfx_rd8(const void* p) { return *(const uint8_t*)p; }
-inline uint16_t tinygfx_rd16(const void* p) { return *(const uint16_t*)p; }
-inline const void* tinygfx_rdptr(const void* p) { return *(const void* const*)p; }
-#endif
