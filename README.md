@@ -74,14 +74,16 @@ drawing code does not change by a single line.
 #include <TinyGFX.h>
 #include <TinyGFX/BusI2C.h>
 #include <TinyGFX/PanelSSD1306.h>
+#include <Wire.h>
 
 static uint8_t fb[128 * 64 / 8];        // 1,024 bytes, supplied by you
 
-TinyGFXBusI2C       bus(/*address*/0x3C);
+TinyGFXBusI2C       bus(Wire, /*address*/0x3C);
 TinyGFXPanelSSD1306 panel(bus, fb, 128, 64);
 TinyGFX             lcd(panel);
 
 void setup() {
+  Wire.begin();                         // the sketch owns the bus
   lcd.begin();
   lcd.fillRect(8, 8, 40, 16, TFT_WHITE);
   panel.display();                      // nothing reaches the screen until this
@@ -102,15 +104,43 @@ More in [examples/](examples/).
 | Bus | Software SPI (default, portable) | `TinyGFX/BusSoftSPI.h` |
 | | Hardware SPI | `TinyGFX/BusSPI.h` |
 | | I2C (Wire) | `TinyGFX/BusI2C.h` |
+| | Software I2C (any two GPIOs) | `TinyGFX/BusSoftI2C.h` |
 | | Command-stream capture (for verification) | `TinyGFX/BusCapture.h` |
-| Panel | ST7789 (colour TFT) | `TinyGFX/PanelST7789.h` |
+| Panel (colour) | ST7789 | `TinyGFX/PanelST7789.h` |
 | | ILI9342C (M5Stack Core / BASIC) | `TinyGFX/PanelILI9342.h` |
-| | SSD1306 (monochrome OLED) | `TinyGFX/PanelSSD1306.h` |
-| | RAM buffer (tests, tiled rendering) | `TinyGFX/PanelMemory.h` |
+| | ILI9341 | `TinyGFX/PanelILI9341.h` |
+| Panel (monochrome) | SSD1306 | `TinyGFX/PanelSSD1306.h` |
+| | SH1106 | `TinyGFX/PanelSH1106.h` |
+| Panel (other) | RAM buffer (offscreen, tiled rendering, tests) | `TinyGFX/PanelMemory.h` |
 | Font | CellFont (external spec v1, for H≤16) | `TinyGFX/FontCell.h` |
 | | u8g2 | `TinyGFX/FontU8g2.h` |
+| Images | raw RGB565 / RLE / RLE+palette / 1bpp (horizontal, vertical) | `TinyGFX/Image.h` |
 | Extras | Tiled rendering (flicker-free) | `TinyGFX/TileCanvas.h` |
 | | `print` / `printf` / float | `TinyGFX/Print.h` |
+
+Colour panels sit on `TinyGFX/PanelDcs.h` and monochrome ones on
+`TinyGFX/PanelPaged.h`. **Adding another controller of the same family
+measures +0 bytes**, so the panel list is cheap to extend.
+
+**The software SPI and the software I2C are there for different reasons.**
+
+| | In the CH32V003 core | Why it exists |
+| --- | --- | --- |
+| `SPI.h` | **absent** | **because it is absent.** `BusSoftSPI` is the default bus |
+| `Wire.h` | **present** | **for the pins.** Hardware I2C only comes out on two fixed pins, and on a part with as few as this one has, those are often wanted elsewhere |
+
+Which one is smaller flips by target (measured):
+
+| | Wire | software |
+| --- | ---: | ---: |
+| CH32V003 | **8,052** | 8,452 (+400) |
+| AVR | 5,608 | **4,164 (−1,444, and −217 of RAM)** |
+
+**On AVR the software one is smaller** - Wire carries a buffer and an
+interrupt-driven state machine. On the CH32V003 Wire is built into the core and
+already present in an empty sketch, so it wins there instead.
+
+The software I2C **needs external pull-ups**, as any I2C bus does.
 
 **What you do not include is not linked in** — buses, panels and font formats alike.
 
@@ -119,10 +149,15 @@ More in [examples/](examples/).
 ```
 drawPixel  drawFastHLine  drawFastVLine  drawLine  drawRect  fillRect  fillScreen  clear
 drawCircle  fillCircle  drawRoundRect  fillRoundRect  drawTriangle  fillTriangle
-pushImage (with a transparent variant)  setAddrWindow  writeColor  writePixels
+pushImage (with a transparent variant)  drawBitmap (1bpp)  drawImage (generated)
+setAddrWindow  writeColor  writePixels
 setClipRect  setRotation  startWrite / endWrite
-setFont  setCursor  setTextColor  setTextSize  drawChar  drawString  textWidth  fontHeight
+setFont  setCursor  setTextColor  setTextSize
+drawChar  drawString  drawCenterString  drawRightString  textWidth  fontHeight
 ```
+
+**What each of these costs is in [docs/API.md](docs/API.md)** - measured, so you
+can budget before you write the sketch.
 
 Names follow LovyanGFX wherever the name was the only thing at stake.
 **This is not a compatibility layer.**
@@ -245,7 +280,10 @@ The design record is Japanese only; [docs/README.ja.md](docs/README.ja.md) is th
 | The API shape and internal structure | [docs/CORE_DESIGN.ja.md](docs/CORE_DESIGN.ja.md) |
 | **Why it is built this way (reasons, and the options not taken)** | [docs/DECISIONS.ja.md](docs/DECISIONS.ja.md) |
 | Flash and RAM budgets, and the measurements | [docs/FOOTPRINT.ja.md](docs/FOOTPRINT.ja.md) |
+| **Every call, and what each one costs** | **[docs/API.md](docs/API.md)** |
+| **How this differs from the other GFX libraries, and why** | **[docs/COMPARISON.md](docs/COMPARISON.md)** |
 | Font measurements (the format itself is specified elsewhere) | [docs/FONT_FORMAT.ja.md](docs/FONT_FORMAT.ja.md) |
+| Image format measurements | [docs/IMAGE_FORMAT.ja.md](docs/IMAGE_FORMAT.ja.md) |
 | Test strategy | [docs/TEST_PLAN.ja.md](docs/TEST_PLAN.ja.md) |
 | **What to check on real hardware** | [docs/MANUAL_TEST.ja.md](docs/MANUAL_TEST.ja.md) |
 | Where the project stands and what is left | [docs/DEVELOPMENT_PLAN.ja.md](docs/DEVELOPMENT_PLAN.ja.md) |

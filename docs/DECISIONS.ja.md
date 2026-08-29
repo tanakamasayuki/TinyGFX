@@ -545,9 +545,9 @@ D1（virtual を置かない）と D4（色深度を抽象化しない）で避�
 | Q1 | 糖衣クラス（`TinyGFX_ST7789_SoftSPI`）を用意するか | 用意する / 3 オブジェクトのままにする | Phase 1 |
 | Q2 | 色定数のプレフィクス | `TFT_BLACK`（現状、`#ifndef` ガード付き）/ `TINYGFX_BLACK` | Phase 1 |
 | Q3 | フォント未設定時の挙動 | 何もしない（現状）/ 既定フォントを持つ | — **D17 で「同梱しない」としたので実質決着**。何もしない |
-| Q4 | `setSwapBytes` 相当を持つか | 持つ / Bus 実装ごとに固定（現状） | Phase 4 |
-| Q5 | CS 共有（他デバイスと SPI 共有）への対応 | v0.x では非対応 / Bus にフック | v1.0 前 |
-| Q6 | AVR で PROGMEM の**画像**を `pushImage` に渡せるようにするか | 対応する / RAM 上のみと明記する | Phase 4。**フォントは D19 で対応済み** |
+| Q4 | `setSwapBytes` 相当を持つか | 持つ / Bus 実装ごとに固定（現状） | Phase 4。**他ライブラリは全社が持っている**（`swap565_t` / `draw16bitBeRGBBitmap` / `setSwapBytes`。[COMPARISON.ja.md](COMPARISON.ja.md)）。画像ツールを作るなら、ツール側でバイト順を選べれば実行時に持たなくて済む |
+| ~~Q5~~ | ~~CS 共有（他デバイスと SPI 共有）への対応~~ | **決着（2026-08-29）。対応済み。** バスは利用者が `begin()` して渡す形にし、TinyGFX は Arduino の作法どおり `beginTransaction` / `endTransaction` で包む。**ページ方式パネルがそれを通っていない不具合があり修正済み**（[DEVELOPMENT_PLAN.ja.md](DEVELOPMENT_PLAN.ja.md) §1.1 の P0）。`tests/monospi/` が「1 バイトもトランザクションの外に出ないこと」を検査する | — |
+| Q6 | AVR で PROGMEM の**画像**を `pushImage` に渡せるようにするか | 対応する / RAM 上のみと明記する | **範囲が狭まった（2026-08-29）。** `drawBitmap` と `drawImage` は `tinygfx_rd8` 経由なので **PROGMEM 対応済み**。残るのは生の `uint16_t` 配列を取る `pushImage` だけで、そちらは `writePixels` の速い経路が RAM 前提。**写真を PROGMEM から窓へ直接流す経路が要るかは未計測**（[IMAGE_FORMAT.ja.md](IMAGE_FORMAT.ja.md)） |
 | ~~Q7~~ | ~~Panel の virtual メソッド数~~ | **決着。8 本にした**（ページ方式パネル向けの `fillRect` を含む。`invertDisplay` / `setSleep` / `displayOn` は具象パネルの非仮想メソッド） | — |
 | ~~Q8~~ | ~~ライブラリ名の重複確認~~ | **決着。3 レジストリとも競合なし**（[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E6） | — |
 | ~~Q9~~ | ~~サブセット化をどちらが持つか~~ | **取り下げ。完全に外部の Python ツールとして作る。TinyGFX 側は考慮しない**（素の GFXfont ヘッダを食えれば足りる） | — |
