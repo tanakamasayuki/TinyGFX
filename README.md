@@ -1,6 +1,7 @@
 # TinyGFX
 
-**A LovyanGFX-flavoured drawing API, cut down until it fits MCUs with very little flash and RAM.**
+**The drawing API Arduino graphics libraries have in common, cut down until it
+fits MCUs with very little flash and RAM.**
 
 > 日本語: [README.ja.md](README.ja.md)
 
@@ -160,8 +161,9 @@ drawChar  drawString  drawCenterString  drawRightString  textWidth  fontHeight
 **What each of these costs is in [docs/API.md](docs/API.md)** - measured, so you
 can budget before you write the sketch.
 
-Names follow LovyanGFX wherever the name was the only thing at stake.
-**This is not a compatibility layer.**
+Names follow what Arduino graphics libraries already share - `fillRect`,
+`drawString`, `setRotation`, `startWrite` - wherever the name was the only
+thing at stake. **This is not a compatibility layer for any of them.**
 
 ## Portability, and the speed you trade for it
 
