@@ -40,7 +40,13 @@ static uint16_t curCol = 0, curPage = 0;
 static uint8_t pendingCmd = 0, argIndex = 0, args[2] = {0, 0};
 static uint32_t dataBytes = 0, txCount = 0;
 
+// 初期化列のうち、パネルの高さで変わる 2 つを拾う（0xA8 多重比、0xDA COM ピン）
+static uint8_t muxArg = 0xFF, comArg = 0xFF, prevCmd = 0;
+
 static void feedCmd(uint8_t c) {
+  if (prevCmd == 0xA8) muxArg = c;
+  else if (prevCmd == 0xDA) comArg = c;
+  prevCmd = c;
   if (pendingCmd != 0) {
     args[argIndex++] = c;
     if (argIndex == 2) {
@@ -221,6 +227,57 @@ void setup() {
       if (whole[i] != model[i]) ++diff;
     }
     tgfxReport("banded_diff", diff);
+  }
+
+  // --- パネルの高さで初期化列が変わること ---------------------------------
+  //
+  // **2026-08-29 の設計レビューの P1。** 初期化列は 128x64 決め打ちだったのに
+  // コンストラクタは任意の w / h を受けていた。128x32 に 64 行ぶんの多重比を
+  // 送ると、絵がガラスの半分に潰れる。
+  {
+    static uint8_t fb32[128 * 32 / 8];
+    TinyGFXPanelSSD1306 p32(bus, fb32, 128, 32);
+    TinyGFX g32(p32);
+    muxArg = comArg = 0xFF;
+    g32.begin();
+    tgfxReport("mux32", (long)muxArg);
+    tgfxReport("com32", (long)comArg);
+
+    muxArg = comArg = 0xFF;
+    TinyGFXPanelSSD1306 p64(bus, fb, 128, 64);
+    TinyGFX g64(p64);
+    g64.begin();
+    tgfxReport("mux64", (long)muxArg);
+    tgfxReport("com64", (long)comArg);
+  }
+
+  // --- 使えない設定は begin() が false を返すこと --------------------------
+  //
+  // どれもコンパイル時には分からない（バッファは利用者が持つポインタ、
+  // 寸法はコンストラクタ引数）。**黙って壊れた絵を出すより落とす。**
+  {
+    TinyGFXPanelSSD1306 pnull(bus, nullptr, 128, 64);
+    TinyGFX g(pnull);
+    tgfxReport("begin_null_buffer", g.begin() ? 1 : 0);
+  }
+  {
+    static uint8_t fb60[128 * 8];
+    TinyGFXPanelSSD1306 podd(bus, fb60, 128, 60);  // 8 の倍数でない
+    TinyGFX g(podd);
+    tgfxReport("begin_odd_height", g.begin() ? 1 : 0);
+  }
+  {
+    static uint8_t fbz[128];
+    TinyGFXPanelSSD1306 pzero(bus, fbz, 0, 64);
+    TinyGFX g(pzero);
+    tgfxReport("begin_zero_width", g.begin() ? 1 : 0);
+  }
+  {
+    // まっとうな設定は通ること（上の 3 つが「常に false」で通らないように）
+    static uint8_t fbok[128 * 64 / 8];
+    TinyGFXPanelSSD1306 pok(bus, fbok, 128, 64);
+    TinyGFX g(pok);
+    tgfxReport("begin_ok", g.begin() ? 1 : 0);
   }
 
   tgfxTestDone();

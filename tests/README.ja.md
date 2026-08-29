@@ -7,7 +7,7 @@ TinyGFX のテスト一式。方針とケース一覧は [../docs/TEST_PLAN.ja.m
 - [pytest-embedded](https://docs.espressif.com/projects/pytest-embedded/en/latest/) + Arduino CLI バックエンド、`uv` で依存管理
 - **Tier 0（`footprint/` / `linkprune/`）はスケッチを実行しない。** ビルドしてサイズと
   シンボル表を見るだけなので `dut` を使わない。実機も要らない
-- **Tier 1（`capture/` ほか 15 本）は `lang-ship:host` 上でホスト実行**し、描いた結果を
+- **Tier 1 は `lang-ship:host` 上でホスト実行**し、描いた結果を
   画素で検証する。SDL2 も LovyanGFX も要らない
 
 ## 動かす
@@ -66,7 +66,9 @@ tests/
   scene/              実機と突き合わせるゴールデンをホストで作る
   hw/m5stack/         **実機（Tier 3）。** .env を渡したときだけ走る
   u8g2/               u8g2 形式フォントのデコード
-  i2c/                I2C + SSD1306（モノクロ・ページ転送・dirty ページ）
+  i2c/                I2C + SSD1306（モノクロ・ページ転送・dirty ページ・寸法契約）
+  monospi/            SPI + SSD1306 / SH1106。トランザクションと CS の作法
+  sh1106/             SH1106 の配線。SSD1306 と同じ絵になること
   build_matrix/       examples が ch32v003 / uno / esp32 / m5stack でビルドできるか（実行はしない）
   manual/m5stack/     **実機検証スケッチ。** pytest では走らない（ビルドだけ検査する）
 ```

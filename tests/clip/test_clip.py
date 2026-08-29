@@ -48,3 +48,20 @@ def test_clip(dut):
         f"画面より大きいクリップで {r['oversize_clip_pixels']} 画素（4096 のはず）")
     assert r["empty_clip_pixels"] == 0, (
         f"空のクリップで {r['empty_clip_pixels']} 画素送っている")
+
+    # --- 極端な座標でも契約どおりクリップすること（2026-08-29 レビューの P1）--
+    #
+    # 遠い側の端を int16_t で計算していたので x + w - 1 が桁溢れし、
+    # **画面いっぱいに描くべき矩形が丸ごと消えていた。** 総当たりで
+    # 28,441 通りの (x, w) が int32 版と食い違う。
+    W = H = 64
+    assert r["huge_rect_pixels"] == (W - 2) * (H - 2), (
+        f"(2,2) から幅 32767 の矩形が {r['huge_rect_pixels']} 画素"
+        f"（{(W - 2) * (H - 2)} のはず。0 なら桁溢れで丸ごと消えている）")
+    assert r["far_negative_pixels"] == 0, (
+        f"遠い左上の矩形が画面に届いている: {r['far_negative_pixels']} 画素")
+    assert r["far_positive_pixels"] == 0, (
+        f"画面外の右下の矩形が描かれている: {r['far_positive_pixels']} 画素")
+    assert r["huge_clip_pixels"] == (W - 2) * (H - 2), (
+        f"巨大なクリップ矩形で {r['huge_clip_pixels']} 画素"
+        f"（{(W - 2) * (H - 2)} のはず）")

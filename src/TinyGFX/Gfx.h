@@ -23,6 +23,20 @@ class TinyGFX {
   explicit TinyGFX(TinyGFXPanel& panel) : _panel(&panel) {}
 
   // ---- basics ----------------------------------------------------------
+  /// Bring the panel up. Returns whether the **configuration** is usable.
+  ///
+  /// It does not, and cannot, mean "a panel answered". Every panel TinyGFX
+  /// drives is write-only in normal use - there is no acknowledgement on a
+  /// 4-wire SPI display at all, and the one panel that can be read back
+  /// (docs/MANUAL_TEST.ja.md) needs the line turned around at 150us a pixel,
+  /// which is not something begin() is going to do. A sketch that treats
+  /// `true` as "the screen is alive" is fooling itself, whatever this returned.
+  ///
+  /// What it does catch is the class of mistake the compiler cannot: a null
+  /// framebuffer, a height that is not a whole number of pages, a zero
+  /// dimension. Those come from constructor arguments and a pointer the sketch
+  /// owns, and they end in a corrupt picture or a write past the end of a
+  /// buffer. **Those return false, and nothing is sent.**
   bool begin() {
     const bool ok = _panel->init();
     resetClipRect();
@@ -50,15 +64,17 @@ class TinyGFX {
 
   // ---- clipping --------------------------------------------------------
   void setClipRect(int16_t x, int16_t y, int16_t w, int16_t h) {
-    int16_t x1 = (int16_t)(x + w - 1);
-    int16_t y1 = (int16_t)(y + h - 1);
+    // 32 bits for the far edge - see fillRect for why.
+    int32_t x1 = (int32_t)x + w - 1;
+    int32_t y1 = (int32_t)y + h - 1;
     if (x < 0) x = 0;
     if (y < 0) y = 0;
     const int16_t mx = (int16_t)(width() - 1);
     const int16_t my = (int16_t)(height() - 1);
     if (x1 > mx) x1 = mx;
     if (y1 > my) y1 = my;
-    _clipX0 = x; _clipY0 = y; _clipX1 = x1; _clipY1 = y1;
+    _clipX0 = x; _clipY0 = y;
+    _clipX1 = (int16_t)x1; _clipY1 = (int16_t)y1;  // clamped above, so this fits
   }
   void resetClipRect() {
     _clipX0 = 0; _clipY0 = 0;
@@ -81,8 +97,15 @@ class TinyGFX {
 
   void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) {
     if (w <= 0 || h <= 0) return;
-    int16_t x1 = (int16_t)(x + w - 1);
-    int16_t y1 = (int16_t)(y + h - 1);
+    // The far edge in 32 bits. Taking coordinates from outside the screen and
+    // clipping them is part of the contract, and x + w - 1 overflows int16_t
+    // long before the caller is doing anything unreasonable: x=2, w=32767
+    // wraps to -32768, so x > x1 and a rectangle that should have covered the
+    // whole screen is dropped instead. 28,441 (x, w) pairs behave that way.
+    // Both are back inside int16_t by the time they are used, because the clip
+    // rectangle is.
+    int32_t x1 = (int32_t)x + w - 1;
+    int32_t y1 = (int32_t)y + h - 1;
     if (x < _clipX0) x = _clipX0;
     if (y < _clipY0) y = _clipY0;
     if (x1 > _clipX1) x1 = _clipX1;
@@ -275,7 +298,8 @@ class TinyGFX {
   void pushImage(int16_t x, int16_t y, int16_t w, int16_t h, const uint16_t* data) {
     if (w <= 0 || h <= 0 || data == nullptr) return;
     int16_t sx = 0, sy = 0;
-    int16_t x1 = (int16_t)(x + w - 1), y1 = (int16_t)(y + h - 1);
+    // 32 bits for the far edge - see fillRect for why.
+    int32_t x1 = (int32_t)x + w - 1, y1 = (int32_t)y + h - 1;
     if (x < _clipX0) { sx = (int16_t)(_clipX0 - x); x = _clipX0; }
     if (y < _clipY0) { sy = (int16_t)(_clipY0 - y); y = _clipY0; }
     if (x1 > _clipX1) x1 = _clipX1;

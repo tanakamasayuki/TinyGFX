@@ -26,8 +26,11 @@ class TinyGFXBusI2C : public TinyGFXBus {
   ///
   /// `chunk` is how many payload bytes go into one transmission.
   /// AVR's Wire buffer is 32 bytes in total, so the default is kept modest.
+  /// `chunk` of 0 is normalised to 1 rather than accepted: writeData() would
+  /// otherwise take 0 bytes a round and never finish - a hang, not a wrong
+  /// picture.
   TinyGFXBusI2C(TwoWire& wire, uint8_t address = 0x3C, uint8_t chunk = 16)
-      : _wire(&wire), _addr(address), _chunk(chunk) {}
+      : _wire(&wire), _addr(address), _chunk(chunk ? chunk : (uint8_t)1) {}
 
   /// Control bytes. Defaults are the SSD1306 family (command 0x00, data 0x40).
   void setControlBytes(uint8_t cmd, uint8_t data) { _cmdCtrl = cmd; _dataCtrl = data; }
