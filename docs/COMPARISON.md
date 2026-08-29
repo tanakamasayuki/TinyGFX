@@ -232,7 +232,6 @@ The survey turned up **one** addition clearly worth making.
 
 | | Cost on a CH32V003 | Who has it |
 | --- | ---: | --- |
-| **1bpp bitmap drawing** | **+120 B** | Adafruit (`drawBitmap` / `drawXBitmap`), U8g2, LovyanGFX |
 | `drawNumber` | +168 B | LovyanGFX, TFT_eSPI |
 | `setTextWrap` | not measured | Adafruit |
 | `drawEllipse` / `fillEllipse` | not measured | Adafruit, LovyanGFX |
@@ -258,10 +257,13 @@ other libraries have it, so compatibility argues for it too.
 
 ## Holes this survey found in TinyGFX
 
-1. **Offscreen drawing is undocumented.** `PanelMemory` + `pushImage` already
-   gives you a sprite, and neither the README nor the API reference says so.
-   **Document what exists before adding an API**
-2. **No 1bpp bitmap.** +120 B, as above. The highest-priority addition
+1. ~~Offscreen drawing is undocumented~~ - **written up** (2026-08-29).
+   `PanelMemory` + `pushImage` is the sprite. **No API was added; what already
+   existed was documented.** See [API.md](API.md)
+2. ~~No 1bpp bitmap~~ - **added** (2026-08-29) as `drawBitmap`. It costs
+   **+284 B**; the +120 estimate was for a naive per-pixel version. Coalescing
+   runs into one `fillRect` each costs 84 B more and saves an order of
+   magnitude of window setups on a colour panel
 3. **No `setTextWrap`.** `TinyGFXPrint` honours `\n` but does not wrap at the
    right edge. Adafruit does. Not measured
 4. **The colour decision is right for now, not forever.** Adding an SSD1327

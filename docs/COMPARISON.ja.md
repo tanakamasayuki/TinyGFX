@@ -229,7 +229,6 @@ CellFont は生のビットマップなので、こちらのデコーダはビ�
 
 | | CH32V003 での実費 | 誰が持っているか |
 | --- | ---: | --- |
-| **1bpp ビットマップの描画** | **+120 B** | Adafruit（`drawBitmap` / `drawXBitmap`）、U8g2、LovyanGFX |
 | `drawNumber` | +168 B | LovyanGFX、TFT_eSPI |
 | `setTextWrap`（自動折り返し） | 未測定 | Adafruit |
 | `drawEllipse` / `fillEllipse` | 未測定 | Adafruit、LovyanGFX |
@@ -255,10 +254,13 @@ CellFont は生のビットマップなので、こちらのデコーダはビ�
 
 ## この調査で見つかった自分の穴
 
-1. **オフスクリーン描画が文書化されていない。** `PanelMemory` + `pushImage`
-   でスプライト相当ができるのに、README にも API にも書いていない。
-   **API を足す前に、あることを書く**
-2. **1bpp ビットマップが無い。** 上記のとおり +120 B。優先度は高い
+1. ~~オフスクリーン描画が文書化されていない~~ → **書いた**（2026-08-29）。
+   `PanelMemory` + `pushImage` でスプライト相当ができる。**API は足さず、
+   あることを書いた**。[API.ja.md](API.ja.md) 参照
+2. ~~1bpp ビットマップが無い~~ → **足した**（2026-08-29）。`drawBitmap`。
+   実費は **+284 B**（当初の見積もり +120 は画素ごとに置く素朴版の値。
+   ランを 1 回の `fillRect` にまとめる版が 84 B 大きく、カラーパネルでは
+   窓設定の回数が桁で減る）
 3. **`setTextWrap` が無い。** `TinyGFXPrint` は `\n` は見るが右端では
    折り返さない。Adafruit にはある。未測定
 4. **色深度の判断は「いまは正しい」であって「永久に正しい」ではない。**

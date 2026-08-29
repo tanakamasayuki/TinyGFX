@@ -294,6 +294,56 @@ class TinyGFX {
     endWrite();
   }
 
+  // ---- 1bpp bitmaps ----------------------------------------------------
+  /// Draw a 1bpp bitmap - an icon, a logo, a sprite sheet cell.
+  ///
+  /// Bits are MSB first and **every row starts on a byte boundary**, so a row
+  /// is `(w + 7) / 8` bytes. That is the layout every icon converter emits and
+  /// the one Adafruit_GFX, U8g2 and LovyanGFX all take.
+  ///
+  /// A 1 is painted in `color`; a 0 is left alone. To paint the background as
+  /// well, fill the rectangle first - it costs less than carrying a second
+  /// argument through the loop.
+  ///
+  /// **The data is read the way font data is** (`tinygfx_rd8`), so on AVR it
+  /// must be in PROGMEM. Everywhere else that is a plain dereference and costs
+  /// nothing (docs/DECISIONS.ja.md D19).
+  ///
+  /// ```cpp
+  /// static const uint8_t icon[] TINYGFX_FONT_PROGMEM = {
+  ///   0x18, 0x24, 0x42, 0x81, 0x81, 0x42, 0x24, 0x18,
+  /// };
+  /// lcd.drawBitmap(10, 10, icon, 8, 8, TFT_WHITE);
+  /// ```
+  ///
+  /// Runs of set bits become one fillRect each, the same way a glyph is drawn,
+  /// so a panel that took the fillRect seam serves this too.
+  void drawBitmap(int16_t x, int16_t y, const uint8_t* bitmap, int16_t w, int16_t h,
+                  uint16_t color) {
+    if (bitmap == nullptr || w <= 0 || h <= 0) return;
+    const int16_t bytesPerRow = (int16_t)((w + 7) >> 3);
+    startWrite();
+    for (int16_t r = 0; r < h; ++r) {
+      const uint8_t* src = bitmap + (int32_t)r * bytesPerRow;
+      int16_t runStart = 0;
+      bool cur = ((tinygfx_rd8(src) >> 7) & 1) != 0;
+      for (int16_t c = 1; c < w; ++c) {
+        const bool on = ((tinygfx_rd8(&src[c >> 3]) >> (7 - (c & 7))) & 1) != 0;
+        if (on != cur) {
+          if (cur) {
+            fillRect((int16_t)(x + runStart), (int16_t)(y + r), (int16_t)(c - runStart), 1, color);
+          }
+          runStart = c;
+          cur = on;
+        }
+      }
+      if (cur) {
+        fillRect((int16_t)(x + runStart), (int16_t)(y + r), (int16_t)(w - runStart), 1, color);
+      }
+    }
+    endWrite();
+  }
+
   // ---- images ----------------------------------------------------------
   void pushImage(int16_t x, int16_t y, int16_t w, int16_t h, const uint16_t* data) {
     if (w <= 0 || h <= 0 || data == nullptr) return;
