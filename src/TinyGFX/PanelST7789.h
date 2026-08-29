@@ -5,10 +5,10 @@
 // order, and inversion on (these panels are normally inverted).
 //
 // Modules vary a lot in how the glass sits on that GRAM, so most of them need
-// one or two lines after begin():
+// one or two lines. Order does not matter, and either side of begin() works:
 //
-//   240x240  lcd.begin(); panel.setGramSize(240, 320);
-//   135x240  lcd.begin(); panel.setGramSize(240, 320); panel.setOffset(52, 40);
+//   240x240  panel.setGramSize(240, 320);
+//   135x240  panel.setGramSize(240, 320); panel.setOffset(52, 40);
 #pragma once
 #include <stdint.h>
 

@@ -53,7 +53,11 @@ inline bool TinyGFXPanelSSD1306::init() {
       0xAF,        // display on
   };
   _bus->init();
-  for (uint8_t i = 0; i < sizeof(kInit); ++i) cmd(kInit[i]);
+  // One transaction around the whole sequence; SPI.beginTransaction() does not
+  // nest, so cmd() cannot be used here.
+  _bus->beginTransaction();
+  for (uint8_t i = 0; i < sizeof(kInit); ++i) _bus->writeCommand(kInit[i]);
+  _bus->endTransaction();
   clearBuffer(false);
   return true;
 }
@@ -62,10 +66,16 @@ inline void TinyGFXPanelSSD1306::display() {
   if (_dirtyHi < _dirtyLo) return;  // nothing changed
   // Dirty pages are tracked in buffer space; the screen may be further down.
   const int16_t base = (_bandPages != 0) ? _pageFirst : 0;
-  cmd(0x21); cmd(0); cmd((uint8_t)(_natW - 1));                                 // column range
-  cmd(0x22); cmd((uint8_t)(base + _dirtyLo)); cmd((uint8_t)(base + _dirtyHi));  // page range
+  _bus->beginTransaction();
+  _bus->writeCommand(0x21);
+  _bus->writeCommand(0);
+  _bus->writeCommand((uint8_t)(_natW - 1));                    // column range
+  _bus->writeCommand(0x22);
+  _bus->writeCommand((uint8_t)(base + _dirtyLo));
+  _bus->writeCommand((uint8_t)(base + _dirtyHi));              // page range
   _bus->writeData(&_buf[(int32_t)_dirtyLo * _natW],
                   (size_t)((int32_t)(_dirtyHi - _dirtyLo + 1) * _natW));
+  _bus->endTransaction();
   _dirtyLo = 32767;
   _dirtyHi = -1;
 }

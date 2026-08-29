@@ -75,7 +75,11 @@ inline bool TinyGFXPanelSH1106::init() {
       0xAF,        // display on
   };
   _bus->init();
-  for (uint8_t i = 0; i < sizeof(kInit); ++i) cmd(kInit[i]);
+  // One transaction around the whole sequence; SPI.beginTransaction() does not
+  // nest, so cmd() cannot be used here.
+  _bus->beginTransaction();
+  for (uint8_t i = 0; i < sizeof(kInit); ++i) _bus->writeCommand(kInit[i]);
+  _bus->endTransaction();
   clearBuffer(false);
   return true;
 }
@@ -84,12 +88,14 @@ inline void TinyGFXPanelSH1106::display() {
   if (_dirtyHi < _dirtyLo) return;  // nothing changed
   // Dirty pages are tracked in buffer space; the screen may be further down.
   const int16_t base = (_bandPages != 0) ? _pageFirst : 0;
+  _bus->beginTransaction();
   for (int16_t p = _dirtyLo; p <= _dirtyHi; ++p) {
-    cmd((uint8_t)(0xB0 | (uint8_t)(base + p)));  // page
-    cmd((uint8_t)(0x00 | (_col0 & 0x0F)));       // column, low nibble
-    cmd((uint8_t)(0x10 | (_col0 >> 4)));         // column, high nibble
+    _bus->writeCommand((uint8_t)(0xB0 | (uint8_t)(base + p)));  // page
+    _bus->writeCommand((uint8_t)(0x00 | (_col0 & 0x0F)));       // column, low nibble
+    _bus->writeCommand((uint8_t)(0x10 | (_col0 >> 4)));         // column, high nibble
     _bus->writeData(&_buf[(int32_t)p * _natW], (size_t)_natW);
   }
+  _bus->endTransaction();
   _dirtyLo = 32767;
   _dirtyHi = -1;
 }

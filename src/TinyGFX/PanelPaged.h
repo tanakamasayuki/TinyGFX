@@ -74,6 +74,16 @@ class TinyGFXPanelPaged : public TinyGFXPanel {
   void writePixels(const uint16_t* data, uint32_t count) override {
     while (count--) put(*data++ != 0);
   }
+  // Deliberately empty, and not an oversight.
+  //
+  // TinyGFX::startWrite() calls this before a drawing burst, but a paged panel
+  // puts nothing on the bus while drawing - every primitive lands in the local
+  // framebuffer and only display() sends anything. Opening an SPI transaction
+  // here would hold CS low for the whole of the drawing arithmetic, which is
+  // exactly what a bus shared with an SD card must not do.
+  //
+  // The bus traffic that does exist - init(), display(), and the one-off
+  // commands - opens its own transaction. See cmd() below.
   void beginTransaction() override {}
   void endTransaction() override {}
 
@@ -180,7 +190,16 @@ class TinyGFXPanelPaged : public TinyGFXPanel {
   }
   ~TinyGFXPanelPaged() = default;
 
-  void cmd(uint8_t c) { _bus->writeCommand(c); }
+  /// One command, in a transaction of its own. For a sketch calling
+  /// invertDisplay() and friends outside any drawing burst.
+  ///
+  /// init() and display() do NOT use this - they open one transaction around
+  /// the whole sequence instead, because SPI.beginTransaction() does not nest.
+  void cmd(uint8_t c) {
+    _bus->beginTransaction();
+    _bus->writeCommand(c);
+    _bus->endTransaction();
+  }
 
   /// Logical coordinates to buffer coordinates. Rotation lives here.
   void toBuffer(int16_t x, int16_t y, int16_t* fx, int16_t* fy) const {
