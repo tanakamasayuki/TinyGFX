@@ -41,6 +41,7 @@ TinyGFXPanelST7789 panel(bus, 240, 240, /*rst*/2);
 TinyGFX            lcd(panel);
 
 void setup() {
+  panel.setGramSize(240, 320);        // 240x240 ST7789 のコントローラ側 GRAM
   lcd.begin();
   lcd.setRotation(1);
   lcd.fillScreen(TFT_BLACK);
@@ -57,11 +58,12 @@ void loop() {}
 
 3 オブジェクトを並べる形。冗長だが、**どのピンがどの層のものかが見える**のと、
 Bus の差し替えが 1 行で済む。ハードウェア SPI が使える環境では
-`#include <TinyGFX/BusSPI.h>` にして `TinyGFXBusSPI bus(/*dc*/3, /*cs*/4);` に差し替えるだけ。
+`#include <TinyGFX/BusSPI.h>` にして `TinyGFXBusSPI bus(SPI, /*dc*/3, /*cs*/4);` に差し替え、
+`lcd.begin()` より前にスケッチ側で `SPI.begin(...)` を呼ぶ。
 
-`TinyGFXBusSPI` が SCK / MOSI を取らないのは、Arduino の `SPI.begin()` が
-ピンを取らないコアがあるため。ピンを指定したい環境では自分で `SPI.begin(...)` を呼び、
-`initSpi=false` を渡す。
+`TinyGFXBusSPI` が SCK / MOSI を取らないのは、Arduino Core ごとに `SPI.begin()` の
+引数が違うため。スケッチ側で `SPI.begin(...)` を呼び、開始済みの `SPI` を
+`TinyGFXBusSPI bus(SPI, /*dc*/3, /*cs*/4);` として渡す。
 
 **暫定（Q1）**: よくある組み合わせをまとめた糖衣クラスを用意するかは未定。
 
@@ -207,6 +209,8 @@ public:
   virtual void setWindow(uint16_t xs, uint16_t ys, uint16_t xe, uint16_t ye) = 0;
   virtual void writeColor(uint16_t color, uint32_t count) = 0;
   virtual void writePixels(const uint16_t* data, uint32_t count) = 0;
+  virtual void fillRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h,
+                        uint16_t color); // 既定は setWindow + writeColor
   virtual void beginTransaction() = 0;
   virtual void endTransaction() = 0;
 
@@ -215,7 +219,8 @@ public:
 };
 ```
 
-**仮想メソッドは 7 本**。`invertDisplay` / `setSleep` / `displayOn` は
+**仮想メソッドは 8 本**。`fillRect` はページ方式の 1bpp パネルがバイト単位の塗りを
+引き受けるための 1 本。`invertDisplay` / `setSleep` / `displayOn` は
 **具象パネル側の非仮想メソッド**にした（Q7 決着）。全員が払うほどのものではないため。
 
 Panel が持つ状態:

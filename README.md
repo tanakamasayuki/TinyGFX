@@ -10,7 +10,7 @@ Anything you do not call costs nothing at all.
 > ### Only one setup has run on real hardware
 >
 > **On 2026-08-28 this drove a physical display for the first time**: an M5Stack BASIC
-> (ILI9342C). 45 host tests and 1 hardware test also pass. But that is **the only configuration confirmed on
+> (ILI9342C). The host suite and the M5Stack hardware suite pass. But that is **the only configuration confirmed on
 > real glass.**
 >
 > | | |
@@ -50,6 +50,7 @@ TinyGFXPanelST7789 panel(bus, 240, 240, /*rst*/2);
 TinyGFX            lcd(panel);
 
 void setup() {
+  panel.setGramSize(240, 320);  // controller-side GRAM of a 240x240 ST7789 module
   lcd.begin();
   lcd.setRotation(1);
   lcd.fillScreen(TFT_BLACK);
@@ -258,7 +259,7 @@ cd tests && uv sync && uv run pytest -v -s
 No hardware needed: everything either runs on the host core or just builds and inspects
 size and symbols. Details in [tests/README.md](tests/README.md).
 
-Of the 45, the characteristic ones:
+Some characteristic tests:
 
 - **`linkprune/`** — `nm` proves that unused features and unused font formats are absent from the final binary
 - **`footprint/`** — per-configuration increments stay within budget, and **the numbers are always printed**

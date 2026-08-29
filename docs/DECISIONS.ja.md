@@ -548,7 +548,7 @@ D1（virtual を置かない）と D4（色深度を抽象化しない）で避�
 | Q4 | `setSwapBytes` 相当を持つか | 持つ / Bus 実装ごとに固定（現状） | Phase 4 |
 | Q5 | CS 共有（他デバイスと SPI 共有）への対応 | v0.x では非対応 / Bus にフック | v1.0 前 |
 | Q6 | AVR で PROGMEM の**画像**を `pushImage` に渡せるようにするか | 対応する / RAM 上のみと明記する | Phase 4。**フォントは D19 で対応済み** |
-| ~~Q7~~ | ~~Panel の virtual メソッド数~~ | **決着。7 本にした**（`invertDisplay` / `setSleep` / `displayOn` は具象パネルの非仮想メソッド） | — |
+| ~~Q7~~ | ~~Panel の virtual メソッド数~~ | **決着。8 本にした**（ページ方式パネル向けの `fillRect` を含む。`invertDisplay` / `setSleep` / `displayOn` は具象パネルの非仮想メソッド） | — |
 | ~~Q8~~ | ~~ライブラリ名の重複確認~~ | **決着。3 レジストリとも競合なし**（[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E6） | — |
 | ~~Q9~~ | ~~サブセット化をどちらが持つか~~ | **取り下げ。完全に外部の Python ツールとして作る。TinyGFX 側は考慮しない**（素の GFXfont ヘッダを食えれば足りる） | — |
 | Q10 | `TinyGFXTileCanvas` の描画コールバックの形 | 関数ポインタ + `void*`（現状）/ テンプレートで任意の callable | Phase 2 |
