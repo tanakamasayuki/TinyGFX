@@ -213,6 +213,28 @@ examples は `sketch.yaml` にプロファイル（`ch32v003` / `uno` / `esp32` 
 
 `noalloc` は `linkprune/` に統合した（base との差で判定するほうが正確なため）。
 
+### `build_matrix/test_headers.py` — ヘッダが単体で成立するか
+
+**すべての公開ヘッダ（25 本）が、すべての対象コアで `<TinyGFX.h>` の後に
+1 本だけ足してビルドできること。** 実行しない。
+
+examples を回す `test_example_builds` と補い合う。あちらは「組み合わせが
+動くか」、こちらは「部品が単体で成立するか」。これが無いと 2 つ抜ける。
+
+- **別のサブヘッダにうっかり依存していないか。** `Progmem.h` を切り出した
+  ときがまさにその形だった（パネルが `tinygfx_rd8` を使うのに `Font.h` 経由で
+  しか手に入らなかった）
+- **ホスト以外で通るか。** ホストテストは `lang-ship:host` でしか動かさない。
+  新しいヘッダはそこだけ通って満足しがちで、AVR の PROGMEM や CH32V003 の
+  16 ビット int で初めて壊れる
+
+**通過: 25 本 × 3 コア**（CH32V003 はコアに SPI が無いので `BusSPI.h` のみ skip）。
+
+**なぜ `<TinyGFX.h>` を先に足すのか。** サブヘッダだけを include しても
+arduino-cli はライブラリを引かない（ライブラリ名と同じ `TinyGFX.h` を見て
+解決するため。`library.properties` の `includes=TinyGFX.h` がそれ）。
+**それが実際の契約なので、テストもそれに合わせている。**
+
 ## 6. 手動テスト（実機）
 
 `docs/MANUAL_TEST.ja.md` に手順を書く。自動テストには含めない。
