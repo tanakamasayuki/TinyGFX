@@ -29,7 +29,7 @@
 | ライブラリ名の確認 | **完了。3 レジストリとも競合なし**（E6） |
 | 実機確認 | **M0 通過（2026-08-28、M5Stack BASIC）。初めて実機に絵が出た。** 既定の MADCTL / 色順が正しかった。反転は世代差あり（D22）。**M0b / M1〜M4 は未** |
 | examples | **完了。6 本**（HelloWorld / Shapes / FlickerFree / HardwareSPI / OledI2C / M5StackBasic）。日英 README つき |
-| 利用者向けドキュメント | `README.md` / `README.ja.md` は**あり**。`docs/GUIDE` / `docs/API` は未着手（実機の後） |
+| 利用者向けドキュメント | `README.md` / `README.ja.md` と [API.md](API.md) / [API.ja.md](API.ja.md) は**あり**。`GUIDE`（配線とオフセットの手引き）だけ未着手 —— **実機の後**（M1 / M3〜M7） |
 
 ### 1.1 リリース前 TODO（2026-08-29 設計レビュー）
 
@@ -143,7 +143,9 @@ ST7735 / ILI9341。パネル初期化テーブルの整理。CH32V 向け Fast B
 ### フェーズ 6 — 仕上げ（**examples のみ完了**）
 
 - examples — **完了。6 本**
-- README / GUIDE / API（日英）— **未着手。次にやる**
+- README（日英）— **完了**
+- API（日英）— **完了。**[API.md](API.md) / [API.ja.md](API.ja.md)
+- GUIDE（日英）— **未着手。実機待ち**（配線とオフセットの説明は、動いていないうちに書くと嘘になる）
 - API 安定化、ベンチ — 未
 
 **実機（M0 / M1 / M2）が終わるまで利用者向けドキュメントは書かない。**

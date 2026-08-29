@@ -454,7 +454,8 @@ H>16 でも**字数が少なければ CellFont のほうが総量で安い**（�
 生成は [LGFXFontToolJs](https://www.npmjs.com/package/lgfx-font-tool) を使い、
 最終的には**プロジェクトで使う文字だけ**をサブセット化して埋め込む。
 
-いまは `tools/gen_font.py` が出す 5x7（0x20-0x3F、32 字）が測定用のつなぎ。
+測定用のつなぎも本番の CLI が出したものを使う（`tests/common_libs/tgfx_font/`）。
+手書きのつなぎ生成器 `tools/gen_font.py` は役目を終えて削除済み。
 
 ### 9.7 Print / printf / float は拡張ヘッダで提供する
 
