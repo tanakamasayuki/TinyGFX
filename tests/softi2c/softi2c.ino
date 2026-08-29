@@ -1,14 +1,16 @@
-// **ビット叩きの I2C が、Wire と同じバイト列を出すか。**
+// **Does bit-banged I2C put the same bytes on the wire as Wire does?**
 //
-// 実機が無くても線の上の波形は見られる。ホストコアのピンフックで
-// **I2C のバスそのものを模す**:
+// The waveform can be watched without hardware. The host core's pin hooks are
+// used to **model the I2C bus itself**:
 //
-//   - オープンドレイン: OUTPUT+LOW で引き下げ、INPUT で手放す
-//   - **読み出しフックがプルアップの役** — INPUT のピンは HIGH に見える
-//   - SCL の立ち上がりで SDA を読み、START / STOP を検出してバイトに戻す
+//   - open drain: OUTPUT+LOW pulls down, INPUT lets go
+//   - **the read hook plays the pull-up** - a pin set to INPUT reads HIGH
+//   - SDA is sampled on the rising edge of SCL; START / STOP are detected and
+//     the bytes reassembled
 //
-// 戻したバイト列を SSD1306 の模型に流し、**Wire 経由で同じ絵を描いた結果と
-// 突き合わせる。** 1 画素でも違えば実装が違う。
+// Those bytes are fed to a model of an SSD1306 and **compared against the same
+// picture drawn through Wire.** One pixel of difference means the
+// implementations differ.
 #define TGFX_HOST_PROBE_SPI 1
 #include <TinyGFX.h>
 #include <TinyGFX/BusI2C.h>
@@ -24,7 +26,7 @@ static const uint8_t PIN_SDA = 4, PIN_SCL = 5;
 
 static uint8_t fbSoft[W * H / 8], fbWire[W * H / 8];
 
-// ---- SSD1306 の模型（tests/i2c と同じ） ---------------------------------
+// ---- a model of an SSD1306 (the same one tests/i2c uses) -----------------
 static uint8_t model[W * PAGES];
 static uint16_t colStart = 0, colEnd = W - 1, curCol = 0, curPage = 0;
 static uint8_t pendingCmd = 0, argIndex = 0, args[2] = {0, 0};
@@ -46,18 +48,18 @@ static void putByte(uint8_t b) {
   if (curPage < (uint16_t)PAGES && curCol < (uint16_t)W) model[curPage * W + curCol] = b;
   if (curCol >= colEnd) { curCol = colStart; ++curPage; } else { ++curCol; }
 }
-/// 1 転送ぶんのバイト列を SSD1306 として解釈する（先頭はアドレス）。
+/// Read one transfer's bytes as an SSD1306 would (the address comes first).
 static uint8_t ctrl = 0xFF, bytePos = 0;
 static void feedTransferByte(uint8_t b) {
-  if (bytePos == 0) { bytePos = 1; return; }             // アドレス
-  if (bytePos == 1) { ctrl = b; bytePos = 2; return; }   // 制御バイト
+  if (bytePos == 0) { bytePos = 1; return; }             // the address
+  if (bytePos == 1) { ctrl = b; bytePos = 2; return; }   // the control byte
   if (ctrl == 0x00) feedCmd(b);
   else { putByte(b); ++dataBytes; }
 }
 
-// ---- I2C バスの模型（プルアップつき） -----------------------------------
+// ---- a model of the I2C bus, pull-ups and all ---------------------------
 static uint8_t sdaLevel() {
-  // オープンドレイン: OUTPUT なら書いた値、INPUT ならプルアップで HIGH
+  // Open drain: OUTPUT gives what was written, INPUT gives HIGH from the pull-up
   return (HostArduino::pinModeOf(PIN_SDA) == OUTPUT)
              ? HostArduino::pinValue(PIN_SDA) : 1;
 }
@@ -70,15 +72,15 @@ static uint8_t prevScl = 1, prevSda = 1, acc = 0, bits = 0;
 static bool inFrame = false;
 static long starts = 0, stops = 0, bytesSeen = 0;
 
-/// ピンの状態が変わるたびに呼ばれ、波形を追う。
+/// Called on every pin change; follows the waveform.
 static void sample() {
   const uint8_t scl = sclLevel(), sda = sdaLevel();
   if (scl == 1 && prevScl == 1 && sda != prevSda) {
-    // SCL が高いまま SDA が動いたら START / STOP
+    // SDA moving while SCL is high is a START or a STOP
     if (sda == 0) { ++starts; inFrame = true; bits = 0; acc = 0; bytePos = 0; }
     else          { ++stops;  inFrame = false; }
   } else if (scl == 1 && prevScl == 0 && inFrame) {
-    // 立ち上がりで 1 ビット読む。9 ビット目は ACK なので捨てる
+    // One bit on the rising edge. The ninth is the ACK, and is discarded
     if (bits < 8) { acc = (uint8_t)((acc << 1) | sda); }
     if (++bits == 9) { feedTransferByte(acc); ++bytesSeen; bits = 0; acc = 0; }
   }
@@ -88,11 +90,11 @@ static void onWrite(uint8_t, uint8_t, void*) { sample(); }
 static void onMode(uint8_t, uint8_t, void*) { sample(); }
 static int onRead(uint8_t pin, uint8_t held, void*) {
   (void)held;
-  // プルアップ: 手放されたピンは HIGH に見える
+  // The pull-up: a released pin reads HIGH
   return (HostArduino::pinModeOf(pin) == OUTPUT) ? HostArduino::pinValue(pin) : 1;
 }
 
-// ---- Wire 側を覗く -------------------------------------------------------
+// ---- watching the Wire side ----------------------------------------------
 static uint8_t onWire(uint8_t addr, const uint8_t* d, size_t len, bool, void*) {
   if (addr != ADDR || len == 0) return 2;
   if (d[0] == 0x00) { for (size_t i = 1; i < len; ++i) feedCmd(d[i]); }
@@ -117,7 +119,7 @@ void setup() {
 #else
   tgfxTestBegin("softi2c");
 
-  // --- ビット叩き -----------------------------------------------------------
+  // --- bit-banged -----------------------------------------------------------
   for (int i = 0; i < W * PAGES; ++i) model[i] = 0;
   {
     TinyGFXBusSoftI2C bus(PIN_SDA, PIN_SCL, ADDR);

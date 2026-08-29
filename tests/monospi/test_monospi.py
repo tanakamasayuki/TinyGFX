@@ -1,17 +1,17 @@
-"""SPI に繋いだページ方式パネルが、バスの作法を守るか。
+"""Does a page-addressed panel on SPI observe the bus etiquette?
 
-**2026-08-29 の設計レビューで見つかった P0 の再発防止。**
-`TinyGFXPanelPaged` の `beginTransaction()` / `endTransaction()` が空で、
-`cmd()` もバスのトランザクションを通っていなかった。I2C は転送ごとに開始と
-停止をするので露見せず、SPI のテストが無かったので誰も気づかなかった。
+**Stops the P0 found in the 2026-08-29 design review from coming back.**
+`TinyGFXPanelPaged::beginTransaction()` and `endTransaction()` were empty, and
+`cmd()` did not go through a bus transaction either. I2C starts and stops on
+every transfer so nothing showed, and there was no SPI test, so nobody noticed.
 
-SPI では致命的で、二重に悪い。
+On SPI it is fatal, and wrong twice over.
 
-- `SPI.beginTransaction()` を通らないとクロックもモードも決まらない
-- CS が落ちないので、そもそもパネルが聞いていない
-- 同じ線に SD カードが居ると、そちらの転送に割り込む
+- without `SPI.beginTransaction()` neither the clock nor the mode is set
+- CS never drops, so the panel is not listening in the first place
+- an SD card on the same wires gets its transfer cut into
 
-`docs/DEVELOPMENT_PLAN.ja.md` §1.1 の P0。
+`docs/DEVELOPMENT_PLAN.ja.md` 1.1, P0.
 """
 
 from pathlib import Path
@@ -29,32 +29,32 @@ def test_monospi(dut):
     dut.expect("TEST start monospi|TEST skip monospi", timeout=20)
     if not (SKETCH / "output").exists():
         import pytest
-        pytest.skip("バス観測口を持たないホストコア")
+        pytest.skip("this host core has no bus probe")
     dut.expect("TEST done", timeout=60)
 
     r = tc.report(SKETCH)
 
-    # --- **本命。** 1 バイトもトランザクションの外に出ていないこと -----------
+    # --- **the point.** Not one byte outside a transaction ------------------
     for phase in ("init", "draw", "invert", "sh"):
-        assert r[f"{phase}_bytes"] > 0, f"{phase}: 何も出ていない"
+        assert r[f"{phase}_bytes"] > 0, f"{phase}: nothing was sent at all"
         assert r[f"{phase}_outside_txn"] == 0, (
-            f"{phase}: {r[f'{phase}_outside_txn']} バイトが "
-            f"SPI.beginTransaction() の外に出ている（全 {r[f'{phase}_bytes']}）")
+            f"{phase}: {r[f'{phase}_outside_txn']} bytes went out outside "
+            f"SPI.beginTransaction() (of {r[f'{phase}_bytes']})")
         assert r[f"{phase}_cs_high"] == 0, (
-            f"{phase}: {r[f'{phase}_cs_high']} バイトが CS=HIGH のまま出ている")
+            f"{phase}: {r[f'{phase}_cs_high']} bytes went out with CS still HIGH")
 
-    # --- SPISettings が意図どおり -------------------------------------------
-    assert r["spi_clock"] == 8000000, f"クロックが違う: {r['spi_clock']}"
+    # --- SPISettings as intended --------------------------------------------
+    assert r["spi_clock"] == 8000000, f"wrong clock: {r['spi_clock']}"
     assert r["spi_bitorder"] == SPI_MSBFIRST
     assert r["spi_mode"] == SPI_MODE0
 
-    # --- 転送量。変更のあったページだけ流れる -------------------------------
+    # --- traffic: only the pages that changed go out ------------------------
     assert r["draw_data_bytes"] == W * H // 8, (
-        f"全ページ流れていない: {r['draw_data_bytes']}")
+        f"not every page was sent: {r['draw_data_bytes']}")
 
-    # --- 絵になっていること（単色でない） ------------------------------------
-    assert 0 < r["lit"] < W * H, f"絵が単色（点灯 {r['lit']} / {W * H}）"
+    # --- it is a picture, not one flat colour -------------------------------
+    assert 0 < r["lit"] < W * H, f"the picture is one flat colour ({r['lit']} lit of {W * H})"
 
-    # --- 終わったら線を手放していること --------------------------------------
-    assert r["cs_idle_high"] == 1, "CS が LOW のまま残っている"
-    assert r["in_transaction_at_end"] == 0, "トランザクションが開いたまま残っている"
+    # --- the wires are released when it is done -----------------------------
+    assert r["cs_idle_high"] == 1, "CS was left LOW"
+    assert r["in_transaction_at_end"] == 0, "a transaction was left open"

@@ -1,10 +1,12 @@
-"""文字描画。
+"""Text drawing.
 
-フォントは **本番の生成器（LGFXFontToolJs CLI）が出したもの**を tgfx_font に
-置いてある。`lgfxJapanGothic_8` の数字 10 字で、墨面 4x6・送り幅 4・行送り 9。
+The fonts come **from the real generator (the LGFXFontToolJs CLI)** and live in
+tgfx_font: the ten digits of `lgfxJapanGothic_8`, 4x6 of ink, advance 4, line
+box 9.
 
-同じ 10 字を 3 通りに符号化したものを並べてあり、**どれで描いても絵が一致すること**
-を最後に見る（どの符号化を選ぶかは生成器の裁量で、スケッチから見えてはいけない）。
+The same ten characters are there encoded three different ways, and the last
+check is that **all three draw the same picture** - which encoding gets used is
+the generator's business and must not be visible from the sketch.
 """
 
 from pathlib import Path
@@ -27,64 +29,66 @@ def test_text(dut):
     assert r["font_height"] == LINE, f"fontHeight={r['font_height']}"
     assert r["text_width"] == 5 * ADV, f"textWidth('12345')={r['text_width']}"
     assert r["draw_width"] == r["text_width"], (
-        f"drawString の戻り値 {r['draw_width']} が textWidth {r['text_width']} と違う")
-    assert r["width_x2"] == 2 * 5 * ADV, f"倍角の幅が {r['width_x2']}"
-    assert r["height_x2"] == 2 * LINE, f"倍角の高さが {r['height_x2']}"
+        f"drawString returned {r['draw_width']} against textWidth {r['text_width']}")
+    assert r["width_x2"] == 2 * 5 * ADV, f"double-size width is {r['width_x2']}"
+    assert r["height_x2"] == 2 * LINE, f"double-size height is {r['height_x2']}"
 
-    # 収録外の文字
-    assert r["oor_advance"] == 0, "収録されていない文字が送り幅を返している"
-    assert r["oor_pixels"] == 0, "収録されていない文字が画素を送っている"
+    # A character the font does not cover
+    assert r["oor_advance"] == 0, "an uncovered code returned an advance"
+    assert r["oor_pixels"] == 0, "an uncovered code sent pixels"
 
-    # --- 透過描画: グリフの画素だけ ------------------------------------------
+    # --- transparent: the glyph pixels and nothing else ---------------------
     plain = tc.image(SKETCH, "plain")
     on = tc.lit(plain)
-    assert on, "文字が 1 画素も描かれていない"
+    assert on, "not one pixel of text was drawn"
     xs = [x for x, _ in on]
     ys = [y for _, y in on]
-    assert min(xs) >= 2 and max(xs) < 2 + 5 * ADV, f"横のはみ出し: {min(xs)}..{max(xs)}"
-    assert min(ys) >= 3 and max(ys) < 3 + LINE, f"縦のはみ出し: {min(ys)}..{max(ys)}"
+    assert min(xs) >= 2 and max(xs) < 2 + 5 * ADV, f"spilled sideways: {min(xs)}..{max(xs)}"
+    assert min(ys) >= 3 and max(ys) < 3 + LINE, f"spilled vertically: {min(ys)}..{max(ys)}"
 
-    # 倍角は素の 2 倍の面積あたりに広がる
+    # Double size spreads over about four times the area
     dbl = tc.lit(tc.image(SKETCH, "double"))
-    assert max(x for x, _ in dbl) >= 3 * ADV, "倍角が広がっていない"
+    assert max(x for x, _ in dbl) >= 3 * ADV, "double size did not spread"
 
-    # --- 背景色つき: セルが埋まる --------------------------------------------
+    # --- with a background colour: the cell fills ---------------------------
     opaque = tc.image(SKETCH, "opaque").load()
     holes = [(x, y)
              for y in range(3, 3 + LINE)
              for x in range(2, 2 + 5 * ADV)
              if opaque[x, y] == BLACK]
-    assert not holes, f"背景指定なのにセルに穴がある: {len(holes)} 画素 {holes[:8]}"
-    assert opaque[1, 3] == BLACK, "セルの外まで背景が塗られている"
-    assert opaque[2, 3 + LINE] == BLACK, "セルの下まで背景が塗られている"
+    assert not holes, f"holes in the cell despite a background: {len(holes)} px {holes[:8]}"
+    assert opaque[1, 3] == BLACK, "the background painted past the left of the cell"
+    assert opaque[2, 3 + LINE] == BLACK, "the background painted below the cell"
 
-    # --- 透過は背景を残す ----------------------------------------------------
+    # --- transparent leaves the background alone ----------------------------
     tr = tc.image(SKETCH, "transparent").load()
     assert tr[2, 3] == BLACK or tr[2 + 5, 3] == BLACK, (
-        "透過なのにグリフの隙間が塗られている")
+        "the gaps in the glyph were painted despite being transparent")
 
-    # --- CellFont の変種は同じ絵になること ------------------------------------
-    # 索引（連続 / 疎）とグリフ表（無し / 有り）は生成時の選択でしかない。
-    # どれを選んでも描画結果は 1 画素も変わらないこと。
+    # --- the CellFont variants must draw the same picture -------------------
+    # Contiguous vs sparse index, and glyph table vs none, are choices the
+    # generator makes. Not one pixel may differ between them.
     ref = tc.image(SKETCH, "var_fixed")
-    assert tc.lit(ref), "基準の変種が 1 画素も描けていない"
+    assert tc.lit(ref), "the baseline variant drew nothing"
     for name in ["var_records", "var_sparse"]:
         img = tc.image(SKETCH, name)
         box = ImageChops.difference(ref, img).getbbox()
-        assert box is None, f"{name} が固定ピッチ版と違う: bbox={box}"
+        assert box is None, f"{name} differs from the fixed-pitch version: bbox={box}"
 
-    # --- 中央揃え・右揃え ----------------------------------------------------
+    # --- centred and right-aligned ------------------------------------------
     #
-    # **不変条件で見る。** 揃え版と「算出位置に置いた drawString」が 1 画素も
-    # 違わないこと。絶対座標で期待値を書くとグリフの左余白に依存してしまう。
+    # **Stated as an invariant.** The aligned call and a drawString placed at
+    # the computed position must not differ by a pixel. Expected absolute
+    # coordinates would depend on the glyph's left bearing.
     #
-    # LovyanGFX はこれを setTextDatum でも提供しているが、TinyGFX は明示関数
-    # だけにした。datum は drawString が毎回参照する状態になるので、中央揃えを
-    # 使わない人まで 204 B 払う（CH32V003 で実測。明示関数は呼ばなければ 0）。
+    # LovyanGFX also offers this through setTextDatum; TinyGFX has only the
+    # explicit calls. A datum is state drawString consults every time, so
+    # everyone who never centres anything would pay 204 B (measured on a
+    # CH32V003; the explicit calls cost nothing until called).
     w = r["plain_width"]
-    assert w > 0, "textWidth が 0"
-    assert r["center_matches"] == 1, "drawCenterString が drawString(cx - w/2) と違う"
-    assert r["right_matches"] == 1, "drawRightString が drawString(rx - w) と違う"
-    assert r["center_moved"] == 1, "中央揃えと右揃えが同じ位置に描かれている"
-    assert r["center_ret"] == w, f"drawCenterString の戻り値が {r['center_ret']}（{w} のはず）"
-    assert r["right_ret"] == w, f"drawRightString の戻り値が {r['right_ret']}（{w} のはず）"
+    assert w > 0, "textWidth returned 0"
+    assert r["center_matches"] == 1, "drawCenterString differs from drawString(cx - w/2)"
+    assert r["right_matches"] == 1, "drawRightString differs from drawString(rx - w)"
+    assert r["center_moved"] == 1, "centred and right-aligned landed in the same place"
+    assert r["center_ret"] == w, f"drawCenterString returned {r['center_ret']} (want {w})"
+    assert r["right_ret"] == w, f"drawRightString returned {r['right_ret']} (want {w})"

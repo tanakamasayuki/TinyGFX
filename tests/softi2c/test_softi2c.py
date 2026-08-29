@@ -1,19 +1,21 @@
-"""**ビット叩きの I2C が Wire と同じバイト列を出すか。**
+"""**Does bit-banged I2C put the same bytes on the wire as Wire does?**
 
-実機が無くても線の上の波形は見られる。ホストコアのピンフックで **I2C の
-バスそのものを模す**:
+The waveform can be watched without hardware. The host core's pin hooks are
+used to **model the I2C bus itself**:
 
-- オープンドレイン: `OUTPUT`+`LOW` で引き下げ、`INPUT` で手放す
-- **読み出しフックがプルアップの役** —— 手放されたピンは `HIGH` に見える
-- SCL の立ち上がりで SDA を読み、START / STOP を検出してバイトに戻す
+- open drain: `OUTPUT`+`LOW` pulls down, `INPUT` lets go
+- **the read hook plays the pull-up** - a released pin reads `HIGH`
+- SDA is sampled on the rising edge of SCL; START / STOP are detected and the
+  bytes reassembled
 
-戻したバイト列を SSD1306 の模型に流し、**Wire 経由で同じ絵を描いた結果と
-突き合わせる。** 1 バイトでも違えば実装が違う。
+Those bytes are fed to a model of an SSD1306 and **compared against the same
+picture drawn through Wire.** One byte of difference means the implementations
+differ.
 
-`TinyGFXBusSoftI2C` があるのは大きさのためではなくピンのため。ハード I2C は
-固定ピンにしか出ないので、CH32V003 のようにピンの少ない部品ではそこを別の
-用途に使いたいことがある。**AVR では副産物として 1,444 B 小さくもなる**
-（AVR の Wire がバッファと割り込み駆動の状態機械を持つため）。
+`TinyGFXBusSoftI2C` exists for the pins, not for the size. Hardware I2C only
+comes out on fixed pins, and on a part as pin-poor as a CH32V003 those may be
+wanted for something else. **On AVR it happens to be 1,444 B smaller too**,
+because AVR's Wire carries a buffer and an interrupt-driven state machine.
 """
 
 from pathlib import Path
@@ -29,25 +31,25 @@ W, H = 128, 64
 def test_softi2c(dut):
     dut.expect("TEST start softi2c|TEST skip softi2c", timeout=20)
     if not (SKETCH / "output").exists():
-        pytest.skip("ピンフックを持たないホストコア")
+        pytest.skip("this host core has no pin hooks")
     dut.expect("TEST done", timeout=60)
 
     r = tc.report(SKETCH)
 
-    # --- 波形として成立していること -------------------------------------------
-    assert r["soft_starts"] > 0, "START が 1 回も出ていない"
+    # --- it is a well-formed waveform ---------------------------------------
+    assert r["soft_starts"] > 0, "not a single START was seen"
     assert r["soft_stops"] == r["soft_starts"], (
-        f"START {r['soft_starts']} 回に対して STOP {r['soft_stops']} 回")
-    assert r["soft_bytes_seen"] > 0, "1 バイトも読めていない"
+        f"{r['soft_starts']} STARTs against {r['soft_stops']} STOPs")
+    assert r["soft_bytes_seen"] > 0, "not one byte could be read back"
 
-    # --- 転送量が Wire と一致すること ------------------------------------------
+    # --- the same amount of traffic as Wire ---------------------------------
     assert r["soft_data_bytes"] == r["wire_data_bytes"], (
-        f"画素バイト数が違う: ソフト {r['soft_data_bytes']} / "
+        f"different pixel byte counts: soft {r['soft_data_bytes']} / "
         f"Wire {r['wire_data_bytes']}")
 
-    # --- **本命。** 同じ絵になること -------------------------------------------
+    # --- **the point.** The same picture ------------------------------------
     assert r["soft_vs_wire_diff"] == 0, (
-        f"ソフト I2C と Wire で {r['soft_vs_wire_diff']} バイト違う")
+        f"soft I2C and Wire differ by {r['soft_vs_wire_diff']} bytes")
 
-    # 絵が単色で「一致」しても意味がない
-    assert 0 < r["lit"] < W * H, f"絵が単色（点灯 {r['lit']} / {W * H}）"
+    # "Matching" on a flat picture would prove nothing
+    assert 0 < r["lit"] < W * H, f"the picture is one flat colour ({r['lit']} lit of {W * H})"

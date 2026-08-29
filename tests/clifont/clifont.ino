@@ -1,12 +1,12 @@
-// **LGFXFontToolJs の CLI が出した CellFont を、TinyGFX のデコーダで描けるか。**
+// **Can TinyGFX's decoder draw a CellFont that the LGFXFontToolJs CLI produced?**
 //
-// 手で作ったつなぎのフォント（tools/gen_font.py）ではなく、**本番の生成器の出力**を
-// そのまま食わせる。ここが通って初めて「CellFont に対応した」と言える。
+// Not a hand-made interim font - **the real generator's output**, fed in
+// unchanged. Only when this passes is "CellFont is supported" a true statement.
 //
-// この 1 本で仕様の難所を 3 つ踏む:
-//   - 可変ピッチ（グリフ表あり、width / xAdvance / bytesPerGlyph は 0）
-//   - 疎索引の頭ブロック（headCount=2、first=0x32）
-//   - **first より小さいコードがしっぽに居る**（0x20 / 0x2E）
+// This one test walks into three of the awkward parts of the spec:
+//   - variable pitch (a glyph table; width / xAdvance / bytesPerGlyph are 0)
+//   - a sparse index with a head block (headCount=2, first=0x32)
+//   - **codes below `first` living in the tail** (0x20 / 0x2E)
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
 #include <TinyGFX/FontCell.h>
@@ -31,11 +31,12 @@ void setup() {
   lcd.setFont(&cliFont);
   lcd.setTextColor(TFT_WHITE);
 
-  // 行送りと ascent が生成器の書いたとおりか（Line box 11px / ascent 10）
+  // Do the line height and ascent match what the generator wrote?
+  // (line box 11px, ascent 10)
   tgfxReport("line", (long)lcd.fontHeight());
   tgfxReport("ascent", (long)lcd.getTextAscent());
 
-  // 収録されている字だけを並べる。**UTF-8 なのでコードポイントで送る**
+  // Only characters the font covers. **UTF-8, so this goes by code point**
   const int16_t w = lcd.drawString("温度 23.5℃ 設定完了", 1, 2);
   tgfxReport("width", (long)w);
   tgfxReport("lit", (long)[]() {
@@ -45,7 +46,7 @@ void setup() {
   }());
   tgfxShot("clifont", gram, W, H);
 
-  // 収録外（'A'）は何も描かず送り 0
+  // An uncovered code ('A') draws nothing and advances 0
   bus.fill(0);
   tgfxReport("missing_adv", (long)lcd.drawChar('A', 0, 0));
   long after = 0;

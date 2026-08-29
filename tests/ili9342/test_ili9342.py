@@ -1,11 +1,13 @@
-"""ILI9342C の MADCTL・色順・ミラーの組み立て。
+"""How an ILI9342C assembles MADCTL, colour order and mirroring.
 
-ILI9342 は GRAM が最初から横長なので、回転 0 が 320x240（=ネイティブ）になる。
-表そのものは ST7789 と同じで、差は BGR ビットと setMirror の XOR だけ。
+The ILI9342's GRAM is landscape from the start, so rotation 0 is 320x240 - its
+native size. The table itself is the ST7789's; the only differences are the BGR
+bit and the XOR from setMirror.
 
-**この表が実機で正しいかはここでは分からない**（docs/MANUAL_TEST.ja.md M0）。
-ここが守るのは「実装が表どおりに動くこと」。実機でずれたら表を直し、
-ここの期待値も一緒に直す。
+**Whether that table is right on real glass cannot be known here**
+(docs/MANUAL_TEST.ja.md M0). What this holds is that the implementation follows
+the table. If the hardware disagrees, fix the table and these expectations
+together.
 """
 
 from pathlib import Path
@@ -17,7 +19,7 @@ SKETCH = Path(__file__).parent
 MY, MX, MV, BGR = 0x80, 0x40, 0x20, 0x08
 RED565 = 0xF800
 
-# 色順を抜いた素の表（ST7789 と同じ）
+# The bare table, colour order removed (the same as the ST7789)
 BASE = {
     0: 0,
     1: MV | MX,
@@ -42,7 +44,7 @@ def test_ili9342(dut):
             f"flip{rot}_madctl": (base ^ (MX | MY)) | BGR,
             f"bgr{rot}_w": w,
             f"bgr{rot}_h": h,
-            # ILI9342 にオフセットのあるモジュールは無い。素通しであること
+            # No ILI9342 module has an origin offset; the window passes through
             f"bgr{rot}_xs": 0,
             f"bgr{rot}_ys": 0,
         }
@@ -51,18 +53,20 @@ def test_ili9342(dut):
             if got != want:
                 problems.append(f"{key}: {got:#04x} != {want:#04x}"
                                 if key.endswith("madctl") else f"{key}: {got} != {want}")
-    assert not problems, "ILI9342 の表と違う: " + "; ".join(problems)
+    assert not problems, "differs from the ILI9342 table: " + "; ".join(problems)
 
     madctls = {r[f"bgr{rot}_madctl"] for rot in range(4)}
-    assert len(madctls) == 4, f"MADCTL が重複している: {sorted(madctls)}"
+    assert len(madctls) == 4, f"duplicate MADCTL values: {sorted(madctls)}"
 
-    # 両軸ミラーは 180 度回転と同じ。表の入れ替えとして現れる
-    # （片軸だけのミラーは回転では作れない。だから setMirror が要る）
-    assert r["flip0_madctl"] == r["bgr2_madctl"], "両軸ミラーが回転 2 と一致しない"
-    assert r["flip2_madctl"] == r["bgr0_madctl"], "両軸ミラーが回転 0 と一致しない"
+    # Mirroring both axes is the same as rotating 180 degrees, and shows up as
+    # a swap in the table. (Mirroring one axis cannot be made from a rotation -
+    # which is why setMirror exists at all.)
+    assert r["flip0_madctl"] == r["bgr2_madctl"], "both-axis mirror does not match rotation 2"
+    assert r["flip2_madctl"] == r["bgr0_madctl"], "both-axis mirror does not match rotation 0"
 
-    # 描いたものが GRAM に乗るか（コマンド列が ST7789 と同じで通ること）
-    assert r["hit"] == RED565, f"塗った内側が {r['hit']:#06x}"
-    assert r["edge"] == RED565, f"塗った右下端が {r['edge']:#06x}"
-    assert r["miss"] == 0, f"塗っていない左が {r['miss']:#06x}"
-    assert r["past"] == 0, f"塗っていない右下が {r['past']:#06x}"
+    # Does what was drawn reach the GRAM (i.e. does the ST7789 command stream
+    # work here too)?
+    assert r["hit"] == RED565, f"inside the fill is {r['hit']:#06x}"
+    assert r["edge"] == RED565, f"the bottom-right of the fill is {r['edge']:#06x}"
+    assert r["miss"] == 0, f"unpainted, to the left: {r['miss']:#06x}"
+    assert r["past"] == 0, f"unpainted, past the bottom right: {r['past']:#06x}"

@@ -47,6 +47,7 @@ tests/
   capture/            BusCapture rebuilds an image from an ST7789 command stream
   window/             ST7789 rotation MADCTL, width/height, origin offset
   ili9342/            ILI9342C MADCTL, colour order (BGR), mirroring
+  ili9341/            ILI9341, and the init sequence all three DCS panels send
   primitive/          every primitive plus degenerate cases
   clip/               inside the clip equals no clip, outside is untouched (invariant)
   fill/               exact number of pixels pushed
@@ -54,6 +55,7 @@ tests/
   text/               text: return value, scaling, missing glyphs, background, transparency
   fontchain/          CellFont chaining, U+FFFD fallback, baseline alignment
   utf8/               UTF-8 decoding: code point and bytes consumed, per sequence
+  textwrap/           wrapping at the right edge (TINYGFX_TEXT_WRAP=1)
   image/              pushImage placement, cropping, transparency, byte swapping
   image_fmt/          every encoding of one picture draws the same pixels
   image_oracle/       converter output vs the converter's own expected image

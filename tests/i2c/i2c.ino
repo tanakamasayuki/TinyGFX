@@ -1,12 +1,12 @@
-// I2C のモノクロ OLED（SSD1306）を通しで検証する。
+// A monochrome OLED on I2C (SSD1306), end to end.
 //
-//   TinyGFX → PanelSSD1306 → 本番の TinyGFXBusI2C → Wire
-//           → ホストの Wire 観測フック → SSD1306 の模型 → ビットマップ → PPM
+//   TinyGFX -> PanelSSD1306 -> the real TinyGFXBusI2C -> Wire
+//           -> the host's Wire probe -> a model of an SSD1306 -> bitmap -> PPM
 //
-// SPI のカラーパネルとの違いを見るのが目的:
-//   - フレームバッファを持つこと（1bpp。RGB565 を「0 でなければ点灯」で落とす）
-//   - display() を呼ぶまで転送されないこと
-//   - 変更のあったページだけ流すこと
+// The point is what differs from a colour panel on SPI:
+//   - it owns a framebuffer (1bpp; RGB565 reduced to "lit unless zero")
+//   - nothing is transferred until display() is called
+//   - only the pages that changed go out
 #include <TinyGFX.h>
 #include <TinyGFX/BusI2C.h>
 #include <TinyGFX/PanelSSD1306.h>
@@ -33,14 +33,15 @@ TinyGFX lcd(panel);
 TinyGFXPanelSSD1306 bandPanel(bus, bandBuf, W, H, 1);
 TinyGFX bandLcd(bandPanel);
 
-// ---- 受け側の模型（TinyGFX 側が持つ。コアは SSD1306 を知らない） ----------
+// ---- a model of the receiver, kept on this side. The core knows no SSD1306 -
 static uint8_t model[W * H / 8];
 static uint16_t colStart = 0, colEnd = W - 1, pageStart = 0, pageEnd = 7;
 static uint16_t curCol = 0, curPage = 0;
 static uint8_t pendingCmd = 0, argIndex = 0, args[2] = {0, 0};
 static uint32_t dataBytes = 0, txCount = 0;
 
-// 初期化列のうち、パネルの高さで変わる 2 つを拾う（0xA8 多重比、0xDA COM ピン）
+// Pick out the two init commands that follow the panel height
+// (0xA8 multiplex ratio, 0xDA COM pin config)
 static uint8_t muxArg = 0xFF, comArg = 0xFF, prevCmd = 0;
 
 static void feedCmd(uint8_t c) {
@@ -70,7 +71,7 @@ static void putByte(uint8_t b) {
 
 static uint8_t onWire(uint8_t addr, const uint8_t* d, size_t len, bool stop, void* user) {
   (void)stop; (void)user;
-  if (addr != ADDR || len == 0) return 2;  // アドレス NACK
+  if (addr != ADDR || len == 0) return 2;  // NACK on the address
   ++txCount;
   if (d[0] == 0x00) {
     for (size_t i = 1; i < len; ++i) feedCmd(d[i]);
@@ -112,7 +113,7 @@ void setup() {
   lcd.begin();
   tgfxReport("init_transactions", (long)txCount);
 
-  // --- display() を呼ぶまで何も流れない ------------------------------------
+  // --- nothing moves until display() ----------------------------------------
   dataBytes = 0;
   lcd.fillScreen(TFT_WHITE);
   tgfxReport("bytes_before_display", (long)dataBytes);
@@ -120,16 +121,16 @@ void setup() {
   tgfxReport("bytes_full", (long)dataBytes);
   shot("full");
 
-  // --- 一部だけ変えると、変わったページだけ流れる ---------------------------
+  // --- change part of it, and only the changed page goes out ----------------
   panel.clearBuffer(false);
   panel.display();
   dataBytes = 0;
-  lcd.fillRect(8, 8, 32, 8, TFT_WHITE);   // ページ 1 だけに収まる
+  lcd.fillRect(8, 8, 32, 8, TFT_WHITE);   // fits entirely in page 1
   panel.display();
   tgfxReport("bytes_one_page", (long)dataBytes);
   shot("onepage");
 
-  // --- 図形と文字 -----------------------------------------------------------
+  // --- shapes and text ------------------------------------------------------
   panel.clearBuffer(false);
   panel.display();
   dataBytes = 0;
@@ -144,31 +145,32 @@ void setup() {
   tgfxReport("transactions_scene", (long)txCount);
   shot("scene");
 
-  // --- 回転すると幅と高さが入れ替わる ---------------------------------------
+  // --- rotating swaps width and height --------------------------------------
   lcd.setRotation(1);
   tgfxReport("rot1_w", (long)lcd.width());
   tgfxReport("rot1_h", (long)lcd.height());
   panel.clearBuffer(false);
   panel.display();
   dataBytes = 0;
-  lcd.fillRect(0, 0, 8, 24, TFT_WHITE);   // 回転後の左上
+  lcd.fillRect(0, 0, 8, 24, TFT_WHITE);   // the top left after rotating
   panel.display();
   shot("rot1");
   lcd.setRotation(0);
 
-  // --- fillRect の速い経路が、1 画素ずつ描いた結果と一致すること ------------
+  // --- fillRect's fast path must match drawing pixel by pixel ---------------
   //
-  // モノクロパネルは 8 画素を 1 バイトに詰めるので、窓が丸ごと 1 色なら
-  // バイト単位で塗る。**速いだけで、絵は 1 画素も変わってはいけない。**
-  // ページの境界をまたぐ / またがない、回転あり / なしを混ぜて確かめる。
+  // A monochrome panel packs 8 pixels into a byte, so a window of one solid
+  // colour is painted a byte at a time. **Faster, and not one pixel different.**
+  // Cases that cross a page boundary and cases that do not, with and without
+  // rotation.
   {
     static const int16_t R[6][4] = {
-        {0, 0, W, H},            // 全面
-        {8, 8, 32, 8},           // ページ 1 枚にちょうど収まる
-        {3, 5, 17, 11},          // ページ境界をまたぐ、幅も高さも半端
-        {0, 62, 5, 2},           // 最終ページの端
-        {W - 3, 0, 3, 1},        // 右上の 1 行
-        {60, 30, 1, 1},          // 1 画素
+        {0, 0, W, H},            // the whole screen
+        {8, 8, 32, 8},           // exactly one page
+        {3, 5, 17, 11},          // crosses a page boundary; odd width and height
+        {0, 62, 5, 2},           // the edge of the last page
+        {W - 3, 0, 3, 1},        // one row at the top right
+        {60, 30, 1, 1},          // a single pixel
     };
     long diff = 0;
     for (uint8_t rot = 0; rot < 4; ++rot) {
@@ -195,11 +197,11 @@ void setup() {
     tgfxReport("fillrect_fastpath_diff", diff);
   }
 
-  // --- 帯で描いても、全面バッファと同じ絵になること ------------------------
+  // --- drawing in bands must give the same picture as a full buffer ---------
   //
-  // フレームバッファを持たない構成（1 ページぶん 128 バイトだけ）。
-  // シーンをページごとに描き直してその都度流す。**RAM が 1/8 で済むが、
-  // 毎回全ページ流すことになる。** 絵は 1 画素も変わってはいけない。
+  // A configuration with no framebuffer: 128 bytes, one page's worth. The scene
+  // is redrawn per page and pushed each time. **An eighth of the RAM, at the
+  // cost of sending every page every time.** Not one pixel may change.
   {
     lcd.setRotation(0);
     panel.clearBuffer();
@@ -229,11 +231,11 @@ void setup() {
     tgfxReport("banded_diff", diff);
   }
 
-  // --- パネルの高さで初期化列が変わること ---------------------------------
+  // --- the init sequence must follow the panel height -----------------------
   //
-  // **2026-08-29 の設計レビューの P1。** 初期化列は 128x64 決め打ちだったのに
-  // コンストラクタは任意の w / h を受けていた。128x32 に 64 行ぶんの多重比を
-  // 送ると、絵がガラスの半分に潰れる。
+  // **P1 of the 2026-08-29 design review.** The init sequence was hard-coded
+  // for 128x64 while the constructor took any w / h. Sending a 64-row multiplex
+  // ratio to a 128x32 squashes the picture into half the glass.
   {
     static uint8_t fb32[128 * 32 / 8];
     TinyGFXPanelSSD1306 p32(bus, fb32, 128, 32);
@@ -251,10 +253,11 @@ void setup() {
     tgfxReport("com64", (long)comArg);
   }
 
-  // --- 使えない設定は begin() が false を返すこと --------------------------
+  // --- an unusable configuration must make begin() return false -------------
   //
-  // どれもコンパイル時には分からない（バッファは利用者が持つポインタ、
-  // 寸法はコンストラクタ引数）。**黙って壊れた絵を出すより落とす。**
+  // None of these are visible to the compiler: the buffer is a pointer the user
+  // owns, and the dimensions are constructor arguments. **Better to fail than
+  // to quietly draw a broken picture.**
   {
     TinyGFXPanelSSD1306 pnull(bus, nullptr, 128, 64);
     TinyGFX g(pnull);
@@ -262,7 +265,7 @@ void setup() {
   }
   {
     static uint8_t fb60[128 * 8];
-    TinyGFXPanelSSD1306 podd(bus, fb60, 128, 60);  // 8 の倍数でない
+    TinyGFXPanelSSD1306 podd(bus, fb60, 128, 60);  // not a multiple of 8
     TinyGFX g(podd);
     tgfxReport("begin_odd_height", g.begin() ? 1 : 0);
   }
@@ -273,7 +276,8 @@ void setup() {
     tgfxReport("begin_zero_width", g.begin() ? 1 : 0);
   }
   {
-    // まっとうな設定は通ること（上の 3 つが「常に false」で通らないように）
+    // A sound configuration must pass (so the three above cannot be passing
+    // by always returning false)
     static uint8_t fbok[128 * 64 / 8];
     TinyGFXPanelSSD1306 pok(bus, fbok, 128, 64);
     TinyGFX g(pok);

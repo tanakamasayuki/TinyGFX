@@ -249,7 +249,7 @@ CellFont は生のビットマップなので、こちらのデコーダはビ�
 | | CH32V003 での実費 | 誰が持っているか |
 | --- | ---: | --- |
 | `drawNumber` | +168 B | LovyanGFX、TFT_eSPI |
-| `setTextWrap`（自動折り返し） | 未測定 | Adafruit |
+| ~~`setTextWrap`（自動折り返し）~~ | **+164 B。足した**（D33） | Adafruit |
 | `drawEllipse` / `fillEllipse` | 未測定 | Adafruit、LovyanGFX |
 | `drawArc` | 未測定 | LovyanGFX、TFT_eSPI |
 
@@ -281,8 +281,11 @@ CellFont は生のビットマップなので、こちらのデコーダはビ�
    実費は **+284 B**（当初の見積もり +120 は画素ごとに置く素朴版の値。
    ランを 1 回の `fillRect` にまとめる版が 84 B 大きく、カラーパネルでは
    窓設定の回数が桁で減る）
-3. **`setTextWrap` が無い。** `TinyGFXPrint` は `\n` は見るが右端では
-   折り返さない。Adafruit にはある。未測定
+3. ~~**`setTextWrap` が無い。**~~ → **足した**（2026-08-29、D33）。
+   `TINYGFX_TEXT_WRAP=1` で `TinyGFXPrint::setTextWrap()` が現れる。
+   **既定は切**で、切のままなら 0 バイト。入れると **+164 B**（実測）。
+   高いのは「描く前に送り幅を知る」必要があり、フォントデコーダへの
+   2 本目の入口（`advance`）がリンクされるため
 4. **色深度の判断は「いまは正しい」であって「永久に正しい」ではない。**
    SSD1327（4bpp）や灰階調の e-paper を足すときに、パネル側で 565 から
    落とす形が破綻する。**そのときが D4 を見直す時期**

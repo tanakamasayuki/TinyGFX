@@ -1,9 +1,9 @@
-"""Tier 2 — 移植性のコンパイル検証。**実行しない。ビルドが通ることだけ見る。**
+"""Tier 2 - portability, by compiling. **Nothing is run; only that it builds.**
 
-ホストで動かせない `TinyGFXBusSPI` / `TinyGFXBusSoftSPI` の型エラーや API 変更を
-捕まえるのが目的。examples がそのまま素材になる。
+Catches type errors and API changes in `TinyGFXBusSPI` / `TinyGFXBusSoftSPI`,
+neither of which can run on the host. The examples serve as the material.
 
-examples は sketch.yaml にプロファイルを持っているので `--profile` でビルドする。
+The examples carry profiles in sketch.yaml, so they build with `--profile`.
 """
 
 import pytest
@@ -12,12 +12,12 @@ import tinygfx_build as tb
 
 EXAMPLES = tb.REPO / "examples"
 ALL = ["HelloWorld", "Shapes", "FlickerFree", "HardwareSPI", "OledI2C"]
-# ボード専用の例。他のコアではビルドできない（ピンが決め打ち）
+# Board-specific examples. They cannot build on another core (the pins are fixed)
 BOARD_ONLY = [("m5stack", "M5StackBasic")]
 
-# プロファイル名 -> それが要求するコア。入っていなければ skip する
-# （プロファイルは宣言したプラットフォームを勝手に入れないので、
-#  ここで先に見ておかないと CI で巨大なコアを取りにいく事故になる）。
+# Profile name -> the core it needs. Skip if that core is not installed.
+# (A profile does not install the platform it declares, and without this check
+#  CI would go and fetch an enormous core.)
 PROFILE_CORE = {
     "ch32v003": "ch32-riscv-arduino:ch32riscv:CH32V003_EVT",
     "uno": "arduino:avr:uno",
@@ -25,64 +25,64 @@ PROFILE_CORE = {
     "m5stack": "esp32:esp32:m5stack_core",
 }
 
-# CH32V003 のコアには SPI ライブラリが無いので HardwareSPI は外す
-# （docs/EXTERNAL_REQUESTS.ja.md E2）。
+# The CH32V003 core has no SPI library, so HardwareSPI is left out
+# (docs/EXTERNAL_REQUESTS.ja.md E2).
 CASES = (
     [("ch32v003", e) for e in ALL if e != "HardwareSPI"]
     + [("uno", e) for e in ALL]
-    # esp32 はビルドが重いわりに他のコアで拾えない問題が少ないので 1 本だけ。
+    # esp32 builds are slow and rarely catch anything the others miss: one only.
     + [("esp32", "HelloWorld")]
-    # 実機立ち上げ用（docs/MANUAL_TEST.ja.md M0）。ILI9342 を通すのはここだけ。
+    # For bringing hardware up (docs/MANUAL_TEST.ja.md M0). The only ILI9342 build.
     + BOARD_ONLY
 )
 
 pytestmark = [
     pytest.mark.slow,
-    pytest.mark.skipif(not tb.have_arduino_cli(), reason="arduino-cli がない"),
+    pytest.mark.skipif(not tb.have_arduino_cli(), reason="no arduino-cli"),
 ]
 
 
 @pytest.mark.parametrize("profile,example", CASES, ids=lambda v: v)
 def test_example_builds(profile, example):
     if not tb.have_core(PROFILE_CORE[profile]):
-        pytest.skip(f"{PROFILE_CORE[profile]} のコアが入っていない")
+        pytest.skip(f"the {PROFILE_CORE[profile]} core is not installed")
     build = tb.compile_profile(EXAMPLES / example, profile)
-    assert build["flash"] is not None, f"{example} @ {profile}: サイズが取れていない"
+    assert build["flash"] is not None, f"{example} @ {profile}: no size was reported"
     print(f"  {profile:<10} {example:<12} flash={build['flash']:>7} ram={build['ram']}")
 
 
 def test_manual_sketch_builds():
-    """実機検証スケッチ（`tests/manual/m5stack/`）が腐っていないこと。
+    """The hardware bring-up sketch (`tests/manual/m5stack/`) has not rotted.
 
-    自動では走らせない（実機でしか意味がない）。**ビルドだけ通す。**
-    docs/MANUAL_TEST.ja.md M0b。
+    It is never run automatically - it only means anything on real hardware.
+    **This only builds it.** docs/MANUAL_TEST.ja.md M0b.
     """
     if not tb.have_core(PROFILE_CORE["m5stack"]):
-        pytest.skip("esp32 のコアが入っていない")
+        pytest.skip("the esp32 core is not installed")
     build = tb.compile_profile(tb.REPO / "tests" / "manual" / "m5stack", "m5stack")
     assert build["flash"] is not None
     print(f"  manual     m5stack      flash={build['flash']:>7} ram={build['ram']}")
 
 
 def test_hardware_spi_still_fails_on_ch32():
-    """CH32V003 のコアで HardwareSPI が通らないことを**記録として**残す。
+    """**Records** that HardwareSPI does not build on the CH32V003 core.
 
-    TinyGFX の不具合ではなくコア側の状況（EXTERNAL_REQUESTS.ja.md E2）。
-    通るようになったら CASES に足して、このテストは消す。
+    Not a TinyGFX defect - the state of the core (EXTERNAL_REQUESTS.ja.md E2).
+    When it starts building, add it to CASES and delete this test.
     """
     if not tb.have_core(PROFILE_CORE["ch32v003"]):
-        pytest.skip("CH32 コアが入っていない")
+        pytest.skip("the CH32 core is not installed")
     try:
         tb.compile_profile(EXAMPLES / "HardwareSPI", "ch32v003")
     except tb.BuildError as exc:
-        assert "SPI.h" in str(exc), f"想定と違う失敗: {exc}"
+        assert "SPI.h" in str(exc), f"failed for an unexpected reason: {exc}"
         return
-    pytest.skip("CH32 コアで SPI が使えるようになった。CASES に足してこのテストを消すこと")
+    pytest.skip("SPI works on the CH32 core now. Add it to CASES and delete this test")
 
 
-# 文字まわりの切り落としマクロ（src/TinyGFX/FontCell.h と src/TinyGFX/Gfx.h）。
-# 既定は全部 on。off の経路はスケッチが使わないとビルドされないので、
-# ここで実際にコンパイルしておかないと静かに腐る。
+# The text drop macros (src/TinyGFX/FontCell.h and src/TinyGFX/Gfx.h).
+# All default to on. The off path is never built unless a sketch asks for it,
+# so without compiling it here it rots quietly.
 FONT_MACROS = ["TINYGFX_FONT_BG", "TINYGFX_FONT_SCALE", "TINYGFX_FONT_CHAIN",
                "TINYGFX_FONT_UTF8"]
 
@@ -90,30 +90,48 @@ FONT_MACROS = ["TINYGFX_FONT_BG", "TINYGFX_FONT_SCALE", "TINYGFX_FONT_CHAIN",
 @pytest.mark.parametrize("off", [[m] for m in FONT_MACROS] + [FONT_MACROS],
                          ids=lambda v: "+".join(m.split("_")[-1].lower() for m in v))
 def test_font_macros_build(off):
-    """フォントの切り落としマクロを 1 つずつと全部 off でビルドする。
+    """Build with each drop macro off, then with all of them off.
 
-    ついでに削減量を出す。**基準機（CH32V003）で測る**こと。AVR で効く
-    最適化が RISC-V で逆効果になる例が出ている（docs/OPTIMIZE.ja.md J）。
+    Prints what each one saves while it is at it. **Measure on the reference
+    board (CH32V003)**: optimisations that help on AVR have turned out to hurt
+    on RISC-V (docs/OPTIMIZE.ja.md J).
     """
     if not tb.have_core(tb.CH32V003):
-        pytest.skip("CH32V003 のコアが入っていない")
+        pytest.skip("the CH32V003 core is not installed")
     base = tb.compile_construct("t")
     got = tb.compile_construct("t", defines={m: 0 for m in off})
     saved = base["flash"] - got["flash"]
     print(f"  {'+'.join(off):<58} -{saved} B")
-    assert saved >= 0, f"{off} を off にして {-saved} B 増えている"
+    assert saved >= 0, f"turning {off} off grew the build by {-saved} B"
 
 
-# 色定数の 2 つの綴り（docs/DECISIONS.ja.md D30）。中身は全部 static_assert
-# なので、**ビルドが通ること自体が検査**。他ライブラリが先に TFT_RED を
-# 定義している状況を -D で作る。
+# The two spellings of the colour constants (docs/DECISIONS.ja.md D30). The
+# sketch is nothing but static_asserts, so **building at all is the check**.
+# -D recreates the case where another library defined TFT_RED first.
 @pytest.mark.parametrize("foreign", [False, True], ids=["alone", "foreign_tft_red"])
 def test_color_macros(foreign):
     if not tb.have_core(tb.CH32V003):
-        pytest.skip("CH32V003 のコアが入っていない")
+        pytest.skip("the CH32V003 core is not installed")
     defines = {"TFT_RED": "0x1234", "TGFX_FOREIGN_RED": "0x1234"} if foreign else None
     base = tb.compile_construct("base")
     got = tb.compile_construct("color", defines=defines)
-    # マクロなので 1 バイトも増えない
+    # They are macros, so not one byte may be added
     assert got["flash"] == base["flash"], (
-        f"色定数だけで {got['flash'] - base['flash']} B 増えている")
+        f"the colour constants alone added {got['flash'] - base['flash']} B")
+
+
+def test_text_wrap_macro():
+    """`TINYGFX_TEXT_WRAP` defaults to 0 and must cost **not one byte** there.
+
+    Setting it to 1 buys a price tag: wrapping has to know how wide a character
+    is before drawing it, which is a second entry point into the font decoder
+    (`advance`). See docs/DECISIONS.ja.md D33. The number is always printed.
+    """
+    if not tb.have_core(tb.CH32V003):
+        pytest.skip("the CH32V003 core is not installed")
+    off = tb.compile_construct("p1")
+    on = tb.compile_construct("p1", defines={"TINYGFX_TEXT_WRAP": 1})
+    cost = on["flash"] - off["flash"]
+    print(f"  TINYGFX_TEXT_WRAP=1                                        +{cost} B")
+    assert cost > 0, "setting it to 1 added nothing; the wrapping path is not being built"
+    assert cost <= 260, f"wrapping costs {cost} B, far from the 164 B in the docs"

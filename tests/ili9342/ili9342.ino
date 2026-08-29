@@ -1,11 +1,11 @@
-// ILI9342C パネルの MADCTL・色順・ミラーの組み立て。
+// How an ILI9342C assembles MADCTL, colour order and mirroring.
 //
-// ILI9342 は GRAM が最初から横長（320x240）なので、回転 0 が 320x240 になる。
-// オフセットのあるモジュールが無いので、ウィンドウは素通しのはず。
+// The ILI9342's GRAM is landscape from the start (320x240), so rotation 0 is
+// 320x240. No module has an origin offset, so the window should pass through.
 //
-// **MADCTL の値そのものが実機で正しいかはここでは分からない**（MANUAL_TEST M0）。
-// ここが守るのは「実装が表どおりに動くこと」と「setRgbOrder / setMirror が
-// 表に正しく効くこと」。
+// **Whether that MADCTL is right on real glass cannot be known here**
+// (MANUAL_TEST M0). What this holds is that the implementation follows the
+// table, and that setRgbOrder / setMirror act on it correctly.
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
 #include <TinyGFX/PanelILI9342.h>
@@ -33,7 +33,7 @@ void setup() {
   tgfxTestBegin("ili9342");
   lcd.begin();
 
-  for (uint8_t r = 0; r < 4; ++r) probe("bgr", r);   // 既定は BGR
+  for (uint8_t r = 0; r < 4; ++r) probe("bgr", r);   // BGR is the default
 
   panel.setRgbOrder(false);
   for (uint8_t r = 0; r < 4; ++r) probe("rgb", r);
@@ -43,7 +43,7 @@ void setup() {
   for (uint8_t r = 0; r < 4; ++r) probe("flip", r);
   panel.setMirror(false, false);
 
-  // 実際に GRAM へ色が乗ること（ST7789 と同じ 0x2A/0x2B/0x2C を使う）
+  // Colour really reaches the GRAM (through the ST7789's own 0x2A/0x2B/0x2C)
   panel.setRotation(0);
   lcd.setRotation(0);
   bus.fill(0);

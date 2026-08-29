@@ -1,7 +1,7 @@
-"""CellFont の連鎖と U+FFFD 退避。
+"""CellFont chaining and the U+FFFD fallback.
 
-生成されたフォントでは踏めない道を、手で組んだ小さな CellFont で通す。
-仕様（LGFXFontToolJs docs/formats/cellfont.ja.md）の §7.1 / §7.2 / §8 / §15.2。
+Walks paths a generated font cannot reach, using tiny hand-built CellFonts.
+Spec (LGFXFontToolJs docs/formats/cellfont.ja.md) 7.1, 7.2, 8 and 15.2.
 """
 
 from pathlib import Path
@@ -17,38 +17,42 @@ def test_fontchain(dut):
 
     r = tc.report(SKETCH)
 
-    # 'A' は 3x5 を全部塗る。送り幅 4
-    assert (r["a_ret"], r["a_lit"]) == (4, 15), f"'A' が {r['a_lit']} 画素 / 送り {r['a_ret']}"
+    # 'A' fills all of its 3x5. Advance 4.
+    assert (r["a_ret"], r["a_lit"]) == (4, 15), (
+        f"'A' drew {r['a_lit']} pixels, advance {r['a_ret']}")
     assert (r["a_top"], r["a_bottom"]) == (0, 4)
 
-    # 収録外 -> U+FFFD へ退避。豆腐は上 1 行だけ（3 画素）
-    assert r["nd_lit"] == 3, f"退避先が描かれていない（{r['nd_lit']} 画素）"
-    assert r["nd_ret"] == 4, "退避しても送り幅は返る"
+    # Uncovered -> falls back to U+FFFD. That tofu is one row of 3 pixels.
+    assert r["nd_lit"] == 3, f"the fallback was not drawn ({r['nd_lit']} pixels)"
+    assert r["nd_ret"] == 4, "falling back must still return an advance"
     assert (r["nd_top"], r["nd_bottom"]) == (0, 0)
 
-    # 要求そのものが U+FFFD なら再検索しない（無限に潜らない）
+    # Asking for U+FFFD itself must not search again (no infinite descent)
     assert (r["ndself_lit"], r["ndself_ret"]) == (3, 4)
 
-    # **本番。** 前段（fontAN）が U+FFFD を持っていても、後段の 'B' に到達すること。
-    # デコーダの中で退避すると、ここが豆腐（3 画素・0 行目）になって落ちる。
+    # **The real point.** The first link (fontAN) has a U+FFFD, and the 'B' in
+    # the second link must still be reached. A decoder that falls back on its
+    # own turns this into the tofu (3 pixels, row 0) and fails here.
     assert r["chain_lit"] == 9, (
-        f"連鎖の後段の 'B' が出ていない（{r['chain_lit']} 画素）。"
-        "前段の U+FFFD に潰されている疑い")
-    # ベースラインは**先頭フォント**の ascent(5)。fontB は ascent 3 なので 2 行下に出る
+        f"the 'B' in the second link never appeared ({r['chain_lit']} pixels). "
+        "Probably swallowed by the first link's U+FFFD")
+    # The baseline comes from the **first** font's ascent (5). fontB has ascent
+    # 3, so it lands two rows lower.
     assert (r["chain_top"], r["chain_bottom"]) == (2, 4), (
-        f"ベースラインが揃っていない（{r['chain_top']}..{r['chain_bottom']} 行）。"
-        "デコーダが自分の ascent で換算している疑い")
+        f"baselines do not line up (rows {r['chain_top']}..{r['chain_bottom']}). "
+        "Probably the decoder used its own ascent")
 
-    # どこにも無く、退避先も無い -> 何も描かず送り 0
+    # Nowhere in the chain, and no fallback either -> nothing drawn, advance 0
     assert (r["miss_lit"], r["miss_ret"]) == (0, 0)
 
-    # 疎索引: しっぽに first より小さいコードが居ても引けること（§7.1）。
-    # グリフの並びは「頭ブロック -> しっぽ昇順」（§6）なので、
-    # 頭の 'B' が index 0（全塗り 15 画素）、しっぽの 'A' が index 1（上 1 行 3 画素）。
-    assert (r["lohead_lit"], r["lohead_ret"]) == (15, 4), "頭ブロックが引けていない"
-    assert (r["lo_lit"], r["lo_ret"]) == (3, 4), "first より小さいコードが引けていない"
+    # Sparse index: a code below `first`, living in the tail, must still be
+    # found (7.1). Glyphs are ordered "head block, then tail ascending" (6), so
+    # the head 'B' is index 0 (fully inked, 15 px) and the tail 'A' is index 1
+    # (one row, 3 px).
+    assert (r["lohead_lit"], r["lohead_ret"]) == (15, 4), "the head block was not found"
+    assert (r["lo_lit"], r["lo_ret"]) == (3, 4), "a code below `first` was not found"
 
-    # 行送りと ascent は連鎖の先頭のもの
+    # Line height and ascent come from the head of the chain
     assert r["chain_line"] == 6
-    assert r["chain_ascent"] == 5, "連鎖の ascent が先頭のものになっていない"
+    assert r["chain_ascent"] == 5, "the chain's ascent is not the head font's"
     assert r["b_ascent"] == 3

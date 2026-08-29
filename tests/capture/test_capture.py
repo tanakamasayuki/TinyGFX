@@ -1,6 +1,7 @@
-"""BusCapture が ST7789 のコマンド列から画を復元できること（Tier 1 の土台）。
+"""BusCapture rebuilds a picture from an ST7789 command stream. Tier 1 rests on
+this one.
 
-これが通らないと、以降の描画テストは書けない。
+Nothing else in the drawing tests can be written until this passes.
 """
 
 from pathlib import Path
@@ -17,29 +18,29 @@ def test_capture(dut):
 
     r = tc.report(SKETCH)
 
-    assert r["init_commands"] > 5, f"初期化列が短すぎる: {r['init_commands']}"
+    assert r["init_commands"] > 5, f"init sequence too short: {r['init_commands']}"
 
-    # --- 転送画素数は過不足なく一致すること ---------------------------------
-    assert r["fillscreen_pixels"] == 64 * 64, f"fillScreen が {r['fillscreen_pixels']} 画素"
-    assert r["fillrect_pixels"] == 8 * 8, f"fillRect(8x8) が {r['fillrect_pixels']} 画素"
-    assert r["pixel_pixels"] == 1, f"drawPixel が {r['pixel_pixels']} 画素"
+    # --- exactly the right number of pixels, no more, no fewer --------------
+    assert r["fillscreen_pixels"] == 64 * 64, f"fillScreen sent {r['fillscreen_pixels']} pixels"
+    assert r["fillrect_pixels"] == 8 * 8, f"fillRect(8x8) sent {r['fillrect_pixels']} pixels"
+    assert r["pixel_pixels"] == 1, f"drawPixel sent {r['pixel_pixels']} pixels"
 
-    # --- ウィンドウの値 -----------------------------------------------------
+    # --- the window values --------------------------------------------------
     assert (r["win_xs"], r["win_ys"]) == (3, 5)
     assert (r["win_xe"], r["win_ye"]) == (12, 11)  # x+w-1, y+h-1
-    assert (r["off_xs"], r["off_ys"]) == (2, 1), "原点オフセットがウィンドウに乗っていない"
+    assert (r["off_xs"], r["off_ys"]) == (2, 1), "the origin offset is not reaching the window"
 
-    assert r["txn_depth"] == 0, "startWrite / endWrite が釣り合っていない"
+    assert r["txn_depth"] == 0, "startWrite / endWrite are not balanced"
 
-    # --- 復元された画 -------------------------------------------------------
+    # --- the rebuilt picture ------------------------------------------------
     img = tc.image(SKETCH, "fillscreen")
     assert img.size == (64, 64)
-    assert tc.colors(img) == {BLUE: 64 * 64}, f"全面が青一色でない: {tc.colors(img)}"
+    assert tc.colors(img) == {BLUE: 64 * 64}, f"the screen is not solid blue: {tc.colors(img)}"
 
     img = tc.image(SKETCH, "fillrect")
     assert img.getpixel((4, 4)) == RED and img.getpixel((11, 11)) == RED
     for p in [(3, 4), (12, 11), (4, 3), (4, 12)]:
-        assert img.getpixel(p) == BLACK, f"矩形が {p} へはみ出している"
+        assert img.getpixel(p) == BLACK, f"the rectangle spilled onto {p}"
     assert tc.colors(img)[RED] == 64
 
     img = tc.image(SKETCH, "pixel")

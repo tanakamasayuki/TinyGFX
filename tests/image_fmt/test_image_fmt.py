@@ -1,13 +1,15 @@
-"""**同じ絵をどの形式で符号化しても、1 画素も違わないこと。**
+"""**However a picture is encoded, not one pixel may differ.**
 
-変換ツール（`tools/img2h.py`）は絵ごとに最小の形式を総当たりで選ぶ。
-生 RGB565 / RLE / RLE+パレット / 1bpp 横詰め / 1bpp 縦詰め —— **どれを
-選んだかがスケッチから見えてはいけない。** それを固定するのがこのテスト。
+The converter (`tools/img2h.py`) brute-forces the smallest encoding for each
+picture: raw RGB565, RLE, RLE with a palette, 1bpp packed horizontally, 1bpp
+packed vertically. **Which one it picked must not be visible from the sketch**,
+and that is what this test pins down.
 
-CellFont で「3 通りの符号化が同じ画素を描く」（`tests/text/`）を固定したのと
-同じ考え方。符号化はツールの都合であって、利用者の関心事ではない。
+The same idea as pinning "three encodings draw the same pixels" for CellFont
+(`tests/text/`). Encoding is the tool's business, not the user's.
 
-形式の選び方と実測は [docs/IMAGE_FORMAT.ja.md](../../docs/IMAGE_FORMAT.ja.md)。
+How formats are chosen, with the measurements, is in
+[docs/IMAGE_FORMAT.ja.md](../../docs/IMAGE_FORMAT.ja.md).
 """
 
 from pathlib import Path
@@ -24,72 +26,78 @@ def test_image_fmt(dut):
 
     r = tc.report(SKETCH)
 
-    # --- 絵が出ていること（全部真っ黒で「一致」しても意味がない） ------------
-    assert 0 < r["raw_lit"] < W * H, f"生 RGB565 の絵が単色（点灯 {r['raw_lit']}）"
-    assert 0 < r["mono_lit"] < W * H, f"1bpp の絵が単色（点灯 {r['mono_lit']}）"
+    # --- there is a picture (all-black matching all-black proves nothing) ----
+    assert 0 < r["raw_lit"] < W * H, f"raw RGB565 is one flat colour ({r['raw_lit']} lit)"
+    assert 0 < r["mono_lit"] < W * H, f"the 1bpp picture is one flat colour ({r['mono_lit']} lit)"
 
-    # --- **本命。** 形式が違っても絵は同じ -----------------------------------
-    assert r["rle565_diff"] == 0, f"RLE が生と {r['rle565_diff']} 画素違う"
-    assert r["rlepal4_diff"] == 0, f"RLE+パレットが生と {r['rlepal4_diff']} 画素違う"
+    # --- **the point.** A different format, the same picture ----------------
+    assert r["rle565_diff"] == 0, f"RLE differs from raw by {r['rle565_diff']} pixels"
+    assert r["rlepal4_diff"] == 0, f"RLE+palette differs from raw by {r['rlepal4_diff']} pixels"
     assert r["mono_v_diff"] == 0, (
-        f"1bpp の縦詰めが横詰めと {r['mono_v_diff']} 画素違う")
+        f"1bpp packed vertically differs from horizontally by {r['mono_v_diff']} pixels")
 
-    # --- クリップが効くこと ---------------------------------------------------
+    # --- clipping works -----------------------------------------------------
     assert r["clip_outside"] == 0, (
-        f"クリップの外に {r['clip_outside']} 画素描いている")
+        f"{r['clip_outside']} pixels drawn outside the clip")
 
-    # --- 画面外は 1 画素も送らない -------------------------------------------
+    # --- entirely off screen sends nothing ----------------------------------
     assert r["offscreen_pixels"] == 0, (
-        f"完全に画面外の画像で {r['offscreen_pixels']} 画素送っている")
+        f"an image entirely off screen sent {r['offscreen_pixels']} pixels")
 
-    # --- raw565 は 1 行に窓を 1 つしか開かない ---------------------------------
+    # --- raw565 opens one window a row, no more -----------------------------
     #
-    # 写真は連長が 1 なので、連ごとに fillRect を呼ぶと**画素ごとに窓が開く**。
-    # 実測でそうなっていた: 32x32 の雑音で **1,024 画素に対しコマンド 3,072 個**、
-    # 1 画素 13 バイト。1 行 1 窓にして 96 個になった（docs/IMAGE_FORMAT.ja.md）。
+    # A photograph has runs of one, so a fillRect per run means **a window per
+    # pixel**. That is what it used to do: 1,024 pixels of 32x32 noise cost
+    # **3,072 commands**, 13 bytes a pixel. One window a row brought it to 96
+    # (docs/IMAGE_FORMAT.ja.md).
     #
-    # コマンドは窓 1 つにつき 3 個（CASET / RASET / RAMWR）。
+    # A window is three commands: CASET, RASET, RAMWR.
     assert r["photo_pixels"] == W * H, (
-        f"64x64 を 32x32 に描いて {r['photo_pixels']} 画素。{W*H} のはず")
+        f"a 64x64 drawn into 32x32 sent {r['photo_pixels']} pixels; want {W*H}")
     assert r["photo_cmds"] == 3 * H, (
-        f"窓が {r['photo_cmds'] / 3:.0f} 個。行数 {H} と同じでなければならない")
+        f"{r['photo_cmds'] / 3:.0f} windows opened; it must equal the {H} rows")
 
-    # 左上へはみ出しても同じ。自前でクリップする経路なので、**画面外に書かない**
-    # ことと画素数が変わらないことを見る。
+    # The same hanging off the top left. This path clips itself, so what matters
+    # is **not writing off screen** and the pixel count staying put.
     assert r["photo_off_pixels"] == W * H, (
-        f"はみ出させて {r['photo_off_pixels']} 画素。{W*H} のはず")
+        f"hanging off the edge sent {r['photo_off_pixels']} pixels; want {W*H}")
     assert r["photo_off_cmds"] == 3 * H
 
-    # クリップ内はクリップ無しと 1 画素も違わず、外は 1 画素も触られないこと。
+    # Inside the clip must not differ by a pixel from no clip; outside it, not
+    # one pixel may be touched.
     assert r["photo_clip_in_diff"] == 0, (
-        f"クリップ内が {r['photo_clip_in_diff']} 画素違う")
+        f"inside the clip differs by {r['photo_clip_in_diff']} pixels")
     assert r["photo_clip_out_lit"] == 0, (
-        f"クリップの外に {r['photo_clip_out_lit']} 画素描いている")
+        f"{r['photo_clip_out_lit']} pixels drawn outside the clip")
     assert r["photo_clip_pixels"] == 16 * 16, (
-        f"16x16 のクリップで {r['photo_clip_pixels']} 画素送っている")
+        f"a 16x16 clip sent {r['photo_clip_pixels']} pixels")
     assert r["photo_clip_cmds"] == 3 * 16
 
-    # 極端な座標では 1 画素も送らないこと。`clipX0 - x` の桁溢れで c0 が負に
-    # 化けると、**画像データの手前を読んで**画面に出る。
+    # Extreme coordinates must send nothing. If `clipX0 - x` overflows and c0
+    # goes negative, it **reads in front of the image data** and puts that on
+    # the screen.
     assert r["photo_extreme_pixels"] == 0, (
-        f"完全に画面外なのに {r['photo_extreme_pixels']} 画素送っている")
+        f"entirely off screen, yet {r['photo_extreme_pixels']} pixels were sent")
     assert r["photo_extreme_cmds"] == 0, (
-        f"完全に画面外なのに窓を {r['photo_extreme_cmds'] / 3:.0f} 個開いている")
+        f"entirely off screen, yet {r['photo_extreme_cmds'] / 3:.0f} windows were opened")
 
-    # --- 透過 -----------------------------------------------------------------
+    # --- transparency -------------------------------------------------------
     #
-    # 同じ画像を透過あり／無しで描く。**透過色の画素だけが下地を残し、
-    # それ以外は 1 画素も違わないこと。**
+    # The same image drawn with and without transparency. **Only the pixels of
+    # the transparent colour leave the background showing; nothing else may
+    # differ by a pixel.**
     #
-    # 透過を見るかは形式ではなく ops が決める（生成ヘッダが指す）ので、
-    # 透過の無い画像しか使わないスケッチには判定のコードが載らない。
-    # 実費は 24〜66 B（形式と MCU による。docs/IMAGE_FORMAT.ja.md）。
+    # Whether transparency is honoured is decided by the ops, not the format
+    # (the generated header points at one), so a sketch that only uses opaque
+    # images does not link the test for it. It costs 24-66 B depending on the
+    # format and the MCU (docs/IMAGE_FORMAT.ja.md).
     assert r["opaque_bg_left"] == 0, (
-        f"透過なしなのに下地が {r['opaque_bg_left']} 画素残っている")
-    assert r["trans_bg_left"] > 0, "透過ありなのに下地が 1 画素も残っていない"
-    assert r["trans_bg_left"] < W * H, "透過ありで全部下地のまま（何も描けていない）"
+        f"opaque, yet {r['opaque_bg_left']} pixels of background remain")
+    assert r["trans_bg_left"] > 0, "transparent, yet no background shows at all"
+    assert r["trans_bg_left"] < W * H, (
+        "transparent, and everything is still background (nothing was drawn)")
 
-    # 違うのは透過色の画素だけ。それ以外は同じ絵。
+    # Only the transparent pixels differ. Everywhere else is the same picture.
     assert r["trans_differ"] == r["trans_bg_left"], (
-        f"透過色以外も違っている: 差 {r['trans_differ']} / "
-        f"下地の残り {r['trans_bg_left']}")
+        f"something other than the transparent colour differs: {r['trans_differ']} "
+        f"changed against {r['trans_bg_left']} left as background")

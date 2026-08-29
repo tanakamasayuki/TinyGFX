@@ -1,25 +1,26 @@
 #!/usr/bin/env python3
-"""画像を TinyGFX 用の .h に変換する —— **実験用の最小実装。**
+"""Convert an image into a .h for TinyGFX - **a minimal, experimental one.**
 
-正式なツールは LGFXFontToolJs 側（ブラウザ + CLI）に作る予定で、これはその
-前に「どの形式がどれだけ効くか」を実測するための踏み台。docs/IMAGE_FORMAT.ja.md
-の判断材料を作るのが仕事。
+The real tool is going to live on the LGFXFontToolJs side (browser and CLI).
+This is the scaffold that comes first, so that "how much does each format
+actually save" can be measured. Its job is to produce the evidence behind
+docs/IMAGE_FORMAT.ja.md.
 
-PNG のフィルタ選択と同じ考え方で、**符号化を総当たりして一番小さいものを
-選ぶ。** 利用者は形式を指定しない（--format で強制はできる）。
+Same idea as choosing a PNG filter: **brute-force the encodings and take the
+smallest.** The user does not pick a format (--format can force one).
 
     uv run python tools/img2h.py icon.png --name myIcon --out icon.h
-    uv run python tools/img2h.py icon.png --report      # 全形式の大きさだけ出す
+    uv run python tools/img2h.py icon.png --report      # just the sizes, per format
 
-対応する形式は docs/IMAGE_FORMAT.ja.md の表と対応:
+The formats line up with the table in docs/IMAGE_FORMAT.ja.md:
 
-    raw565      生 RGB565
-    pal4        4bpp パレット（色数 16 以下）
-    pal8        8bpp パレット（色数 256 以下）
-    rle565      RLE。長さ 1B + 色 2B
-    rlepal4     RLE + 4bit パレット。長さ 4bit(1..16) + 索引 4bit
-    bitmap1h    1bpp 横詰め（drawBitmap と同じ並び）
-    bitmap1v    1bpp 縦詰め（SSD1306 / SH1106 のページ形式そのもの）
+    raw565      raw RGB565
+    pal4        4bpp palette (16 colours or fewer)
+    pal8        8bpp palette (256 colours or fewer)
+    rle565      RLE: 1 byte of length, 2 of colour
+    rlepal4     RLE with a 4-bit palette: 4 bits of length (1..16), 4 of index
+    bitmap1h    1bpp packed horizontally (the order drawBitmap wants)
+    bitmap1v    1bpp packed vertically (an SSD1306 / SH1106 page, exactly)
 """
 
 import argparse
@@ -29,7 +30,7 @@ from pathlib import Path
 try:
     from PIL import Image
 except ImportError:
-    sys.exit("PIL が要る: uv run --with pillow python tools/img2h.py ...")
+    sys.exit("PIL is required: uv run --with pillow python tools/img2h.py ...")
 
 
 def to565(rgb):
@@ -38,11 +39,11 @@ def to565(rgb):
 
 
 def load(path, mono=None):
-    """画像を RGB565 の 2 次元配列にする。
+    """The image as a 2-D array of RGB565.
 
-    `mono` を渡すと、その閾値（0..255 の輝度）で 2 値化する。**モノクロ
-    パネル向けには必須。** 元素材が PNG だと文字の縁がアンチエイリアスされて
-    いて、そのままでは 50 色を超えることがあり、1bpp に符号化できない。
+    Passing `mono` thresholds it at that luminance (0..255). **Required for a
+    monochrome panel**: a PNG source usually has antialiased edges on its text,
+    which can push it past 50 colours and make 1bpp impossible to encode.
     """
     im = Image.open(path).convert("RGB")
     w, h = im.size
@@ -54,14 +55,14 @@ def load(path, mono=None):
     return w, h, [[to565(px[x, y]) for x in range(w)] for y in range(h)]
 
 
-# --- 符号化 ---------------------------------------------------------------
-# どれも (バイト列, パレット or None) を返す。無理なら None。
+# --- encoders --------------------------------------------------------------
+# Each returns (bytes, palette or None), or None when it cannot be done.
 
 def enc_raw565(w, h, rows, _pal):
     out = bytearray()
     for row in rows:
         for c in row:
-            out += bytes((c >> 8, c & 0xFF))   # ビッグエンディアン（線に出る順）
+            out += bytes((c >> 8, c & 0xFF))   # big endian: the order it goes on the wire
     return bytes(out), None
 
 
@@ -73,7 +74,7 @@ def enc_pal(w, h, rows, pal, bits):
     for row in rows:
         if bits == 8:
             out += bytes(idx[c] for c in row)
-        else:  # 4bit。**行ごとにバイト境界へ揃える**（行の切り出しが楽になる）
+        else:  # 4-bit. **Each row starts on a byte boundary**, which keeps rows easy to cut
             b, half = 0, False
             for c in row:
                 b = (b << 4) | idx[c]
@@ -87,7 +88,7 @@ def enc_pal(w, h, rows, pal, bits):
 
 
 def runs_of(w, h, rows):
-    """行をまたいで連続させたラン列。(長さ, 色) を返す。"""
+    """The runs, continued across row boundaries, as (length, colour)."""
     flat = [c for row in rows for c in row]
     out, cur, n = [], flat[0], 1
     for c in flat[1:]:
@@ -118,7 +119,7 @@ def enc_rlepal4(w, h, rows, pal):
         i = idx[c]
         while n > 0:
             take = min(n, 16)
-            out.append(((take - 1) << 4) | i)   # 長さは 1..16 を 0..15 で持つ
+            out.append(((take - 1) << 4) | i)   # lengths 1..16 are stored as 0..15
             n -= take
     return bytes(out), pal
 
@@ -128,7 +129,7 @@ def enc_bitmap1h(w, h, rows, pal):
         return None
     on = pal[1]
     out = bytearray()
-    for row in rows:                            # 各行がバイト境界から始まる
+    for row in rows:                            # every row starts on a byte boundary
         b, k = 0, 0
         for c in row:
             b = (b << 1) | (1 if c == on else 0); k += 1
@@ -140,7 +141,8 @@ def enc_bitmap1h(w, h, rows, pal):
 
 
 def enc_bitmap1v(w, h, rows, pal):
-    """縦詰め。1 バイト = 縦 8 画素、LSB が上。SSD1306 のページ形式そのもの。"""
+    """Packed vertically: one byte is 8 pixels tall, LSB at the top. Exactly an
+    SSD1306 page."""
     if pal is None or len(pal) != 2:
         return None
     on = pal[1]
@@ -153,9 +155,9 @@ def enc_bitmap1v(w, h, rows, pal):
     return bytes(out), pal
 
 
-# pal4 / pal8（非圧縮パレット）は**実装していない。** 測った全画像で
-# rlepal4 に負けたため（64x64 の UI アイコンで 2,054 対 416）。必要になったら
-# enc_pal と DECODER_BYTES を戻して測り直す。
+# pal4 / pal8 (uncompressed palettes) are **not implemented.** They lost to
+# rlepal4 on every image measured (2,054 against 416 on a 64x64 UI icon). If
+# they are ever needed, put enc_pal and DECODER_BYTES back and measure again.
 ENCODERS = [
     ("raw565",   enc_raw565),
     ("rle565",   enc_rle565),
@@ -165,22 +167,24 @@ ENCODERS = [
 ]
 
 
-# デコーダの実費。**src/TinyGFX/Image.h の本実装で実測**（2026-08-29、-Os）。
+# What a decoder actually costs. **Measured against the real implementation in
+# src/TinyGFX/Image.h** (2026-08-29, -Os).
 #
-# **アーキテクチャで順位が入れ替わる。** AVR は 8 ビットなので 16 ビットの
-# 演算が高く、ESP32 は逆にビット取り出しのループが高い。だから --mcu が要る。
+# **The ranking changes with the architecture.** AVR is 8-bit, so 16-bit
+# arithmetic is expensive there; on an ESP32 it is the bit-extraction loop that
+# costs. That is why --mcu exists.
 #
 #                ch32v003   avr  esp32
-#   raw565            400   638    492   ← AVR ではこれが最安
-#   rle565            387   663    467   ← ch32 / esp32 ではこれが最安
+#   raw565            400   638    492   <- cheapest on AVR
+#   rle565            387   663    467   <- cheapest on ch32 / esp32
 #   rlepal4           395   679    483
 #   bitmap1h          400   654    592
 #   bitmap1v          392   690    592
 #
-# 「データ + デコーダ」で比べないと総量が最小にならない（CellFont 仕様
-# §13.4 と同じ話）。**しかもデコーダ代は画像ごとではなく形式ごとに 1 回**
-# なので、画像を 1 枚ずつ最小化すると形式が散らばって損をする。
-# --batch では「使う形式の組み合わせ」を総当たりする。
+# Only "data plus decoder" minimises the total (the same point as CellFont
+# spec 13.4). **And a decoder is paid for once per format, not once per image**,
+# so minimising each image on its own scatters the formats and costs more.
+# --batch brute-forces the set of formats to use.
 DECODER_BYTES = {
     "ch32v003": {"raw565": 400, "rle565": 387, "rlepal4": 395,
                  "bitmap1h": 400, "bitmap1v": 392},
@@ -190,30 +194,32 @@ DECODER_BYTES = {
                  "bitmap1h": 592, "bitmap1v": 592},
 }
 
-# **同じデコーダを共有する形式の組。** 1bpp の横詰めと縦詰めは、ビットの
-# 取り出し方が 1 行違うだけの同じループなので 1 本にまとめられる。向きは
-# 呼び出し側で定数（生成ヘッダが形式を知っている）なので、片方しか使わな
-# ければ片方ぶんの代金しか出ない。**「両対応にすると無駄」は起きない。**
+# **Formats that share a decoder.** 1bpp packed horizontally and vertically are
+# the same loop, differing by one line in how the bit is taken, so they are one
+# decoder. The direction is a constant at the call site (the generated header
+# knows the format), so using only one costs only one. **"Supporting both is
+# wasteful" never happens here.**
 SHARED = {
     "ch32v003": {("bitmap1h", "bitmap1v"): 504},
     "avr":      {("bitmap1h", "bitmap1v"): 864},
     "esp32":    {("bitmap1h", "bitmap1v"): 696},
 }
 
-# ページ境界に揃った縦詰めは、ページ方式パネルのバッファそのものなので
-# TinyGFXPanelPaged::pushVBitmap() がバイト複写で貼れる。**汎用経路の
-# 代わりではなく追加の速い経路。**
+# A page-aligned vertical bitmap is a paged panel's buffer, exactly, so
+# TinyGFXPanelPaged::pushVBitmap() can blit it. **An extra fast path, not a
+# replacement for the general one.**
 #
-# **244 B（CH32V003 実測）。** 「memcpy だけだから 24 B 程度」と見積もって
-# いたが本実装では 10 倍だった —— ページ境界・回転・帯・パネル外の判定と
-# dirty の追跡が残るため。汎用経路が 408 B なので**縮むのは 164 B だけ**で、
-# サイズでは rlepal4 に負けることがある。**速い経路の価値はサイズではなく
-# 速度**（ラン展開ではなくバイト複写）。
+# **244 B, measured on a CH32V003.** The estimate was "about 24 B, it is just a
+# memcpy"; the real implementation came out ten times that, because the page
+# alignment, rotation, band and off-panel checks and the dirty tracking all
+# remain. The general path is 408 B, so **it only saves 164 B** and can lose to
+# rlepal4 on size. **The value of the fast path is speed, not size** - a byte
+# copy instead of expanding runs.
 ALIGNED_VBLIT = {"ch32v003": 244, "avr": 244, "esp32": 244}
 
 
 def group_cost(formats, mcu):
-    """使う形式の集合に対するデコーダ総額。共有する組は 1 本ぶんにまとめる。"""
+    """What a set of formats costs in decoders, counting a shared pair once."""
     rest, total = set(formats), 0
     for combo, cost in SHARED[mcu].items():
         hit = rest & set(combo)
@@ -236,7 +242,7 @@ def encode_all(w, h, rows):
     return out, uniq
 
 
-# --- 出力 -----------------------------------------------------------------
+# --- output ----------------------------------------------------------------
 
 def carray(name, data, per_line=16, typ="uint8_t"):
     body = ",\n  ".join(
@@ -248,23 +254,24 @@ def carray(name, data, per_line=16, typ="uint8_t"):
 def emit(name, w, h, fmt, data, pal, uniq, argv, transparent=None):
     ops = {"raw565": "Raw565", "rle565": "Rle565", "rlepal4": "Rlepal4",
            "bitmap1h": "Bitmap1h", "bitmap1v": "Bitmap1v"}[fmt]
-    # 透過は ops ではなく構造体の値で表す（形式とは扱いが違う）。理由は
-    # src/TinyGFX/Image.h の CellImage::transparent のコメントにある実測。
+    # Transparency is carried by a field in the struct rather than by the ops
+    # (it is a different kind of thing from the format). The reasoning, with
+    # the measurements, is on CellImage::transparent in src/TinyGFX/Image.h.
     L = []
-    L.append(f"// {name} — TinyGFX 画像\n//")
-    L.append("// tools/img2h.py が生成（**実験用**。正式なツールに置き換わる）")
-    L.append(f"// 形式   : {fmt}")
-    L.append(f"// 寸法   : {w}x{h}")
-    L.append(f"// 色数   : {len(uniq)}")
+    L.append(f"// {name} — a TinyGFX image\n//")
+    L.append("// Generated by tools/img2h.py (**experimental**; the real tool will replace it)")
+    L.append(f"// Format     : {fmt}")
+    L.append(f"// Size       : {w}x{h}")
+    L.append(f"// Colours    : {len(uniq)}")
     if transparent is not None:
-        L.append(f"// 透過   : 0x{transparent:04X}"
-                 + ("（パレット索引）" if pal else "（色）"))
-    L.append(f"// データ : {len(data)} バイト" + (f" + パレット {len(pal)*2}" if pal else ""))
-    L.append(f"//\n// 再生成:\n//   python3 tools/img2h.py {' '.join(argv)}\n")
+        L.append(f"// Transparent: 0x{transparent:04X}"
+                 + (" (palette index)" if pal else " (colour)"))
+    L.append(f"// Data       : {len(data)} bytes" + (f" + {len(pal)*2} of palette" if pal else ""))
+    L.append(f"//\n// Rebuild with:\n//   python3 tools/img2h.py {' '.join(argv)}\n")
     L.append("#pragma once")
     L.append("#include <stdint.h>\n")
     L.append("#if !defined(TINYGFX_IMAGE_SPEC_VERSION)")
-    L.append('#error "描画器の TinyGFX/Image.h を先に include すること"')
+    L.append('#error "Include the renderer\'s TinyGFX/Image.h before this file"')
     L.append("#endif\n")
     L.append(carray(f"{name}Data", data))
     if pal:
@@ -282,22 +289,24 @@ def emit(name, w, h, fmt, data, pal, uniq, argv, transparent=None):
     L.append(f"  {len(pal) if pal else 0},")
     L.append(f"  {1 if transparent is not None else 0},")
     L.append("};")
-    # **使う形式のデコーダだけがリンクされる。** ops を指すだけでよく、
-    # マクロでの事前有効化は要らない（実測で確認済み: 未使用は +0 B）。
+    # **Only the decoder for the format in use gets linked.** Pointing at the
+    # ops is enough; no macro has to enable it in advance (measured: an unused
+    # one is +0 B).
     L.append(f"\nstatic const TinyGFXImageRef {name}Ref = "
              f"{{&{name}, &tinygfxImage{ops}Ops}};")
     return "\n".join(L) + "\n"
 
 
 def pick_set(per_image, dec):
-    """**画像 1 枚ずつではなく、まとめて選ぶ。**
+    """**Choose across the whole set, not one image at a time.**
 
-    デコーダ代は「形式ごとに 1 回」であって「画像ごとに 1 回」ではない。
-    5 枚がそれぞれ別の形式を選ぶとデコーダを 5 本積むことになり、多少
-    データが増えても 1 つの形式に揃えたほうが総量で勝つことが多い。
+    A decoder is paid for once per format, not once per image. Five images each
+    picking their own format means carrying five decoders, and settling on one
+    format usually wins on the total even when the data grows a little.
 
-    形式は少ないので、**使う形式の組み合わせを総当たり**して総量が最小の
-    ものを採る。返すのは (画像ごとの形式, 総量, 使う形式の集合)。
+    There are few formats, so this **brute-forces the set of formats to use**
+    and takes whichever total is smallest. Returns (format per image, total,
+    the set of formats used).
     """
     names = [n for n, _ in ENCODERS]
     best = None
@@ -322,16 +331,16 @@ def pick_set(per_image, dec):
 
 
 def batch(a):
-    """フォルダを一括で処理する。"""
+    """Process a whole folder at once."""
     def dec(fs):
         if a.aligned and set(fs) == {"bitmap1v"}:
-            return ALIGNED_VBLIT[a.mcu]     # 揃った全幅ならバイト複写で済む
+            return ALIGNED_VBLIT[a.mcu]     # aligned and full width means a byte copy
         return group_cost(fs, a.mcu)
 
     files = sorted(p for p in Path(a.batch).iterdir()
                    if p.suffix.lower() in (".png", ".bmp", ".gif", ".jpg", ".jpeg"))
     if not files:
-        sys.exit(f"画像が無い: {a.batch}")
+        sys.exit(f"no images in {a.batch}")
     per_image, meta = {}, {}
     for f in files:
         w, h, rows = load(f, a.mono)
@@ -345,22 +354,22 @@ def batch(a):
     choice, total, used = pick_set(per_image, dec)
     set_data = total - dec(used)
 
-    print(f"MCU: {a.mcu}   画像 {len(files)} 枚"
-          + (f"   （--mono {a.mono} で 2 値化）" if a.mono is not None else "")
+    print(f"MCU: {a.mcu}   {len(files)} image(s)"
+          + (f"   (thresholded at --mono {a.mono})" if a.mono is not None else "")
           + ("   （--aligned）" if a.aligned else ""))
     print()
-    print(f"  {'画像':<20} {'1枚ずつ':<10} {'まとめて':<10} {'データ':>7}")
+    print(f"  {'image':<20} {'alone':<10} {'together':<10} {'data':>7}")
     for k in per_image:
         n, s = naive_fmt[k], choice[k]
-        mark = "" if n == s else "  ←変わった"
+        mark = "" if n == s else "  <- changed"
         print(f"  {k:<20} {n:<10} {s:<10} {per_image[k][s][2]:>7}{mark}")
     print()
-    print(f"  1 枚ずつ最小: データ {naive_data} + デコーダ {naive_dec}"
-          f"（{len({naive_fmt[k] for k in naive_fmt})} 形式） = {naive_data + naive_dec}")
-    print(f"  まとめて最小: データ {set_data} + デコーダ {total - set_data}"
-          f"（{len(used)} 形式: {', '.join(used)}） = {total}")
+    print(f"  smallest alone:    data {naive_data} + decoders {naive_dec}"
+          f" ({len({naive_fmt[k] for k in naive_fmt})} formats) = {naive_data + naive_dec}")
+    print(f"  smallest together: data {set_data} + decoders {total - set_data}"
+          f" ({len(used)} formats: {', '.join(used)}) = {total}")
     d = (naive_data + naive_dec) - total
-    print(f"  → まとめたほうが {d:+} B" if d else "  → 同じ")
+    print(f"  -> together is {d:+} B" if d else "  -> the same")
 
     if a.out:
         outdir = Path(a.out); outdir.mkdir(parents=True, exist_ok=True)
@@ -371,66 +380,69 @@ def batch(a):
             name = a.prefix + "".join(c if c.isalnum() else "_" for c in f.stem)
             (outdir / (f.stem + ".h")).write_text(
                 emit(name, w, h, fmt, data, pal, uniq, [str(f)]))
-        print(f"  → {outdir} に {len(per_image)} 本出力")
+        print(f"  -> wrote {len(per_image)} headers into {outdir}")
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("image", nargs="?")
-    ap.add_argument("--batch", metavar="フォルダ",
-                    help="フォルダを一括処理し、**形式をまとめて**最小化する")
+    ap.add_argument("--batch", metavar="FOLDER",
+                    help="process a folder at once, minimising **across formats**")
     ap.add_argument("--mcu", choices=["ch32v003", "avr", "esp32"], default="ch32v003",
-                    help="デコーダ代はアーキテクチャで変わる。**順位まで入れ替わる**")
+                    help="decoder costs vary by architecture - **the ranking itself changes**")
     ap.add_argument("--aligned", action="store_true",
-                    help="縦詰めをページ境界の全幅にだけ貼る前提にする。"
-                         "ページ方式パネルなら memcpy で済むのでデコーダが 24 B になる")
-    ap.add_argument("--prefix", default="", help="一括出力のシンボル接頭辞")
+                    help="assume vertical bitmaps are only ever blitted full width "
+                         "on a page boundary; on a paged panel that is a memcpy, "
+                         "which brings the decoder down to 24 B")
+    ap.add_argument("--prefix", default="", help="symbol prefix for batch output")
     ap.add_argument("--transparent", metavar="RRGGBB",
-                    help="この色を透過にする（16 進 6 桁）。**透過の無い画像しか"
-                         "使わないなら指定しないこと** — 判定のコードが要らなくなる")
+                    help="make this colour transparent (six hex digits). **Leave it "
+                         "off if none of your images need transparency** - the test "
+                         "then costs nothing")
     ap.add_argument("--name", default="image")
     ap.add_argument("--out")
     ap.add_argument("--format", choices=[n for n, _ in ENCODERS],
-                    help="総当たりせず指定の形式にする")
-    ap.add_argument("--report", action="store_true", help="全形式の大きさだけ出す")
-    ap.add_argument("--mono", nargs="?", type=int, const=128, metavar="閾値",
-                    help="輝度で 2 値化する（既定 128）。モノクロパネル向け")
+                    help="force this format instead of brute-forcing")
+    ap.add_argument("--report", action="store_true", help="just print the size of every format")
+    ap.add_argument("--mono", nargs="?", type=int, const=128, metavar="THRESHOLD",
+                    help="threshold by luminance (default 128), for a monochrome panel")
     ap.add_argument("--prefer", choices=["h", "v"], default="v",
-                    help="1bpp が同点のときどちらを採るか。**縦詰め(v)が既定** — "
-                         "SSD1306 / SH1106 に直接貼れるため。ページ方式でないなら h")
+                    help="which 1bpp packing wins a tie. **Vertical (v) by default**, "
+                         "because it blits straight onto an SSD1306 / SH1106. Use h if "
+                         "the panel is not page addressed")
     a = ap.parse_args()
     if a.batch:
         batch(a)
         return
     if not a.image:
-        ap.error("画像か --batch のどちらかが要る")
+        ap.error("an image or --batch is required")
 
     w, h, rows = load(a.image, a.mono)
     enc, uniq = encode_all(w, h, rows)
 
     if a.report:
-        note = f"（--mono {a.mono} で 2 値化）" if a.mono is not None else ""
-        print(f"{Path(a.image).name}  {w}x{h}  色数 {len(uniq)}{note}")
-        print(f"  {'形式':<10} {'データ':>8} {'デコーダ':>8} {'総量':>8}")
+        note = f" (thresholded at --mono {a.mono})" if a.mono is not None else ""
+        print(f"{Path(a.image).name}  {w}x{h}  {len(uniq)} colours{note}")
+        print(f"  {'format':<10} {'data':>8} {'decoder':>8} {'total':>8}")
         dec = DECODER_BYTES[a.mcu]
         best_d = min(v[2] for v in enc.values())
         best_t = min(v[2] + dec[k] for k, v in enc.items())
         for name, _ in ENCODERS:
             if name in enc:
                 _, _p, total = enc[name]
-                marks = ("←データ最小" if total == best_d else "") + \
-                        (" ←総量最小" if total + dec[name] == best_t else "")
+                marks = ("<- smallest data" if total == best_d else "") + \
+                        (" <- smallest total" if total + dec[name] == best_t else "")
                 print(f"  {name:<10} {total:>8} {dec[name]:>8} "
                       f"{total + dec[name]:>8}  {marks}")
             else:
                 print(f"  {name:<10} {'—':>8}")
-        print("  ※ デコーダは CH32V003 実測。**1 枚しか使わないなら総量、"
-              "同じ形式を何枚も使うならデータ量**で選ぶ")
+        print("  note: decoder sizes are measured on a CH32V003. **Choose by total "
+              "for a single image, by data when several images share a format**")
         return
 
-    # 同点のときの順序を安定させる。1bpp の横／縦は必ず同じ大きさになるので、
-    # **データ量では決まらない。貼る先のパネルで決まる。**
+    # Keep ties resolved consistently. 1bpp horizontal and vertical always come
+    # out the same size, so **the data cannot decide - the target panel does.**
     order = {n: i for i, (n, _) in enumerate(ENCODERS)}
     if a.prefer == "v":
         order["bitmap1v"] = -1
@@ -438,21 +450,21 @@ def main():
         order["bitmap1h"] = -1
     fmt = a.format or min(enc, key=lambda k: (enc[k][2], order[k]))
     if fmt not in enc:
-        sys.exit(f"{fmt} では符号化できない（色数 {len(uniq)}）")
+        sys.exit(f"{fmt} cannot encode this ({len(uniq)} colours)")
     data, pal, total = enc[fmt]
     tr = None
     if a.transparent:
         c565 = to565(tuple(int(a.transparent[i:i+2], 16) for i in (0, 2, 4)))
         if pal:
             if c565 not in pal:
-                sys.exit(f"透過色 {a.transparent} が画像に無い")
+                sys.exit(f"the transparent colour {a.transparent} does not appear in the image")
             tr = pal.index(c565)
         else:
             tr = c565
     text = emit(a.name, w, h, fmt, data, pal, uniq, sys.argv[1:], tr)
     if a.out:
         Path(a.out).write_text(text)
-        print(f"{a.out}  {fmt}  {total} B  ({w}x{h}, 色数 {len(uniq)})")
+        print(f"{a.out}  {fmt}  {total} B  ({w}x{h}, {len(uniq)} colours)")
     else:
         print(text)
 

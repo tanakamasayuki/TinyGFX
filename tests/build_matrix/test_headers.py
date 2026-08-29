@@ -1,19 +1,20 @@
-"""**すべての公開ヘッダが、すべての対象コアで単体ビルドできること。**
+"""**Every public header must compile on its own, on every target core.**
 
-Tier 2。実行しない。**ビルドが通ることだけ**見る。
+Tier 2. Nothing is run; only that it **builds**.
 
-これが無いと 2 つ抜ける。
+Without this, two things go unchecked.
 
-- **各ヘッダが単独で成立しているか。** 実際の使われ方は「`<TinyGFX.h>` の後に
-  必要なものだけ足す」なので、うっかり別のサブヘッダに依存していると利用者の
-  手元でだけ壊れる。`Progmem.h` を切り出したときがまさにその形だった
-  （パネルが `tinygfx_rd8` を使うのに `Font.h` 経由でしか手に入らなかった）
-- **ホスト以外で通るか。** ホストテストは `lang-ship:host` でしか動かさない。
-  新しいヘッダはそこだけ通って満足しがちで、AVR の PROGMEM や
-  CH32V003 の 16 ビット int で初めて壊れることがある
+- **Whether each header stands on its own.** The way these are actually used is
+  "`<TinyGFX.h>`, then add what you need", so a header that quietly depends on
+  another sub-header breaks only on the user's machine. Splitting out
+  `Progmem.h` was exactly that shape: panels used `tinygfx_rd8` but could only
+  reach it through `Font.h`.
+- **Whether it builds anywhere but the host.** The host tests only ever run on
+  `lang-ship:host`. A new header passes there and feels finished, then breaks
+  on AVR's PROGMEM or the CH32V003's 16-bit int.
 
-examples を回す `test_example_builds` と補い合う関係。あちらは「組み合わせが
-動くか」、こちらは「部品が単体で成立するか」。
+The counterpart of `test_example_builds`, which runs the examples: that one
+asks whether the combinations work, this one whether the pieces stand alone.
 """
 
 from pathlib import Path
@@ -24,11 +25,11 @@ import tinygfx_build as tb
 
 SRC = tb.REPO / "src" / "TinyGFX"
 
-# Arduino のバスを引くヘッダは、そのコアに該当ライブラリが要る。
-# CH32V003 のコアには SPI が無い（docs/EXTERNAL_REQUESTS.ja.md E2）。
+# A header that pulls in an Arduino bus needs that library on the core.
+# The CH32V003 core has no SPI (docs/EXTERNAL_REQUESTS.ja.md E2).
 NEEDS_SPI = {"BusSPI.h"}
 
-# 対象コア。**ホストだけで満足しないこと**がこのテストの主眼。
+# The target cores. **Not settling for the host alone** is the whole point.
 CORES = [
     ("ch32v003", tb.CH32V003),
     ("uno", "arduino:avr:uno"),
@@ -39,14 +40,14 @@ HEADERS = sorted(p.name for p in SRC.glob("*.h"))
 
 pytestmark = [
     pytest.mark.slow,
-    pytest.mark.skipif(not tb.have_arduino_cli(), reason="arduino-cli がない"),
+    pytest.mark.skipif(not tb.have_arduino_cli(), reason="no arduino-cli"),
 ]
 
 
 @pytest.mark.parametrize("core,fqbn", CORES, ids=[c for c, _ in CORES])
 def test_every_header_compiles(core, fqbn, tmp_path):
     if not tb.have_core(fqbn):
-        pytest.skip(f"{fqbn} のコアが入っていない")
+        pytest.skip(f"the {fqbn} core is not installed")
 
     skipped, built = [], []
     for h in HEADERS:
@@ -55,11 +56,12 @@ def test_every_header_compiles(core, fqbn, tmp_path):
             continue
         sketch = tmp_path / h[:-2]
         sketch.mkdir()
-        # `<TinyGFX.h>` + そのヘッダ 1 本だけ。**他のサブヘッダは足さない。**
+        # `<TinyGFX.h>` plus that one header. **No other sub-header.**
         #
-        # サブヘッダだけを include しても arduino-cli はライブラリを引かない
-        # （ライブラリ名と同じ `TinyGFX.h` を見て解決するため。`library.properties`
-        # の `includes=TinyGFX.h` がそれ）。だからこれが実際の契約。
+        # Including only a sub-header does not make arduino-cli find the
+        # library: it resolves through `TinyGFX.h`, the header named after the
+        # library (that is what `includes=TinyGFX.h` in `library.properties`
+        # is). So this pair is the real contract.
         (sketch / f"{sketch.name}.ino").write_text(
             f"#include <TinyGFX.h>\n#include <TinyGFX/{h}>\n"
             "void setup() {}\nvoid loop() {}\n")
@@ -68,7 +70,7 @@ def test_every_header_compiles(core, fqbn, tmp_path):
             built.append(h)
         except tb.BuildError as e:
             pytest.fail(
-                f"{core}: <TinyGFX.h> の後に <TinyGFX/{h}> を足すと通らない\n  {e}")
+                f"{core}: <TinyGFX.h> followed by <TinyGFX/{h}> does not build\n  {e}")
 
-    print(f"  {core:<9} {len(built)} 本ビルド"
-          + (f"（{', '.join(skipped)} は skip）" if skipped else ""))
+    print(f"  {core:<9} {len(built)} headers built"
+          + (f" (skipped {', '.join(skipped)})" if skipped else ""))

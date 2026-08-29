@@ -1,12 +1,13 @@
-"""回転・オフセットが MADCTL と CASET / RASET にどう出るか。
+"""How rotation and offset come out in MADCTL and CASET / RASET.
 
-回転はコントローラの MADCTL でやる設計（docs/DECISIONS.ja.md D7）なので、
-ソフト側で確かめられるのは「幅と高さの入れ替わり」「MADCTL の値」
-「ウィンドウにオフセットが正しく乗るか」の 3 つ。
+Rotation is done by the controller's MADCTL by design (docs/DECISIONS.ja.md
+D7), so what can be checked in software is three things: that width and height
+swap, that MADCTL takes the right value, and that the offset reaches the window.
 
-**MADCTL の値そのものが実機で正しいかは、ここでは分からない**（MANUAL_TEST M2）。
-ここが守るのは「実装が下の表どおりに動いていること」。表が違っていたら実機で
-分かるので、そのときはこの表も直す。
+**Whether that MADCTL value is right on real glass cannot be known here**
+(MANUAL_TEST M2). What this holds is that the implementation follows the table
+below. If the table is wrong, the hardware will say so - and then this table
+gets fixed too.
 """
 
 from pathlib import Path
@@ -17,7 +18,7 @@ SKETCH = Path(__file__).parent
 
 MADCTL_MY, MADCTL_MX, MADCTL_MV = 0x80, 0x40, 0x20
 
-# 135x240 パネル / GRAM 240x320 / 回転 0 のオフセット (52, 40)
+# A 135x240 panel on a 240x320 GRAM, offset (52, 40) at rotation 0
 #   cs2 = 240 - 135 - 52 = 53
 #   rs2 = 320 - 240 - 40 = 40
 EXPECTED = {
@@ -40,27 +41,28 @@ def test_window(dut):
             got = r[f"rot{rot}_{key}"]
             if got != value:
                 problems.append(f"r={rot} {key}: {got} != {value}")
-    assert not problems, "回転ごとの値が表と違う: " + "; ".join(problems)
+    assert not problems, "values per rotation differ from the table: " + "; ".join(problems)
 
     madctls = {r[f"rot{rot}_madctl"] for rot in range(4)}
-    assert len(madctls) == 4, f"MADCTL が重複している: {sorted(madctls)}"
+    assert len(madctls) == 4, f"duplicate MADCTL values: {sorted(madctls)}"
 
     for rot in range(4):
         xs, ys = r[f"zero{rot}_xs"], r[f"zero{rot}_ys"]
-        assert (xs, ys) == (0, 0), f"オフセット無しのパネルで r={rot} が ({xs},{ys})"
+        assert (xs, ys) == (0, 0), f"a panel with no offset gave ({xs},{ys}) at r={rot}"
 
-    assert (r["clip_w"], r["clip_h"]) == (240, 135), "setRotation で width/height が入れ替わっていない"
+    assert (r["clip_w"], r["clip_h"]) == (240, 135), "setRotation did not swap width/height"
 
-    # --- setter の呼び出し順に依存しないこと（2026-08-29 レビューの P0） ------
+    # --- the setters must not depend on call order (P0 of the 2026-08-29
+    # review) ----------------------------------------------------------------
     #
-    # setGramSize() / setOffset() は、どちらを先に呼んでも、begin() の前でも
-    # 後でも、その場で現在回転のオフセットを導出すること。以前は
-    # setRotation() の中でしか導出しておらず、回転しないスケッチでは
-    # オフセットが一生効かなかった。
-    for who, label in (("late", "begin() の後"),
-                       ("swap", "begin() の後・逆順"),
-                       ("early", "begin() の前")):
+    # setGramSize() and setOffset() must derive the offset for the current
+    # rotation on the spot: either order, before or after begin(). They used to
+    # be derived only inside setRotation(), so a sketch that never rotated
+    # never got its offset at all.
+    for who, label in (("late", "after begin()"),
+                       ("swap", "after begin(), reversed order"),
+                       ("early", "before begin()")):
         got = (r[f"{who}_xs"], r[f"{who}_ys"])
         assert got == (52, 40), (
-            f"{label}に setGramSize/setOffset を呼んだのに窓が {got}"
-            "（setRotation を挟まないと反映されていない）")
+            f"setGramSize/setOffset called {label} left the window at {got} "
+            "(it only takes effect once setRotation runs)")

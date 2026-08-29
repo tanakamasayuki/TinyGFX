@@ -1,18 +1,19 @@
-// SH1106 の配線を、実機なしで検証する。
+// The SH1106 wiring, checked without hardware.
 //
-//   TinyGFX → PanelSH1106 → 本番の TinyGFXBusI2C → Wire
-//           → ホストの Wire 観測フック → SH1106 の模型 → ビットマップ
+//   TinyGFX -> PanelSH1106 -> the real TinyGFXBusI2C -> Wire
+//           -> the host's Wire probe -> a model of an SH1106 -> bitmap
 //
-// SH1106 が SSD1306 と違うのは 2 点だけで、どちらもここで見る。
+// An SH1106 differs from an SSD1306 in exactly two ways, and both are covered.
 //
-//   1. **132 カラムの RAM に 128 カラムのガラス。** 絵の左端は RAM の
-//      カラム 2。ずれると 2 画素ずれた絵になる
-//   2. **カラム／ページの範囲指定コマンドが無い。** 0x21 / 0x22 が使えず、
-//      ページごとにカーソルを置いて（0xB0|page、0x00 / 0x10 でカラム）
-//      1 ページずつ流す
+//   1. **132 columns of RAM behind 128 columns of glass.** The left edge of the
+//      picture is RAM column 2; get it wrong and the picture shifts two pixels
+//   2. **no column/page range commands.** 0x21 / 0x22 are unavailable, so the
+//      cursor is placed per page (0xB0|page, then 0x00 / 0x10 for the column)
+//      and one page is streamed at a time
 //
-// **同じ絵を SSD1306 でも描いて、復号した結果が 1 ビットも違わないことを見る。**
-// 共有部分（PanelPaged）が同じなので、ここで差が出たら転送側の不具合。
+// **The same picture is drawn on an SSD1306 too, and the decoded results must
+// not differ by a bit.** Everything shared (PanelPaged) is the same code, so a
+// difference here is a defect in the transfer layer.
 #include <TinyGFX.h>
 #include <TinyGFX/BusI2C.h>
 #include <TinyGFX/PanelSH1106.h>
@@ -27,7 +28,7 @@
 static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps};
 
 static const int W = 128, H = 64, PAGES = H / 8;
-static const int RAM_W = 132;  // SH1106 が実際に持っているカラム数
+static const int RAM_W = 132;  // how many columns an SH1106 really has
 static const uint8_t ADDR = 0x3C;
 
 static uint8_t fbA[W * H / 8], fbB[W * H / 8];
@@ -37,8 +38,8 @@ TinyGFXPanelSSD1306 ssd(bus, fbB, W, H);
 TinyGFX shLcd(sh);
 TinyGFX ssdLcd(ssd);
 
-// ---- 受け側の模型 ---------------------------------------------------------
-// SH1106 は 132 カラム、SSD1306 は 128 カラムぶんだけ使う。
+// ---- a model of the receiver ---------------------------------------------
+// An SH1106 has 132 columns; an SSD1306 uses only 128 of the same array.
 static uint8_t model[RAM_W * PAGES];
 static uint16_t curCol = 0, curPage = 0;
 static uint16_t colStart = 0, colEnd = W - 1;
@@ -48,7 +49,7 @@ static uint32_t dataBytes = 0;
 
 static void feedCmd(uint8_t c) {
   if (sh1106Mode) {
-    // ページごとにカーソルを置く方式。範囲指定は無い
+    // The cursor is placed per page; there is no range to set
     if ((c & 0xF0) == 0xB0)      curPage = (uint16_t)(c & 0x0F);
     else if ((c & 0xF0) == 0x00) curCol = (uint16_t)((curCol & 0xF0) | (c & 0x0F));
     else if ((c & 0xF0) == 0x10) curCol = (uint16_t)((curCol & 0x0F) | ((c & 0x0F) << 4));
@@ -73,7 +74,8 @@ static void putByte(uint8_t b) {
     model[(uint32_t)curPage * RAM_W + curCol] = b;
   }
   if (sh1106Mode) {
-    // カラムはページ内で進み、端で折り返す。ページはまたがない
+    // The column advances within the page and wraps at the end; it never
+    // crosses into the next page
     curCol = (uint16_t)((curCol + 1) % ramW);
   } else {
     if (curCol >= colEnd) { curCol = colStart; ++curPage; }
@@ -100,7 +102,7 @@ static void scene(TinyGFX& g) {
   g.drawString("12345", 70, 4);
 }
 
-/// 模型の RAM から、見えている 128 カラムぶんを取り出す。
+/// Take the visible 128 columns out of the model's RAM.
 static void extract(uint8_t* out, int colOffset) {
   for (int p = 0; p < PAGES; ++p) {
     for (int x = 0; x < W; ++x) out[p * W + x] = model[p * RAM_W + colOffset + x];
@@ -133,10 +135,11 @@ void setup() {
   scene(shLcd);
   sh.display();
   tgfxReport("sh_bytes", (long)dataBytes);
-  extract(fromSh, 2);  // 既定のカラムオフセット
+  extract(fromSh, 2);  // the default column offset
   shot("sh1106", fromSh);
 
-  // 絵が単色でないこと。真っ白どうし・真っ黒どうしで「一致」しても意味がない
+  // The picture must not be one flat colour: all-white matching all-white
+  // would prove nothing
   long lit = 0;
   for (int i = 0; i < W * H / 8; ++i) {
     for (int b = 0; b < 8; ++b) {
@@ -145,7 +148,7 @@ void setup() {
   }
   tgfxReport("sh_lit", lit);
 
-  // ガラスの外（カラム 0,1 と 130,131）には何も書かれていないこと
+  // Nothing may be written outside the glass (columns 0, 1 and 130, 131)
   long outside = 0;
   for (int p = 0; p < PAGES; ++p) {
     if (model[p * RAM_W + 0]) ++outside;
@@ -155,7 +158,7 @@ void setup() {
   }
   tgfxReport("outside_glass", outside);
 
-  // --- 同じ絵を SSD1306 で ------------------------------------------------
+  // --- the same picture on an SSD1306 ---------------------------------------
   sh1106Mode = false;
   for (int i = 0; i < RAM_W * PAGES; ++i) model[i] = 0;
   ssdLcd.begin();
@@ -172,7 +175,7 @@ void setup() {
   }
   tgfxReport("sh_vs_ssd_diff", diff);
 
-  // --- カラムオフセットを変えると絵がずれること ---------------------------
+  // --- changing the column offset must shift the picture --------------------
   sh1106Mode = true;
   for (int i = 0; i < RAM_W * PAGES; ++i) model[i] = 0;
   sh.setColumnOffset(0);
@@ -188,12 +191,12 @@ void setup() {
   tgfxReport("offset0_matches_ssd", same == W * H / 8 ? 1 : 0);
   sh.setColumnOffset(2);
 
-  // --- 縦詰めビットマップの速い経路 -----------------------------------------
+  // --- the fast path for vertically packed bitmaps --------------------------
   //
-  // **ページ境界に揃った縦詰めは、このパネルのバッファそのもの。**
-  // pushVBitmap() が memcpy 相当で貼る。汎用の drawImage() と 1 ビットも
-  // 違わないことを見る（違えば速いだけの経路ではなく別物になってしまう）。
-  sh1106Mode = false;   // SSD1306 の模型で見る
+  // **A page-aligned vertical bitmap is this panel's buffer, exactly.**
+  // pushVBitmap() blits it. It must not differ from the general drawImage() by
+  // a single bit - otherwise it is not a faster path but a different one.
+  sh1106Mode = false;   // observed through the SSD1306 model
   {
 
   }
@@ -223,7 +226,7 @@ void setup() {
     }
     tgfxReport("vblit_lit", lit);
 
-    // 揃っていない位置は断る（描かずに false）
+    // An unaligned position is refused: nothing drawn, false returned
     ssd.clearBuffer();
     tgfxReport("vblit_unaligned", ssd.pushVBitmap(0, 3, W, H, splash_vData) ? 1 : 0);
     tgfxReport("vblit_offpanel", ssd.pushVBitmap(0, 0, W, 128, splash_vData) ? 1 : 0);

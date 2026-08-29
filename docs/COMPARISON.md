@@ -254,7 +254,7 @@ The survey turned up **one** addition clearly worth making.
 | | Cost on a CH32V003 | Who has it |
 | --- | ---: | --- |
 | `drawNumber` | +168 B | LovyanGFX, TFT_eSPI |
-| `setTextWrap` | not measured | Adafruit |
+| ~~`setTextWrap`~~ | **+164 B, and added** (D33) | Adafruit |
 | `drawEllipse` / `fillEllipse` | not measured | Adafruit, LovyanGFX |
 | `drawArc` | not measured | LovyanGFX, TFT_eSPI |
 
@@ -286,8 +286,11 @@ other libraries have it, so compatibility argues for it too.
    **+284 B**; the +120 estimate was for a naive per-pixel version. Coalescing
    runs into one `fillRect` each costs 84 B more and saves an order of
    magnitude of window setups on a colour panel
-3. **No `setTextWrap`.** `TinyGFXPrint` honours `\n` but does not wrap at the
-   right edge. Adafruit does. Not measured
+3. ~~**No `setTextWrap`.**~~ → **added** (2026-08-29, D33).
+   `TINYGFX_TEXT_WRAP=1` brings out `TinyGFXPrint::setTextWrap()`.
+   **Off by default**, and off costs nothing. On costs **+164 B** (measured).
+   The price is that wrapping has to know how wide a character is *before*
+   drawing it, which links a second entry point into the font decoder
 4. **The colour decision is right for now, not forever.** Adding an SSD1327
    (4bpp) or a greyscale e-paper breaks the "let the panel reduce 565" model.
    **That is when D4 needs revisiting**

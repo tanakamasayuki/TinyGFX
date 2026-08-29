@@ -8,6 +8,23 @@
 
 #include "Gfx.h"
 
+/// Wrap to the next line when a character would not fit (Adafruit_GFX's
+/// setTextWrap). **Off, and it has to be asked for at compile time.**
+///
+/// Wrapping correctly means knowing how wide a character is *before* drawing
+/// it - a character that does not fit must start the next line, not be drawn
+/// clipped against the edge. That is a second entry point into the font
+/// decoder (`advance`, on top of `draw`), and the linker cannot drop it once
+/// write() refers to it. **Measured on a CH32V003: 164 bytes, paid by every
+/// sketch that prints, wrapping or not** - which is the same reason
+/// setTextDatum is not here either (docs/API.ja.md).
+///
+/// Define it as 1 to get setTextWrap(). Sketches that already call textWidth()
+/// have paid most of it anyway.
+#ifndef TINYGFX_TEXT_WRAP
+#define TINYGFX_TEXT_WRAP 0
+#endif
+
 class TinyGFXPrint : public TinyGFX, public Print {
  public:
   explicit TinyGFXPrint(TinyGFXPanel& panel) : TinyGFX(panel) {}
@@ -75,12 +92,33 @@ class TinyGFXPrint : public TinyGFX, public Print {
     _lineStartX = x;
   }
 
+#if TINYGFX_TEXT_WRAP
+  /// Wrap at the right edge of the screen. Off until asked for, and a wrapped
+  /// line restarts at the x of the last setCursor(), the same place '\n' goes.
+  void setTextWrap(bool on) { _wrap = on; }
+  bool getTextWrap() const { return _wrap; }
+#endif
+
  private:
   void put(uint16_t ch) {
+#if TINYGFX_TEXT_WRAP
+    if (_wrap) {
+      // The advance has to be known before drawing: a character that does not
+      // fit belongs on the next line, not clipped against the edge.
+      const int16_t adv = advanceOf(ch);
+      if (adv > 0 && (int32_t)_cursorX + adv > width()) {
+        _cursorX = _lineStartX;
+        _cursorY = (int16_t)(_cursorY + fontHeight());
+      }
+    }
+#endif
     _cursorX = (int16_t)(_cursorX + drawChar(ch, _cursorX, _cursorY));
   }
 
   int16_t _lineStartX = 0;
+#if TINYGFX_TEXT_WRAP
+  bool _wrap = false;
+#endif
 #if TINYGFX_FONT_UTF8
   uint16_t _acc = 0;    // the code point so far
   uint8_t _need = 0;    // continuation bytes still owed

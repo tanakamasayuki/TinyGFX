@@ -1,10 +1,10 @@
-// 本番のバス実装をホストで通しで検証する。
+// The real bus implementations, end to end on the host.
 //
-//   TinyGFX → PanelST7789 → **TinyGFXBusSoftSPI / TinyGFXBusSPI** → 線
-//            → TinyGFX 側のパネル模型 → 仮想 GRAM → PPM
+//   TinyGFX -> PanelST7789 -> **TinyGFXBusSoftSPI / TinyGFXBusSPI** -> the wire
+//            -> a model of the panel -> a virtual GRAM -> PPM
 //
-// ここまで来て初めて、ビット順・DC を落とすタイミング・トランザクション中の
-// CS が検証できる。BusCapture だけでは Bus の手前までしか見えない。
+// Only at this point can bit order, when DC drops, and CS during a transaction
+// be checked at all. BusCapture only ever sees as far as the front of the Bus.
 #define TGFX_HOST_PROBE_SPI 1
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
@@ -30,7 +30,7 @@ void setup() {
   tgfxTestBegin("hostbus");
   SPI.begin();  // the sketch owns the bus; TinyGFX never begins it
 
-  // ---- ソフト SPI（CH32V003 の既定バス） --------------------------------
+  // ---- software SPI: the default bus on a CH32V003 -----------------------
   {
     TinyGFXBusSoftSPI bus(PIN_SCK, PIN_MOSI, PIN_DC, PIN_CS);
     TinyGFXPanelST7789 panel(bus, W, H);
@@ -50,7 +50,7 @@ void setup() {
     probe.detach();
   }
 
-  // ---- ハードウェア SPI ---------------------------------------------------
+  // ---- hardware SPI --------------------------------------------------------
   {
     TinyGFXBusSPI bus(SPI, PIN_DC, PIN_CS, 24000000UL);
     TinyGFXPanelST7789 panel(bus, W, H);
@@ -68,8 +68,8 @@ void setup() {
     tgfxReport("hw_pixels", (long)sink.pixelCount());
     tgfxShot("hw", gram, W, H);
 
-    // SPISettings が意図どおりか（ST7789 は MODE0 / MSB first）
-    // 1.5.0 で読み取り専用アクセサが入ったので、そちらを使う
+    // Are the SPISettings what was intended? (an ST7789 wants MODE0, MSB first)
+    // 1.5.0 added read-only accessors, so use those
     const SPISettings s = SPI.settings();
     tgfxReport("spi_clock", (long)s.clock());
     tgfxReport("spi_bitorder", (long)s.bitOrder());
@@ -78,7 +78,7 @@ void setup() {
     probe.detach();
   }
 
-  // CS はトランザクションの外で HIGH に戻っていること
+  // CS must be back HIGH outside a transaction
   tgfxReport("cs_idle_high", digitalRead(PIN_CS) == HIGH ? 1 : 0);
   tgfxReport("dc_idle_high", digitalRead(PIN_DC) == HIGH ? 1 : 0);
 

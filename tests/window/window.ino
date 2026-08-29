@@ -1,16 +1,16 @@
-// 回転と原点オフセットが CASET / RASET / MADCTL にどう出るか。
+// How rotation and the origin offset come out in CASET / RASET / MADCTL.
 //
-// 回転はコントローラの MADCTL でやる設計（docs/DECISIONS.ja.md D7）なので、
-// ソフト側で確かめられるのは「幅と高さが入れ替わるか」「MADCTL の値」
-// 「ウィンドウにオフセットが正しく乗るか」の 3 つ。
-// MADCTL の値そのものが正しいかは実機でしか分からない（MANUAL_TEST M2）。
+// Rotation is done by the controller's MADCTL by design (docs/DECISIONS.ja.md
+// D7), so what can be checked in software is three things: that width and
+// height swap, the MADCTL value, and that the offset reaches the window.
+// Whether that value is right can only be found out on hardware (MANUAL_TEST M2).
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
 #include <TinyGFX/PanelST7789.h>
 #include <tgfx_test.h>
 
 static uint16_t gram[8 * 8];
-// 135x240 の ST7789 モジュールを模す: GRAM 240x320、可視域は (52, 40) から
+// Models a 135x240 ST7789 module: a 240x320 GRAM, visible from (52, 40)
 TinyGFXBusCapture bus(gram, 8, 8);
 TinyGFXPanelST7789 panel(bus, 135, 240);
 TinyGFX lcd(panel);
@@ -36,37 +36,38 @@ void setup() {
   panel.setOffset(52, 40);
   for (uint8_t r = 0; r < 4; ++r) probe("rot", r);
 
-  // オフセットなしのパネルでは全回転で 0 のままであること
+  // On a panel with no offset it must stay 0 at every rotation
   panel.setGramSize(135, 240);
   panel.setOffset(0, 0);
   for (uint8_t r = 0; r < 4; ++r) probe("zero", r);
 
-  // 回転すると clip も新しい大きさに戻ること
+  // Rotating must also reset the clip to the new size
   panel.setRotation(0);
   lcd.setRotation(1);
   tgfxReport("clip_w", (long)lcd.width());
   tgfxReport("clip_h", (long)lcd.height());
   lcd.setRotation(0);
 
-  // --- setter の呼び出し順に依存しないこと --------------------------------
+  // --- the setters must not depend on call order ---------------------------
   //
-  // **2026-08-29 の設計レビューで見つかった P0 の再発防止。**
-  // オフセットは setRotation() の中でしか導出しておらず、begin() の後に
-  // setGramSize() / setOffset() を呼んだだけでは反映されなかった。回転を
-  // 使わないスケッチでは一生反映されない。上の probe() は毎回
-  // setRotation() を通るので、この経路を素通りしていた。
+  // **Stops the P0 found in the 2026-08-29 design review from coming back.**
+  // The offset was only derived inside setRotation(), so calling setGramSize()
+  // or setOffset() after begin() had no effect at all - and a sketch that never
+  // rotates would never get one. The probe() above goes through setRotation()
+  // every time, which is how this path stayed unexamined.
   {
     TinyGFXPanelST7789 late(bus, 135, 240);
     TinyGFX g(late);
-    g.begin();                     // ここで setRotation(0) 相当まで済む
+    g.begin();                     // this gets as far as setRotation(0)
     late.setGramSize(240, 320);
     late.setOffset(52, 40);
-    g.setAddrWindow(0, 0, 1, 1);   // **setRotation を挟まない**
+    g.setAddrWindow(0, 0, 1, 1);   // **no setRotation in between**
     tgfxReport("late_xs", (long)bus.windowXs());
     tgfxReport("late_ys", (long)bus.windowYs());
   }
   {
-    // 逆順でも同じであること（どちらが後でも古い方の値で導出しない）
+    // The same in the other order (whichever comes second must not derive
+    // from the older pair)
     TinyGFXPanelST7789 swap(bus, 135, 240);
     TinyGFX g(swap);
     g.begin();
@@ -77,7 +78,8 @@ void setup() {
     tgfxReport("swap_ys", (long)bus.windowYs());
   }
   {
-    // begin() の前に呼んでも効くこと（バスに触らないので順序自由）
+    // Calling them before begin() must work too (they touch no bus, so the
+    // order is free)
     TinyGFXPanelST7789 early(bus, 135, 240);
     TinyGFX g(early);
     early.setGramSize(240, 320);

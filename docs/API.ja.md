@@ -393,7 +393,8 @@ while (*p) {
 
 ## マクロ
 
-すべて既定は「全部入り」。**何も定義しなければ挙動は変わらない。**
+**何も定義しなければ挙動は変わらない。** 大半は既定 1 の切り落としで、
+`TINYGFX_TEXT_WRAP` と `TINYGFX_FILL_CHUNK` だけが既定 0 の後付け。
 
 | マクロ | 既定 | 0 にすると | CH32V003 |
 | --- | --- | --- | ---: |
@@ -401,6 +402,7 @@ while (*p) {
 | `TINYGFX_FONT_SCALE` | 1 | `setTextSize(2)` 以上が効かなくなる | −116 |
 | `TINYGFX_FONT_CHAIN` | 1 | `CellFont::next` の連鎖を辿らない | −16 |
 | `TINYGFX_FONT_UTF8` | 1 | 文字列をバイト単位（Latin-1）で読む | **−148**（`TinyGFXPrint` も使っていれば −292） |
+| `TINYGFX_TEXT_WRAP` | **0** | （1 で `TinyGFXPrint::setTextWrap()` が現れる） | **+164** |
 | `TINYGFX_FONT_SPARSE` | 1 | 疎索引のフォントが**描けなくなる** | フォント次第 |
 | `TINYGFX_FONT_RECORDS` | 1 | 可変ピッチのフォントが**描けなくなる** | フォント次第 |
 | `TINYGFX_MONO_FAST_FILL` | 1 | モノクロの塗りが 1 画素ずつになる | −428 |
@@ -424,6 +426,7 @@ LovyanGFX 系（[LGFXVirtualCanvas](https://github.com/tanakamasayuki/LGFXVirtua
 | `drawArc` / `drawEllipse` / `drawBezier` | 三角関数か媒介変数。要望が出たら実測してから |
 | `setTextDatum` / `getTextDatum` | **入れない。** 揃えは `drawCenterString` / `drawRightString` で提供する（下記） |
 | 糖衣クラス（`TinyGFX_ST7789_SoftSPI` のようなもの） | **入れない。** 大きさは変わらない（実測 ±0）が、**バスを利用者が持っていることがこのライブラリの売り**で、糖衣クラスは中でバスを作ってしまう（D31） |
+| `setTextWrap` | **既定は入っていない。** `TINYGFX_TEXT_WRAP=1` で `TinyGFXPrint::setTextWrap()` が現れる。**+164 B** —— 折り返しは「描く前に送り幅を知る」必要があり、フォントデコーダへの 2 本目の入口が要る（D33） |
 | `setSwapBytes` | **入れない。** 実行時のモードは「使わないスケッチにも +44 B / RAM +4 B」（画素ごとの分岐）。代わりに `tinygfx_swapBytes565(data, count)` を呼ぶ。**呼ばなければ 0 B、呼べば +32 B**（D29） |
 | `drawNumber` | **+168 B で足せる**（実測）。整数から文字列への変換 |
 | パレット・色深度の切り替え | コアに色深度の抽象を持たない（D4） |
