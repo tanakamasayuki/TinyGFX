@@ -29,6 +29,7 @@ increment over a sketch that already has the panel, the bus and `fillRect`**
 | `drawRect` | 284 | |
 | `fillCircle` | 388 | |
 | `pushImage` | 392 | |
+| `drawBitmap` (1bpp) | 284 | runs coalesced into one `fillRect` each |
 | `drawLine` | 436 | Bresenham |
 | `drawCircle` | 472 | |
 | `drawTriangle` | 520 | |
@@ -173,9 +174,56 @@ All take `uint16_t color` last; coordinates are `int16_t`.
 | --- | --- |
 | `pushImage(x, y, w, h, const uint16_t* data)` | RGB565, row major |
 | `pushImage(x, y, w, h, data, uint16_t transparent)` | that colour is skipped |
+| `drawBitmap(x, y, const uint8_t* bitmap, w, h, color)` | **1bpp, for icons. +284 B** |
 
-**Keep the data in RAM.** PROGMEM images on AVR are not supported
+`pushImage` data must be **in RAM**. PROGMEM images on AVR are not supported
 ([DECISIONS.ja.md](DECISIONS.ja.md) Q6).
+
+`drawBitmap` is the other way round: it **reads the way font data is read**
+(`tinygfx_rd8`), so on AVR it must be **in PROGMEM**. Bits are MSB first and
+**every row starts on a byte boundary** - `(w + 7) / 8` bytes to a row. That is
+the layout Adafruit_GFX, U8g2 and LovyanGFX all use, so an icon converter's
+output drops straight in.
+
+```cpp
+static const uint8_t icon[] TINYGFX_FONT_PROGMEM = {
+  0x18, 0x24, 0x42, 0x81, 0x81, 0x42, 0x24, 0x18,
+};
+lcd.drawBitmap(10, 10, icon, 8, 8, TFT_WHITE);
+```
+
+Only the 1 bits are painted; 0 bits are left alone. To paint the background as
+well, fill the rectangle first - cheaper than carrying a second colour through
+the loop.
+
+**Runs of set bits become one `fillRect` each**, so a panel that took the
+`fillRect` seam serves this too. That costs 84 B more than placing pixels one at
+a time, and saves an order of magnitude of window setups on a colour panel.
+
+### Drawing offscreen (what other libraries call a sprite)
+
+**There is no separate API.** `TinyGFXPanelMemory` presents a RAM buffer as a
+panel, so you build a `TinyGFX` on it, draw, and `pushImage()` the result.
+
+```cpp
+static uint16_t sprBuf[16 * 16];              // 512 B
+TinyGFXPanelMemory sprPanel(sprBuf, 16, 16);
+TinyGFX spr(sprPanel);
+
+spr.begin();
+sprPanel.fillBuffer(TFT_BLACK);
+spr.fillCircle(8, 8, 6, TFT_RED);             // every drawing call works here
+
+lcd.pushImage(10, 10, 16, 16, sprBuf);                  // paste it
+lcd.pushImage(10, 50, 16, 16, sprBuf, TFT_BLACK);       // paste it, black transparent
+```
+
+`TinyGFXPanelMemory` also has `readPixel(x, y)` and `fillBuffer(color)`.
+
+**Two bytes a pixel, so mind the size.** On the reference board (CH32V003, 2 KB
+of RAM) 16x16 is 512 B and **32x32 does not fit at 2,048 B** (measured). If what
+you want is a whole screen without flicker, use the band rendering in
+[`TinyGFX/TileCanvas.h`](../src/TinyGFX/TileCanvas.h) instead of a sprite.
 
 ### Text
 
@@ -259,7 +307,6 @@ to not carry what will not fit on the reference board.
 | `drawArc` / `drawEllipse` / `drawBezier` | trigonometry or parametric curves. Measure first if someone asks |
 | `setTextDatum` / `getTextDatum` | **deliberately absent.** Alignment is `drawCenterString` / `drawRightString` instead - see below |
 | `drawNumber` | **+168 B would buy it** (measured). Integer to string |
-| 1bpp bitmap drawing | **+120 B would buy it** (measured). For icons; more natural than a 16bpp `pushImage` on a monochrome panel |
 | Palettes, switchable colour depth | the core has no colour-depth abstraction (D4) |
 | `readPixel` | it lives on the panel: `TinyGFXPanelDcs::readPixels()`. **150us a pixel**, for debugging |
 

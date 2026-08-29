@@ -28,6 +28,7 @@
 | `drawRect` | 284 | |
 | `fillCircle` | 388 | |
 | `pushImage` | 392 | |
+| `drawBitmap`（1bpp） | 284 | ランを 1 回の `fillRect` にまとめる |
 | `drawLine` | 436 | Bresenham |
 | `drawCircle` | 472 | |
 | `drawTriangle` | 520 | |
@@ -169,9 +170,54 @@ RAM が足りなければ**帯**で描ける（1 ページ 128 B）。
 | --- | --- |
 | `pushImage(x, y, w, h, const uint16_t* data)` | RGB565、行優先 |
 | `pushImage(x, y, w, h, data, uint16_t transparent)` | その色は飛ばす |
+| `drawBitmap(x, y, const uint8_t* bitmap, w, h, color)` | **1bpp。アイコン用。+284 B** |
 
-**データは RAM に置くこと。** AVR の PROGMEM 画像には未対応
+`pushImage` のデータは **RAM に置くこと。** AVR の PROGMEM 画像には未対応
 （[DECISIONS.ja.md](DECISIONS.ja.md) Q6）。
+
+`drawBitmap` は逆で、**フォントと同じ読み方（`tinygfx_rd8`）をするので
+AVR では PROGMEM に置くこと。** ビットは MSB first、**各行がバイト境界から
+始まる**（1 行 `(w + 7) / 8` バイト）。Adafruit_GFX・U8g2・LovyanGFX と同じ
+並びなので、アイコン変換ツールの出力がそのまま使える。
+
+```cpp
+static const uint8_t icon[] TINYGFX_FONT_PROGMEM = {
+  0x18, 0x24, 0x42, 0x81, 0x81, 0x42, 0x24, 0x18,
+};
+lcd.drawBitmap(10, 10, icon, 8, 8, TFT_WHITE);
+```
+
+1 のビットだけを塗り、0 は触らない（透過）。背景も塗りたいなら先に
+`fillRect` するほうが、第 2 の色を持ち回るより小さい。
+
+**立っているビットの連なりを 1 回の `fillRect` にまとめる**ので、
+`fillRect` を奪ったパネルはこれも面倒を見る。画素ごとに置く実装より
+84 B 大きいが、カラーパネルでは窓設定の回数が桁で減る。
+
+### オフスクリーンに描く（スプライト相当）
+
+**専用の API は無い。** `TinyGFXPanelMemory` が RAM バッファをパネルとして
+見せるので、そこに `TinyGFX` を建てて描き、`pushImage()` で画面に戻す。
+
+```cpp
+static uint16_t sprBuf[16 * 16];              // 512 B
+TinyGFXPanelMemory sprPanel(sprBuf, 16, 16);
+TinyGFX spr(sprPanel);
+
+spr.begin();
+sprPanel.fillBuffer(TFT_BLACK);
+spr.fillCircle(8, 8, 6, TFT_RED);             // 普通の描画 API が全部使える
+
+lcd.pushImage(10, 10, 16, 16, sprBuf);                  // そのまま貼る
+lcd.pushImage(10, 50, 16, 16, sprBuf, TFT_BLACK);       // 黒を透過して貼る
+```
+
+`TinyGFXPanelMemory` には `readPixel(x, y)` と `fillBuffer(color)` もある。
+
+**1 画素 2 バイトなので大きさに注意。** 基準機 CH32V003（RAM 2KB）では
+16x16 が 512 B で、**32x32 は 2,048 B になって載らない**（実測）。
+画面全体を持ちたいだけなら、スプライトではなく
+[`TinyGFX/TileCanvas.h`](../src/TinyGFX/TileCanvas.h) の帯描画を使う。
 
 ### 文字
 
@@ -252,7 +298,6 @@ LovyanGFX 系（[LGFXVirtualCanvas](https://github.com/tanakamasayuki/LGFXVirtua
 | `drawArc` / `drawEllipse` / `drawBezier` | 三角関数か媒介変数。要望が出たら実測してから |
 | `setTextDatum` / `getTextDatum` | **入れない。** 揃えは `drawCenterString` / `drawRightString` で提供する（下記） |
 | `drawNumber` | **+168 B で足せる**（実測）。整数から文字列への変換 |
-| 1bpp ビットマップの描画 | **+120 B で足せる**（実測）。アイコン用途。モノクロパネルでは `pushImage`（16bpp）より素直 |
 | パレット・色深度の切り替え | コアに色深度の抽象を持たない（D4） |
 | `readPixel` | パネル側にある。`TinyGFXPanelDcs::readPixels()`。**1 画素 150us** のデバッグ用 |
 
