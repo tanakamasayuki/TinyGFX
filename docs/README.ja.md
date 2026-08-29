@@ -11,7 +11,7 @@ TinyGFX の設計文書。**たたき台だが、フットプリントの数字�
 
 | 区分 | 言語 | 対象 |
 | --- | --- | --- |
-| 使う人が読むもの | 日英 | `../README.ja.md`、`GUIDE.ja.md`、`API.ja.md`、`../examples/README.ja.md`、`../tests/README.ja.md` |
+| 使う人が読むもの | 日英 | `../README.ja.md`、`GUIDE.ja.md`、[API.ja.md](API.ja.md)、`../examples/README.ja.md`、`../tests/README.ja.md` |
 | 内部の記録・作業メモ | 日本語のみ | [REQUIREMENTS.ja.md](REQUIREMENTS.ja.md)、[CORE_DESIGN.ja.md](CORE_DESIGN.ja.md)、[DECISIONS.ja.md](DECISIONS.ja.md)、[FOOTPRINT.ja.md](FOOTPRINT.ja.md)、[OPTIMIZE.ja.md](OPTIMIZE.ja.md)、[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md)、[TEST_PLAN.ja.md](TEST_PLAN.ja.md)、[DEVELOPMENT_PLAN.ja.md](DEVELOPMENT_PLAN.ja.md)、[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md)、[MANUAL_TEST.ja.md](MANUAL_TEST.ja.md) |
 
 利用者向け文書（README / GUIDE / API）は **API が固まってから**書く。今は内部文書だけ。
@@ -23,6 +23,7 @@ TinyGFX の設計文書。**たたき台だが、フットプリントの数字�
 | **何を作るライブラリで、どこまでが責務なのか知る** | **[REQUIREMENTS.ja.md](REQUIREMENTS.ja.md)** |
 | **API の形と内部構造を知る** | **[CORE_DESIGN.ja.md](CORE_DESIGN.ja.md)** |
 | **なぜそう設計したのかを知る／論点を潰す** | **[DECISIONS.ja.md](DECISIONS.ja.md)** |
+| **公開 API と、それぞれの値札を見る** | **[API.ja.md](API.ja.md)** |
 | フラッシュ・RAM の予算と実測値を見る | [FOOTPRINT.ja.md](FOOTPRINT.ja.md) |
 | これから削る余地と、その実測値を見る | [OPTIMIZE.ja.md](OPTIMIZE.ja.md) |
 | **フォントまわりの実測を知る**（形式そのものは外部仕様） | **[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md)** |
