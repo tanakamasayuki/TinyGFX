@@ -11,6 +11,11 @@
 // It is also the answer when a board has one I2C peripheral and you need a
 // second bus.
 //
+// **A pin bus, so the pins are TinyGFX's** - the opposite of TinyGFXBusI2C,
+// which takes a Wire instance you already began and leaves it alone. Here SDA
+// and SCL are driven from this file, so nothing else may use them
+// (docs/GLOSSARY.md).
+//
 // **External pull-ups are required**, as on any I2C bus. The lines are driven
 // the open-drain way: LOW is an output driven low, HIGH is the pin let go
 // (INPUT) and the pull-up doing the work. Driving a line high would fight

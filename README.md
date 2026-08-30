@@ -34,7 +34,7 @@ Anything you do not call costs nothing at all.
 | **Unused features cost 0 bytes** | A sketch that only calls `fillScreen` contains no circles and no text. **A test checks this mechanically** |
 | **No framebuffer required** | Drawing streams straight to the panel. Keep one only when you want to (see below) |
 | **No dynamic allocation** | No `malloc`, `new` or `String`. Buffers are supplied by you |
-| **It never begins the bus for you** | It calls neither `SPI.begin()` nor `Wire.begin()`, and picks no pins. **You hand it a bus you already set up**, so your settings survive |
+| **It never begins the bus for you** | It calls neither `SPI.begin()` nor `Wire.begin()`. **You hand it a bus you already set up**, so your settings survive. (Hand it pin numbers instead and TinyGFX drives those pins itself - your choice, made explicit) |
 | **Bus, panel and font format are all swappable** | and **the implementations you do not use are not linked in** |
 | **Decisions are made from measurements** | every design call is backed by a number measured on a CH32V003 (`docs/FOOTPRINT.ja.md`) |
 
@@ -180,8 +180,8 @@ display.begin();              // <- and this calls Wire.begin() inside
 **your configuration is overwritten.** The pins revert to the defaults, the
 clock drops, and the other sensors on that bus stop working - silently.
 
-TinyGFX calls neither `SPI.begin()` nor `Wire.begin()` and picks no pins. It
-**takes an instance you already prepared**.
+TinyGFX calls neither `SPI.begin()` nor `Wire.begin()`. It **takes an instance
+you already prepared**.
 
 ```cpp
 Wire.begin(21, 22, 400000);            // yours. TinyGFX does not touch it
@@ -191,6 +191,23 @@ TinyGFXBusI2C bus(Wire, 0x3C);
 The only pins it drives are **DC and CS, which belong to that panel**.
 Transfers are wrapped in `beginTransaction` / `endTransaction` the standard
 Arduino way, so an SD card on the same wires keeps working.
+
+**Hand it pins instead, and the deal reverses.** `TinyGFXBusSoftSPI` and
+`TinyGFXBusSoftI2C` take pin numbers rather than a peripheral, and TinyGFX
+drives those pins itself - all of them, SCK and MOSI included. Nothing else may
+use them.
+
+```cpp
+TinyGFXBusSoftSPI bus(5, 6, 3, 4);     // TinyGFX owns these four pins
+```
+
+**Which of the two you get depends on what you hand over, not on whether the
+transport is hardware.** `TinyGFXBusSPI` takes whatever your core calls `SPI`,
+and TinyGFX neither knows nor needs to know whether that is a hardware
+peripheral - a core is free to implement it in software, and your own
+`SPIClass` subclass works just as well. The word "Soft" in `TinyGFXBusSoftSPI`
+means *TinyGFX* is doing the bit-banging. See
+[docs/GLOSSARY.md](docs/GLOSSARY.md).
 
 **The page-addressed monochrome panels were found not to be doing this on
 2026-08-29, and it is fixed.** I2C starts and stops on every transfer so it
