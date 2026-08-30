@@ -65,9 +65,12 @@ def test_image_oracle(dut):
         _, _, cut = to565(got)
 
         diff = [i for i, (a, b) in enumerate(zip(want, cut)) if a != b]
-        lit = sum(1 for c in cut if c)
-        if not (0 < lit < want_w * want_h):
-            problems.append(f"{name}: the picture is one flat colour ({lit} lit of {want_w * want_h})")
+        # An all-one-colour picture would match an all-one-colour reference and
+        # prove nothing. Count the colours rather than the lit pixels: a
+        # photograph has no black in it at all, and "every pixel is non-zero"
+        # is not the same as "every pixel is the same".
+        if len(set(cut)) < 2:
+            problems.append(f"{name}: the picture is one flat colour")
         if diff:
             i = diff[0]
             problems.append(
