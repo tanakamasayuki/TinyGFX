@@ -97,7 +97,7 @@ abstraction.
 
 | Protocol | What it is | Drivers |
 | --- | --- | --- |
-| **DCS protocol** | Window plus pixels: MIPI DCS `0x2A` CASET, `0x2B` RASET, `0x2C` RAMWR. Colour is RGB565 | ST7789 / ILI9341 / ILI9342 / ST7735 / GC9A01 … |
+| **DCS protocol** | Window plus pixels: MIPI DCS `0x2A` CASET, `0x2B` RASET, `0x2C` RAMWR. Colour is RGB565 | ST7789 / ST7735 / ST7796 / ILI9341 / ILI9342 |
 | **Page protocol** | Page plus bits: one byte is 8 pixels tall. Owns a framebuffer and sends it on `display()` | SSD1306 / SH1106 |
 
 **Adding a controller usually adds no protocol.** An ST7796 or a GC9A01 speaks

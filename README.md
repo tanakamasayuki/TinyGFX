@@ -109,6 +109,8 @@ More in [examples/](examples/).
 | | Software I2C (any two GPIOs) | `TinyGFX/BusSoftI2C.h` |
 | | Command-stream capture (for verification) | `TinyGFX/BusCapture.h` |
 | Panel (colour) | ST7789 | `TinyGFX/panels/ST7789_240x240.h` and others |
+| | ST7735 (1.8 / 1.44 / 0.96 inch) | `TinyGFX/panels/ST7735_128x160.h` and others |
+| | ST7796 (3.5 inch, 320x480) | `TinyGFX/panels/ST7796_320x480.h` |
 | | ILI9342C (M5Stack Core / BASIC) | `TinyGFX/panels/ILI9342_320x240.h` |
 | | ILI9341 | `TinyGFX/panels/ILI9341_240x320.h` |
 | Panel (monochrome) | SSD1306 | `TinyGFX/panels/SSD1306_128x64.h` and others |
