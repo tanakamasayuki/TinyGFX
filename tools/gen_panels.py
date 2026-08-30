@@ -4,8 +4,8 @@
     python3 tools/gen_panels.py            # write the headers and the READMEs
     python3 tools/gen_panels.py --check    # fail if anything is out of date
 
-It also rewrites the catalogue table in README.md and README.ja.md, between the
-PANEL TABLE markers. **A hand-maintained list of two dozen panels goes stale on
+It also rewrites the catalogue table in README.md and README.ja.md, and the
+panel entries in keywords.txt, between their markers. **A hand-maintained list of two dozen panels goes stale on
 the first addition**, so it is generated from the same table as the headers.
 
 **A panel is a preset - the product someone bought.** The library ships the
@@ -256,6 +256,31 @@ def readme_table(ja):
     return head + "\n" + "\n".join(rows)
 
 
+KW_BEGIN, KW_END = "# BEGIN PANEL KEYWORDS", "# END PANEL KEYWORDS"
+
+
+def patch_keywords(check=False):
+    """Keep the Arduino IDE's keyword list in step with the catalogue.
+
+    The panel classes are the names a sketch actually types, so leaving them
+    out of keywords.txt is the one place the omission shows.
+    """
+    p = REPO / "keywords.txt"
+    s = p.read_text()
+    i, j = s.find(KW_BEGIN), s.find(KW_END)
+    if i < 0 or j < 0:
+        return ["keywords.txt: no PANEL KEYWORDS markers"]
+    names = sorted("TinyGFXPanel" + name(e)
+                   for entries in (PAGED, DCS) for e in entries)
+    body = "\n".join(f"{n}\tKEYWORD1" for n in names)
+    want = s[:i + len(KW_BEGIN)] + "\n" + body + "\n" + s[j:]
+    if want == s:
+        return []
+    if not check:
+        p.write_text(want)
+    return ["keywords.txt"]
+
+
 def patch_readmes(check=False):
     """Rewrite the table between the markers. Returns the files that differ."""
     differ = []
@@ -294,7 +319,7 @@ def main():
     diff = sorted(f for f, body in want.items()
                   if not (OUT / f).exists() or (OUT / f).read_text() != body)
 
-    readmes = patch_readmes(check=a.check)
+    readmes = patch_readmes(check=a.check) + patch_keywords(check=a.check)
 
     if a.check:
         if diff or stale or readmes:

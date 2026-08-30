@@ -75,12 +75,17 @@ static const TinyGFXFontRef myFont = {&Name, &tinygfxFontCellOps, nullptr};
 
 ## Panel origin offset
 
-240x240 and 135x240 ST7789 modules are smaller than the controller's GRAM, so their origin
-is shifted. Set both values:
+A 240x240 or 135x240 ST7789 is smaller than the controller's memory, so its origin is
+shifted - and getting that wrong leaves rotations 2 and 3 out of place.
+
+**The panel header carries it**, so there is nothing to set:
 
 ```cpp
-panel.setGramSize(240, 320);   // the controller's GRAM
-panel.setOffset(52, 40);       // where the visible area sits at rotation 0
+#include <TinyGFX/panels/ST7789_135x240.h>
+TinyGFXPanelST7789_135x240 panel(bus, /*rst*/2);
 ```
 
-Rotations 1-3 are derived from those.
+If your module is shifted anyway, `panel.setOffset(x, y)` and
+`panel.setGramSize(w, h)` override it at runtime, in any order and either side of
+`begin()`. Rotations 1-3 are derived from whatever those end up being.
+See [../docs/PANEL_TUNING.md](../docs/PANEL_TUNING.md).
