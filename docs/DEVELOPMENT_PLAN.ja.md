@@ -14,8 +14,8 @@
 | リポジトリ整備 | **完了**（§4） |
 | 描画コア `src/TinyGFX/Gfx.h` | **実装済み。** 全プリミティブ + クリップ + 回転 + 画像 + 文字 |
 | Bus | `BusSoftSPI`（既定）/ `BusSPI` / `BusI2C` / `BusCapture` **実装済み** |
-| ドライバ | `DriverST7789` / `DriverILI9341` / `DriverILI9342` / `DriverSSD1306` / `DriverSH1106` / `MemoryTarget` **実装済み** |
-| パネル（プリセット） | `panels/` に 7 枚 **実装済み**（D34）。ST7789 240x240・135x240 / ILI9342 320x240 / ILI9341 240x320 / SSD1306 128x64・128x32 / SH1106 128x64。**実機確認済みは ILI9342 の 1 枚だけ** |
+| ドライバ | `DriverST7789` / `DriverST7735` / `DriverST7796` / `DriverILI9341` / `DriverILI9342` / `DriverSSD1306` / `DriverSH1106` / `MemoryTarget` **実装済み** |
+| パネル（プリセット） | `panels/` に **24 枚**（D34）。`tools/gen_panels.py` が生成し、`build_matrix` が全部を 2 コアでビルドする |
 | 帯レンダリング `TileCanvas.h` | **実装済み**（D16） |
 | `Print.h`（拡張） | **実装済み** |
 | フォント | **CellFont v1 へ移行（2026-08-28、D17 再改訂）。** 形式の仕様は LGFXFontToolJs 側に切り出し、TinyGFX はその描画器の 1 実装になった。頭ブロック・形式内連鎖・U+FFFD 退避・ベースライン基準を取り込んで **+248 B**（[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md)） |

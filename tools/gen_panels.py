@@ -67,6 +67,9 @@ PAGED = [
          note="The 0.69 inch bar. **The one module that does not sit centred\n"
               "in memory** - it is flush left, so the derived offset is wrong\n"
               "for it and is overridden here."),
+    dict(driver="SSD1306", w=96, h=40, com_pins=SEQUENTIAL, col0=0,
+         note="A 96x40. Like the 96x16 it sits flush left rather than centred,\n"
+              "so the derived offset is overridden here."),
     dict(driver="SSD1306", w=72, h=40,
          note="The 0.42 inch module."),
     dict(driver="SSD1306", w=64, h=48,
@@ -95,10 +98,35 @@ DCS = [
               "either alone gets rotation wrong."),
     dict(driver="ST7789", w=240, h=320, gram=(240, 320), offset=(0, 0),
          note="The full 2.0 inch panel, filling its memory exactly."),
+    dict(driver="ST7789", w=240, h=280, gram=(240, 320), offset=(0, 20),
+         note="The 1.69 inch module. Full width, 40 rows short of the memory,\n"
+              "and centred down it."),
     dict(driver="ST7789", w=170, h=320, gram=(240, 320), offset=(35, 0),
          note="The 1.9 inch bar, centred across its memory."),
     dict(driver="ST7789", w=172, h=320, gram=(240, 320), offset=(34, 0),
          note="The 1.47 inch bar, centred across its memory."),
+    # An ST7735 is the same chip behind at least four pieces of glass. The
+    # memory is 132x162 and the panel sits somewhere inside it, so **the offset
+    # is what separates these entries** - along with the colour order on one.
+    dict(driver="ST7735", w=128, h=160, gram=(132, 162), offset=(2, 1),
+         note="The 1.8 inch module. Glass centred in the 132x162 memory."),
+    dict(driver="ST7735", w=128, h=160, suffix="FlushRgb", gram=(132, 162),
+         offset=(0, 0), rgb=True,
+         note="A 1.8 inch whose glass is flush with the memory **and wired RGB\n"
+              "rather than BGR**. Try this when the 128x160 comes out shifted\n"
+              "two pixels with red and blue swapped."),
+    dict(driver="ST7735", w=128, h=128, gram=(132, 162), offset=(2, 3),
+         note="The 1.44 inch square module. **Not centred vertically** - it\n"
+              "sits 3 rows down a 162-row memory, not 17."),
+    dict(driver="ST7735", w=80, h=160, gram=(132, 162), offset=(26, 1),
+         note="The 0.96 inch bar, centred in the memory."),
+    dict(driver="ST7735", w=80, h=160, suffix="Offset24", gram=(132, 162),
+         offset=(24, 0),
+         note="A 0.96 inch bar that sits at column 24 rather than centred.\n"
+              "Try this when the 80x160 is shifted a couple of pixels."),
+    dict(driver="ST7796", w=320, h=480, gram=(320, 480), offset=(0, 0),
+         note="The 3.5 inch breakout. Its memory is exactly the panel, so\n"
+              "nothing is offset."),
     dict(driver="ILI9341", w=240, h=320, gram=(240, 320), offset=(0, 0),
          note="The 2.4 and 2.8 inch SPI breakouts. Portrait memory, inversion\n"
               "off, and mounted mirrored on X - which is what makes rotation 0\n"
@@ -175,6 +203,8 @@ def render(e, paged):
             body += f"\n    setGramSize({gw}, {gh});"
         if (ox, oy) != (0, 0):
             body += f"\n    setOffset({ox}, {oy});"
+        if "rgb" in e:
+            body += "\n    setRgbOrder(false);   // this glass is wired RGB"
         if body:
             body += "\n  "
     note = "".join("// " + ln + "\n" for ln in e["note"].split("\n"))
