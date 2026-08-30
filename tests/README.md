@@ -57,6 +57,7 @@ tests/
   panels/             the panel catalogue: what a preset actually carries
   utf8/               UTF-8 decoding: code point and bytes consumed, per sequence
   textwrap/           wrapping at the right edge (TINYGFX_TEXT_WRAP=1)
+  panels_seqcom/      the `_SeqCom` entry: same driver and size, different value
   image/              pushImage placement, cropping, transparency, byte swapping
   image_fmt/          every encoding of one picture draws the same pixels
   image_oracle/       converter output vs the converter's own expected image

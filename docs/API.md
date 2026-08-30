@@ -410,14 +410,14 @@ to 0 and add something.
 
 | Macro | Default | Setting it to 0 | CH32V003 |
 | --- | --- | --- | ---: |
-| `TINYGFX_FONT_BG` | 1 | the second argument of `setTextColor` stops working | −108 |
-| `TINYGFX_FONT_SCALE` | 1 | `setTextSize(2)` and above stop working | −116 |
-| `TINYGFX_FONT_CHAIN` | 1 | `CellFont::next` is not followed | −16 |
+| `TINYGFX_FONT_BG` | 1 | the second argument of `setTextColor` stops working | −104 |
+| `TINYGFX_FONT_SCALE` | 1 | `setTextSize(2)` and above stop working | −100 |
+| `TINYGFX_FONT_CHAIN` | 1 | `CellFont::next` is not followed | −8 |
 | `TINYGFX_FONT_UTF8` | 1 | strings are read a byte at a time (Latin-1) | **−148** (−292 if `TinyGFXPrint` is in too) |
 | `TINYGFX_TEXT_WRAP` | **0** | (1 brings out `TinyGFXPrint::setTextWrap()`) | **+164** |
 | `TINYGFX_FONT_SPARSE` | 1 | a sparse font **cannot be drawn** | font dependent |
 | `TINYGFX_FONT_RECORDS` | 1 | a variable-pitch font **cannot be drawn** | font dependent |
-| `TINYGFX_MONO_FAST_FILL` | 1 | monochrome fills go back to one pixel at a time | −428 |
+| `TINYGFX_MONO_FAST_FILL` | 1 | monochrome fills go back to one pixel at a time | −408 |
 | `TINYGFX_FILL_CHUNK` | 0 | (1 or more enables block writes; speed only) | — |
 
 **`SPARSE` and `RECORDS` have to match the font, or the wrong glyphs are
