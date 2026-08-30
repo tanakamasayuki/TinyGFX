@@ -111,13 +111,7 @@ void loop() {}
 | | I2C（Wire） | `TinyGFX/BusI2C.h` |
 | | ソフト I2C（任意の GPIO 2 本） | `TinyGFX/BusSoftI2C.h` |
 | | コマンド列の記録（検証用） | `TinyGFX/BusCapture.h` |
-| パネル（カラー） | ST7789 | `TinyGFX/panels/ST7789_240x240.h` ほか |
-| | ST7735（1.8 / 1.44 / 0.96 インチ） | `TinyGFX/panels/ST7735_128x160.h` ほか |
-| | ST7796（3.5 インチ 320x480） | `TinyGFX/panels/ST7796_320x480.h` |
-| | ILI9342C（M5Stack Core / BASIC） | `TinyGFX/panels/ILI9342_320x240.h` |
-| | ILI9341 | `TinyGFX/panels/ILI9341_240x320.h` |
-| パネル（モノクロ） | SSD1306 | `TinyGFX/panels/SSD1306_128x64.h` ほか |
-| | SH1106 | `TinyGFX/panels/SH1106_128x64.h` |
+| パネル | **下の一覧**（7 ドライバ・24 枚） | `TinyGFX/panels/…` |
 | 描画先（その他） | RAM バッファ（オフスクリーン・帯・テスト用） | `TinyGFX/MemoryTarget.h` |
 | フォント | CellFont（H≤16 向けの外部仕様 v1） | `TinyGFX/FontCell.h` |
 | | u8g2 | `TinyGFX/FontU8g2.h` |
@@ -319,6 +313,65 @@ CH32V003 のフラッシュの半分を超えます。**禁止はしていませ
 
 対応を確認している環境: **CH32V003**（基準機）、**Arduino Uno R3**、**ESP32**。
 他の数字は [docs/FOOTPRINT.ja.md](docs/FOOTPRINT.ja.md)。
+
+## 対応パネル
+
+**パネルはプリセットです。** 買ったものを 1 枚 include すれば、寸法・オフセット・
+COM 配線が入った状態で使えます。
+
+```cpp
+#include <TinyGFX/panels/SSD1306_128x64.h>     // ← ここだけ差し替える
+
+static uint8_t fb[TinyGFXPanelSSD1306_128x64::kBufferBytes];
+TinyGFXPanelSSD1306_128x64 panel(bus, fb);
+```
+
+<!-- BEGIN PANEL TABLE -->
+| ドライバ | 種類 | パネル（`TinyGFX/panels/<ドライバ>_<寸法>.h`） |
+| --- | --- | --- |
+| **ST7789** | カラー（RGB565） | `240x240` / `135x240` / `240x320` / `240x280` / `170x320` / `172x320` |
+| **ST7735** | カラー（RGB565） | `128x160` / `128x160 (FlushRgb)` / `128x128` / `80x160` / `80x160 (Offset24)` |
+| **ST7796** | カラー（RGB565） | `320x480` |
+| **ILI9341** | カラー（RGB565） | `240x320` |
+| **ILI9342C** | カラー（RGB565） | `320x240` |
+| **SSD1306** | モノクロ（1bpp） | `128x64` / `128x64 (SeqCom)` / `128x32` / `96x16` / `96x40` / `72x40` / `64x48` / `64x32` / `48x64` |
+| **SH1106** | モノクロ（1bpp） | `128x64` |
+<!-- END PANEL TABLE -->
+
+`SeqCom` / `FlushRgb` / `Offset24` は、**同じドライバ・同じ寸法で中身が違う**ものです。
+名前が違いそのものになっているので、他社の呼び方（タブの色など）を知らなくても引けます。
+
+### include を替えても直らないものがあります
+
+**一覧から選べば、寸法・オフセット・COM 配線は合います。**
+合わないのはここから先で、**同じ製品でも個体やロットで違う**ためカタログには
+入れられません。
+
+| | 直しかた | どこに書くか |
+| --- | --- | --- |
+| **白黒が反転している** | `panel.invertDisplay(false);` | **`begin()` の後**（バスに直接コマンドを出すため） |
+| **上下・左右が鏡像**（カラー） | `panel.setMirror(mx, my);` | どこでも |
+| **赤と青が逆**（カラー） | `panel.setRgbOrder(false);` | どこでも |
+| **横に数 px ずれる** | `panel.setColumnOffset(n);` / `setOffset(x, y);` | どこでも |
+
+実例があります。**M5Stack BASIC は同じ ILI9342C でも、古い世代だけ色が反転します。**
+パネルの種類では決まらないので、`invertDisplay(false)` を 1 行足して合わせます。
+
+### 一覧に無い・上でも直らないとき
+
+直しかたは 3 種類あります。
+
+| | 手間 |
+| --- | --- |
+| 向き・反転・色順・オフセット | **実行時のメソッド 1 行**（上の表） |
+| **COM ピン配置**（1 行おきの縞） | **`_SeqCom` 付きに include を替える**か、include の前に `#define TINYGFX_SSD1306_COM_PINS 0x02`。実行時には変えられません |
+| **プリチャージ・VCOMH**（暗い・ちらつく） | include の前に `#define` を 2 行。実行時には変えられません |
+
+症状ごとの対応表は [docs/PANEL_TUNING.ja.md](docs/PANEL_TUNING.ja.md) にあります。
+直った設定をカタログに固定するのは [`tools/gen_panels.py`](tools/gen_panels.py) に 1 行です。
+
+**この一覧は `tools/gen_panels.py` が生成しています。** 手で直しても次の生成で
+戻り、テストが検出します。
 
 ## ちらつき対策
 

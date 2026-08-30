@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Generate the panel catalogue into src/TinyGFX/panels/.
 
-    python3 tools/gen_panels.py            # write the headers
-    python3 tools/gen_panels.py --check    # fail if they are out of date
+    python3 tools/gen_panels.py            # write the headers and the READMEs
+    python3 tools/gen_panels.py --check    # fail if anything is out of date
+
+It also rewrites the catalogue table in README.md and README.ja.md, between the
+PANEL TABLE markers. **A hand-maintained list of two dozen panels goes stale on
+the first addition**, so it is generated from the same table as the headers.
 
 **A panel is a preset - the product someone bought.** The library ships the
 catalogue because, unlike a font, there is a right answer for "the 0.96 inch
@@ -215,6 +219,61 @@ def render(e, paged):
             + tmpl.format(driver=e["driver"], cls=cls, w=e["w"], h=e["h"], body=body))
 
 
+# --- the catalogue table in the READMEs ------------------------------------
+
+BEGIN, END = "<!-- BEGIN PANEL TABLE -->", "<!-- END PANEL TABLE -->"
+
+# One line per driver, ordered the way someone shopping would read it.
+FAMILY_JA = {
+    "ST7789": "ST7789", "ST7735": "ST7735", "ST7796": "ST7796",
+    "ILI9341": "ILI9341", "ILI9342": "ILI9342C",
+    "SSD1306": "SSD1306", "SH1106": "SH1106",
+}
+KIND_JA = {True: "モノクロ（1bpp）", False: "カラー（RGB565）"}
+KIND_EN = {True: "Monochrome (1bpp)", False: "Colour (RGB565)"}
+ORDER = ["ST7789", "ST7735", "ST7796", "ILI9341", "ILI9342", "SSD1306", "SH1106"]
+
+
+def size_label(e):
+    """`240x240`, or `240x240 (SeqCom)` when a suffix separates two entries."""
+    n = f"{e['w']}x{e['h']}"
+    return f"{n} ({e['suffix']})" if e.get("suffix") else n
+
+
+def readme_table(ja):
+    rows = []
+    for drv in ORDER:
+        for entries, paged in ((DCS, False), (PAGED, True)):
+            hits = [e for e in entries if e["driver"] == drv]
+            if not hits:
+                continue
+            sizes = " / ".join(f"`{size_label(e)}`" for e in hits)
+            kind = (KIND_JA if ja else KIND_EN)[paged]
+            rows.append(f"| **{FAMILY_JA[drv]}** | {kind} | {sizes} |")
+    head = ("| ドライバ | 種類 | パネル（`TinyGFX/panels/<ドライバ>_<寸法>.h`） |\n| --- | --- | --- |"
+            if ja else
+            "| Driver | Kind | Panels (`TinyGFX/panels/<driver>_<size>.h`) |\n| --- | --- | --- |")
+    return head + "\n" + "\n".join(rows)
+
+
+def patch_readmes(check=False):
+    """Rewrite the table between the markers. Returns the files that differ."""
+    differ = []
+    for f, ja in (("README.md", False), ("README.ja.md", True)):
+        p = REPO / f
+        s = p.read_text()
+        i, j = s.find(BEGIN), s.find(END)
+        if i < 0 or j < 0:
+            differ.append(f"{f}: no PANEL TABLE markers")
+            continue
+        want = s[:i + len(BEGIN)] + "\n" + readme_table(ja) + "\n" + s[j:]
+        if want != s:
+            differ.append(f)
+            if not check:
+                p.write_text(want)
+    return differ
+
+
 def build():
     return {name(e) + ".h": render(e, paged)
             for entries, paged in ((PAGED, True), (DCS, False))
@@ -235,13 +294,18 @@ def main():
     diff = sorted(f for f, body in want.items()
                   if not (OUT / f).exists() or (OUT / f).read_text() != body)
 
+    readmes = patch_readmes(check=a.check)
+
     if a.check:
-        if diff or stale:
+        if diff or stale or readmes:
             for f in diff:
                 print(f"out of date: {f}")
             for f in stale:
                 print(f"not in the catalogue: {f}")
-            sys.exit(f"{len(diff) + len(stale)} file(s) differ. Run tools/gen_panels.py")
+            for f in readmes:
+                print(f"out of date: {f}")
+            sys.exit(f"{len(diff) + len(stale) + len(readmes)} file(s) differ. "
+                     "Run tools/gen_panels.py")
         print(f"{len(want)} panel(s), all up to date")
         return
 
@@ -250,7 +314,8 @@ def main():
     for f in stale:
         (OUT / f).unlink()
     print(f"wrote {len(want)} panel(s) into {OUT.relative_to(REPO)}"
-          + (f", removed {len(stale)}" if stale else ""))
+          + (f", removed {len(stale)}" if stale else "")
+          + (f", updated {', '.join(readmes)}" if readmes else ""))
 
 
 if __name__ == "__main__":
