@@ -10,7 +10,7 @@
 
 #include "Color.h"
 #include "Font.h"
-#include "Panel.h"
+#include "Target.h"
 
 
 /// Where an uncovered code falls back to (REPLACEMENT CHARACTER).
@@ -36,7 +36,7 @@
 
 class TinyGFX {
  public:
-  explicit TinyGFX(TinyGFXPanel& panel) : _panel(&panel) {}
+  explicit TinyGFX(TinyGFXTarget& panel) : _panel(&panel) {}
 
   // ---- basics ----------------------------------------------------------
   /// Bring the panel up. Returns whether the **configuration** is usable.
@@ -619,7 +619,7 @@ class TinyGFX {
     }
   };
 
-  TinyGFXPanel* _panel;
+  TinyGFXTarget* _panel;
   const TinyGFXFontRef* _font = nullptr;
   int16_t _clipX0 = 0, _clipY0 = 0, _clipX1 = 0, _clipY1 = 0;
   int16_t _cursorX = 0, _cursorY = 0;

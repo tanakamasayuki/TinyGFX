@@ -20,9 +20,9 @@
 // (MANUAL_TEST M5). What this holds is that the implementation follows the table.
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
-#include <TinyGFX/PanelILI9341.h>
-#include <TinyGFX/PanelILI9342.h>
-#include <TinyGFX/PanelST7789.h>
+#include <TinyGFX/DriverILI9341.h>
+#include <TinyGFX/DriverILI9342.h>
+#include <TinyGFX/DriverST7789.h>
 #include <tgfx_test.h>
 
 // A BusCapture that remembers the command stream. **The library is left
@@ -63,7 +63,7 @@ static uint16_t gram[W * H];
 RecordingBus bus(gram, W, H);
 
 /// Report the command stream init() emitted, verbatim.
-static void reportInit(const char* name, TinyGFXPanel& panel) {
+static void reportInit(const char* name, TinyGFXTarget& panel) {
   bus.clearSeq();
   panel.init();
   char key[24];
@@ -77,7 +77,7 @@ static void reportInit(const char* name, TinyGFXPanel& panel) {
   }
 }
 
-static void probe(TinyGFXPanel& panel, const char* prefix, uint8_t r) {
+static void probe(TinyGFXTarget& panel, const char* prefix, uint8_t r) {
   char key[16];
   snprintf(key, sizeof(key), "%s%d", prefix, (int)r);
   panel.setRotation(r);
@@ -96,15 +96,15 @@ void setup() {
   // --- B. the init sequence of all three DCS panels -------------------------
   // Run on the same footing: the same bus, the default dimensions.
   {
-    TinyGFXPanelST7789 st(bus, 240, 320);
+    TinyGFXDriverST7789 st(bus, 240, 320);
     reportInit("st7789", st);
   }
   {
-    TinyGFXPanelILI9341 ili41(bus);
+    TinyGFXDriverILI9341 ili41(bus);
     reportInit("ili9341", ili41);
   }
   {
-    TinyGFXPanelILI9342 ili42(bus);
+    TinyGFXDriverILI9342 ili42(bus);
     reportInit("ili9342", ili42);
   }
 
@@ -112,7 +112,7 @@ void setup() {
   // The default size is 240x320, portrait. The GRAM can stay small: all that
   // is read here is MADCTL, the width and height, and the window origin.
   {
-    TinyGFXPanelILI9341 panel(bus);
+    TinyGFXDriverILI9341 panel(bus);
     panel.init();
     for (uint8_t r = 0; r < 4; ++r) probe(panel, "def", r);
 
@@ -130,7 +130,7 @@ void setup() {
 
   // --- colour really reaches the GRAM ---------------------------------------
   {
-    TinyGFXPanelILI9341 small(bus, W, H);
+    TinyGFXDriverILI9341 small(bus, W, H);
     TinyGFX lcd(small);
     lcd.begin();
     lcd.setRotation(0);

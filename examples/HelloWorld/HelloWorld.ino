@@ -9,7 +9,7 @@
 // The font is bundled with this sketch; TinyGFX ships no font data itself.
 #include <TinyGFX.h>
 #include <TinyGFX/BusSoftSPI.h>
-#include <TinyGFX/PanelST7789.h>
+#include <TinyGFX/panels/ST7789_240x240.h>
 
 #include <TinyGFX/FontCell.h>
 #include "tgfx_clock.h"
@@ -24,7 +24,7 @@ static const int8_t PIN_CS = 4;
 static const int8_t PIN_RST = 2;  // -1 if the module has no reset pin
 
 TinyGFXBusSoftSPI bus(PIN_SCK, PIN_MOSI, PIN_DC, PIN_CS);
-TinyGFXPanelST7789 panel(bus, 240, 240, PIN_RST);
+TinyGFXPanelST7789_240x240 panel(bus, PIN_RST);
 TinyGFX lcd(panel);
 
 void setup() {

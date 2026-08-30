@@ -5,9 +5,7 @@
 One place for the words TinyGFX uses. **This is the first document a reader
 reaches for**, so it exists in both languages, like API.md.
 
-**It states the settled vocabulary, not the current state of the code.** Where a
-name has yet to change, the old one is in the "current name" column. A non-empty
-entry there means the code has not caught up.
+**The vocabulary and the code agree** (the rename landed on 2026-08-30).
 
 ## 1. What you choose
 
@@ -61,7 +59,7 @@ what you hand over stays yours, and what you do not hand over TinyGFX drives.
 
 **The product you bought** - "a 0.96 inch 128x64 I2C OLED".
 
-Named after its controller and its size, `TinyGFXPanelSSD1306_128x64`. Pick one
+Named after its controller and its size, `TinyGFXDriverSSD1306_128x64`. Pick one
 from the catalogue and include it.
 
 ```cpp
@@ -91,10 +89,6 @@ A panel is a target, but **so is a RAM buffer** - which is why no word meaning
 "controller IC" would do here. Tiled rendering (`TinyGFXTileCanvas`) slots a RAM
 target in front of a panel, and that only works because the target is an
 abstraction.
-
-| | Current name |
-| --- | --- |
-| `TinyGFXTarget` | `TinyGFXPanel` |
 
 ### Protocol
 
@@ -130,11 +124,6 @@ SH1106 both speak the page protocol, but the SSD1306 takes a range (`0x21` /
 `0x22`) and accepts the whole run, while an SH1106 has no such command and needs
 the cursor placed per page. **That difference is code, not data**, so it makes
 them separate drivers.
-
-| | Current name |
-| --- | --- |
-| `TinyGFXDriverSSD1306` | `TinyGFXPanelSSD1306` |
-| `TinyGFXDriverDcs` / `TinyGFXDriverPaged` | `TinyGFXPanelDcs` / `TinyGFXPanelPaged` |
 
 ### How they stack
 

@@ -83,13 +83,13 @@ LovyanGFX は 9 種類の色深度を実行時に切り替えられる。Adafrui
 | **GxEPD2** | 同じ形。**「U8G2 と同じくページ描画」と明記**。テンプレート引数でページ数を選ぶ |
 | **Adafruit_GFX** | `GFXcanvas1/8/16`。オフスクリーンのキャンバス |
 | **LovyanGFX / TFT_eSPI** | `Sprite` / `LGFX_Sprite`。色深度も選べる |
-| **TinyGFX** | `TileCanvas`（帯）+ `PanelMemory`（オフスクリーン） |
+| **TinyGFX** | `TileCanvas`（帯）+ `MemoryTarget`（オフスクリーン） |
 
 **帯描画は U8g2 / GxEPD2 と同じ考え方**で、TinyGFX では
 「帯で描いても全面バッファと 1 画素も違わない」ことをテストで固定している
 （`tests/tile/` と `tests/i2c/`）。
 
-**スプライト相当は `TinyGFXPanelMemory` で既にできる** — RAM バッファを
+**スプライト相当は `TinyGFXMemoryTarget` で既にできる** — RAM バッファを
 パネルとして `TinyGFX` を構築し、描いて、`pushImage()` で画面に戻す。
 `pushSprite` という名前の API が無いだけ。**これは文書化の不足であって
 機能の不足ではない。**
@@ -147,7 +147,7 @@ TinyGFX は `TinyGFX/Print.h` に分けてある。**include しなければ 1 �
 **Arduino_GFX は「読み出しをしない」ことを設計判断として明記している**
 （フットプリントと速度のため。すべてのパネルが読めるわけでもない）。
 
-TinyGFX は読める — ただし `TinyGFXPanelDcs::readPixels()` として、
+TinyGFX は読める — ただし `TinyGFXDriverDcs::readPixels()` として、
 **呼ばなければ生成されない**インラインメンバに置いてある。全体で払うのは
 バスの `readSequence` の 8 バイトだけ。**1 画素 150us** なのでデバッグと
 検証の道具であって描画経路ではない。
@@ -275,7 +275,7 @@ CellFont は生のビットマップなので、こちらのデコーダはビ�
 ## この調査で見つかった自分の穴
 
 1. ~~オフスクリーン描画が文書化されていない~~ → **書いた**（2026-08-29）。
-   `PanelMemory` + `pushImage` でスプライト相当ができる。**API は足さず、
+   `MemoryTarget` + `pushImage` でスプライト相当ができる。**API は足さず、
    あることを書いた**。[API.ja.md](API.ja.md) 参照
 2. ~~1bpp ビットマップが無い~~ → **足した**（2026-08-29）。`drawBitmap`。
    実費は **+284 B**（当初の見積もり +120 は画素ごとに置く素朴版の値。

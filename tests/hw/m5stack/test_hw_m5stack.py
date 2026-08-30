@@ -164,7 +164,7 @@ def test_rotation_maps(arduino_test):
                 f"  {ROT_NAMES[i]}: want={ROT_MARKS[i]:#06x} got={got[i]:#06x} ({who})"
             )
         pytest.fail(
-            "the rotation mapping is wrong (MADCTL, or PanelILI9342::setRotation)\n"
+            "the rotation mapping is wrong (MADCTL, or DriverILI9342::setRotation)\n"
             + "\n".join(lines)
         )
     print(f"  rotation marks: {result.artifacts.get('rotation_marks.txt', '')}")

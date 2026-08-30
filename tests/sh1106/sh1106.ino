@@ -1,6 +1,6 @@
 // The SH1106 wiring, checked without hardware.
 //
-//   TinyGFX -> PanelSH1106 -> the real TinyGFXBusI2C -> Wire
+//   TinyGFX -> DriverSH1106 -> the real TinyGFXBusI2C -> Wire
 //           -> the host's Wire probe -> a model of an SH1106 -> bitmap
 //
 // An SH1106 differs from an SSD1306 in exactly two ways, and both are covered.
@@ -12,12 +12,12 @@
 //      and one page is streamed at a time
 //
 // **The same picture is drawn on an SSD1306 too, and the decoded results must
-// not differ by a bit.** Everything shared (PanelPaged) is the same code, so a
+// not differ by a bit.** Everything shared (DriverPaged) is the same code, so a
 // difference here is a defect in the transfer layer.
 #include <TinyGFX.h>
 #include <TinyGFX/BusI2C.h>
-#include <TinyGFX/PanelSH1106.h>
-#include <TinyGFX/PanelSSD1306.h>
+#include <TinyGFX/DriverSH1106.h>
+#include <TinyGFX/DriverSSD1306.h>
 #include <TinyGFX/Image.h>
 #include "splash_v.h"
 #include <tgfx_test.h>
@@ -33,8 +33,8 @@ static const uint8_t ADDR = 0x3C;
 
 static uint8_t fbA[W * H / 8], fbB[W * H / 8];
 TinyGFXBusI2C bus(Wire, ADDR);
-TinyGFXPanelSH1106 sh(bus, fbA, W, H);
-TinyGFXPanelSSD1306 ssd(bus, fbB, W, H);
+TinyGFXDriverSH1106 sh(bus, fbA, W, H);
+TinyGFXDriverSSD1306 ssd(bus, fbB, W, H);
 TinyGFX shLcd(sh);
 TinyGFX ssdLcd(ssd);
 

@@ -54,6 +54,7 @@ tests/
   tile/               tile height never changes the image (invariant)
   text/               text: return value, scaling, missing glyphs, background, transparency
   fontchain/          CellFont chaining, U+FFFD fallback, baseline alignment
+  panels/             the panel catalogue: what a preset actually carries
   utf8/               UTF-8 decoding: code point and bytes consumed, per sequence
   textwrap/           wrapping at the right edge (TINYGFX_TEXT_WRAP=1)
   image/              pushImage placement, cropping, transparency, byte swapping

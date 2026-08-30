@@ -71,19 +71,25 @@ def test_i2c(dut):
     assert r["fillrect_fastpath_diff"] == 0, (
         f"the fillRect fast path differs by {r['fillrect_fastpath_diff']} bytes")
 
-    # --- dimensions and the buffer contract for a paged panel (P1 of the
-    # 2026-08-29 review) ------------------------------------------------------
+    # --- the multiplex ratio must follow the height (P1 of the 2026-08-29
+    # review) -----------------------------------------------------------------
     #
     # The init sequence was hard-coded for 128x64 while the constructor took any
     # w / h. Sending a 64-row multiplex ratio (0x3F) to a 128x32 squashes the
-    # picture into half the glass. Both are now **derived from the height**, so
-    # pin that here.
+    # picture into half the glass. It is now **derived** - height minus one on
+    # every module ever measured - so a bare driver is right at any size.
     assert r["mux64"] == 0x3F, f"the 128x64 multiplex ratio is {r['mux64']:#04x}"
-    assert r["com64"] == 0x12, f"the 128x64 COM pin config is {r['com64']:#04x}"
     assert r["mux32"] == 0x1F, (
         f"the 128x32 multiplex ratio is {r['mux32']:#04x} (still the 64-row value?)")
-    assert r["com32"] == 0x02, (
-        f"the 128x32 COM pin config is {r['com32']:#04x} (still the 64-row value?)")
+
+    # The COM pin layout is **not** derivable: 128x32 and 96x16 want sequential
+    # (0x02) while 64x32 and 64x48 want alternative (0x12), all with heights the
+    # rule would get wrong. So a bare driver sends the datasheet reset value and
+    # the panel header overrides it - checked in tests/panels/.
+    assert r["com64"] == 0x12, (
+        f"a bare driver sent COM pins {r['com64']:#04x}; the datasheet reset is 0x12")
+    assert r["com32"] == 0x12, (
+        f"a bare driver sent COM pins {r['com32']:#04x}; it must not guess from the height")
 
     # --- the begin() contract -----------------------------------------------
     #

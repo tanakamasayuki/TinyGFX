@@ -5,8 +5,8 @@
 // but always in whole-screen coordinates - the offset and the clip are hidden
 // in here.
 //
-// The core was not touched to make this work. It is just PanelMemory, which
-// implements TinyGFXPanel, slotted in front (docs/DECISIONS.ja.md D16).
+// The core was not touched to make this work. It is just MemoryTarget, which
+// implements TinyGFXTarget, slotted in front (docs/DECISIONS.ja.md D16).
 // Not including this header links not one byte of it.
 //
 // RAM needed = screen width * band rows * 2 bytes, supplied by the caller.
@@ -14,8 +14,8 @@
 #include <stdint.h>
 
 #include "Gfx.h"
-#include "Panel.h"
-#include "PanelMemory.h"
+#include "Target.h"
+#include "MemoryTarget.h"
 
 class TinyGFXTileCanvas {
  public:
@@ -23,7 +23,7 @@ class TinyGFXTileCanvas {
   typedef void (*DrawFn)(TinyGFX& gfx, void* ctx);
 
   /// `buffer` holds bufferPixels pixels. The band height follows from the width.
-  TinyGFXTileCanvas(TinyGFXPanel& target, uint16_t* buffer, uint32_t bufferPixels)
+  TinyGFXTileCanvas(TinyGFXTarget& target, uint16_t* buffer, uint32_t bufferPixels)
       : _target(&target),
         _mem(buffer, target.width(), target.height()),
         _gfx(_mem),
@@ -107,8 +107,8 @@ class TinyGFXTileCanvas {
     return _rows > 0;
   }
 
-  TinyGFXPanel* _target;
-  TinyGFXPanelMemory _mem;  // must be constructed before _gfx
+  TinyGFXTarget* _target;
+  TinyGFXMemoryTarget _mem;  // must be constructed before _gfx
   TinyGFX _gfx;
   uint32_t _bufPixels;
   int16_t _rows = 0;

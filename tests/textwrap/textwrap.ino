@@ -12,7 +12,7 @@
 
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
-#include <TinyGFX/PanelST7789.h>
+#include <TinyGFX/DriverST7789.h>
 #include <TinyGFX/Print.h>
 #include <TinyGFX/FontCell.h>
 #include <tgfx_test.h>
@@ -25,7 +25,7 @@ static const TinyGFXFontRef font = {&tgfxUtf8, &tinygfxFontCellOps};
 static const int W = 32, H = 48;
 static uint16_t gram[W * H];
 TinyGFXBusCapture bus(gram, W, H);
-TinyGFXPanelST7789 panel(bus, W, H);
+TinyGFXDriverST7789 panel(bus, W, H);
 TinyGFXPrint lcd(panel);
 
 static void reset() { bus.fill(0); bus.resetCounters(); }

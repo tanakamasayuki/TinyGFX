@@ -1,7 +1,7 @@
 #include <TinyGFX.h>
 #include <TinyGFX/BusSoftSPI.h>
-#include <TinyGFX/PanelST7789.h>
-#include <TinyGFX/PanelMemory.h>
+#include <TinyGFX/DriverST7789.h>
+#include <TinyGFX/MemoryTarget.h>
 #include <TinyGFX/TileCanvas.h>
 #include <TinyGFX/FontCell.h>
 #include <tgfx_digits.h>
@@ -9,7 +9,7 @@
 static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps};
 
 TinyGFXBusSoftSPI bus(/*sck*/5, /*mosi*/6, /*dc*/3, /*cs*/4);
-TinyGFXPanelST7789 panel(bus, 240, 240, /*rst*/2);
+TinyGFXDriverST7789 panel(bus, 240, 240, /*rst*/2);
 TinyGFX lcd(panel);
 
 static const uint16_t img[4] = {0, 1, 2, 3};

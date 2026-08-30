@@ -8,12 +8,12 @@
 // table, and that setRgbOrder / setMirror act on it correctly.
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
-#include <TinyGFX/PanelILI9342.h>
+#include <TinyGFX/DriverILI9342.h>
 #include <tgfx_test.h>
 
 static uint16_t gram[32 * 16];
 TinyGFXBusCapture bus(gram, 32, 16);
-TinyGFXPanelILI9342 panel(bus, 32, 16);
+TinyGFXDriverILI9342 panel(bus, 32, 16);
 TinyGFX lcd(panel);
 
 static void probe(const char* prefix, uint8_t r) {

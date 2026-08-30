@@ -13,7 +13,7 @@
 #include <TinyGFX/BusCapture.h>
 #include <TinyGFX/BusSPI.h>
 #include <TinyGFX/BusSoftSPI.h>
-#include <TinyGFX/PanelST7789.h>
+#include <TinyGFX/DriverST7789.h>
 #include <tgfx_test.h>
 #include <tgfx_host_probe.h>
 
@@ -49,7 +49,7 @@ void setup() {
   // ---- software SPI: no block write, and the baseline --------------------
   {
     TinyGFXBusSoftSPI bus(PIN_SCK, PIN_MOSI, PIN_DC, PIN_CS);
-    TinyGFXPanelST7789 panel(bus, W, H);
+    TinyGFXDriverST7789 panel(bus, W, H);
     TinyGFX lcd(panel);
     TgfxPinProbe probe(sink, PIN_SCK, PIN_MOSI, PIN_DC, PIN_CS);
     probe.attach();
@@ -67,7 +67,7 @@ void setup() {
   // ---- hardware SPI with block writes ------------------------------------
   {
     TinyGFXBusSPI bus(SPI, PIN_DC, PIN_CS, 24000000UL);
-    TinyGFXPanelST7789 panel(bus, W, H);
+    TinyGFXDriverST7789 panel(bus, W, H);
     TinyGFX lcd(panel);
     TgfxSpiProbe probe(sink, PIN_DC);
     probe.attach();

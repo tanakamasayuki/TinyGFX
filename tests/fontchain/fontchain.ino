@@ -13,13 +13,13 @@
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
 #include <TinyGFX/FontCell.h>
-#include <TinyGFX/PanelST7789.h>
+#include <TinyGFX/DriverST7789.h>
 #include <tgfx_test.h>
 
 static const int W = 16, H = 12;
 static uint16_t gram[W * H];
 TinyGFXBusCapture bus(gram, W, H);
-TinyGFXPanelST7789 panel(bus, W, H);
+TinyGFXDriverST7789 panel(bus, W, H);
 TinyGFX lcd(panel);
 
 // --- Font 2 of the chain: only 'B', and a different height (3 px, ascent 3) --

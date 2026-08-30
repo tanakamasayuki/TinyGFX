@@ -84,13 +84,13 @@ point the shades are already gone.
 | **GxEPD2** | the same shape. Its README says **"paged drawing is implemented as picture loop, like in U8G2"**. Page count is a template argument |
 | **Adafruit_GFX** | `GFXcanvas1/8/16` - offscreen canvases |
 | **LovyanGFX / TFT_eSPI** | `Sprite` / `LGFX_Sprite`, with a choice of depth |
-| **TinyGFX** | `TileCanvas` (bands) and `PanelMemory` (offscreen) |
+| **TinyGFX** | `TileCanvas` (bands) and `MemoryTarget` (offscreen) |
 
 **Band rendering is the same idea as U8g2's and GxEPD2's.** In TinyGFX the
 invariant is pinned by test: a band-drawn frame is byte-identical to a
 whole-buffer one (`tests/tile/`, `tests/i2c/`).
 
-**A sprite is already possible with `TinyGFXPanelMemory`** - build a `TinyGFX`
+**A sprite is already possible with `TinyGFXMemoryTarget`** - build a `TinyGFX`
 on a RAM buffer, draw into it, then `pushImage()` it to the screen. There is
 simply no call named `pushSprite`. **That is a documentation gap, not a missing
 feature.**
@@ -151,7 +151,7 @@ board's flash by 2,724 bytes** (measured), so it cannot live in the base.
 **Arduino_GFX states "no read operations" as a design decision** - for
 footprint and speed, and because not every panel can be read.
 
-TinyGFX can read, but through `TinyGFXPanelDcs::readPixels()`, an inline member
+TinyGFX can read, but through `TinyGFXDriverDcs::readPixels()`, an inline member
 that **is not emitted unless called**. The only thing everyone pays is the bus's
 `readSequence`, measured at 8 bytes. At **150us a pixel** it is a debugging and
 verification tool, never a drawing path.
@@ -280,7 +280,7 @@ other libraries have it, so compatibility argues for it too.
 ## Holes this survey found in TinyGFX
 
 1. ~~Offscreen drawing is undocumented~~ - **written up** (2026-08-29).
-   `PanelMemory` + `pushImage` is the sprite. **No API was added; what already
+   `MemoryTarget` + `pushImage` is the sprite. **No API was added; what already
    existed was documented.** See [API.md](API.md)
 2. ~~No 1bpp bitmap~~ - **added** (2026-08-29) as `drawBitmap`. It costs
    **+284 B**; the +120 estimate was for a naive per-pixel version. Coalescing

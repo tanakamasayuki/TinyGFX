@@ -12,7 +12,7 @@
 // Drop <name>.h and <name>.ppm into pairs/ and the next run picks them up.
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
-#include <TinyGFX/PanelMemory.h>
+#include <TinyGFX/MemoryTarget.h>
 #include <TinyGFX/Image.h>
 #include <tgfx_test.h>
 #include "pairs/icon_raw565.h"
@@ -23,7 +23,7 @@
 
 static const int W = 32, H = 32;
 static uint16_t gram[W * H];
-TinyGFXPanelMemory panel(gram, W, H);
+TinyGFXMemoryTarget panel(gram, W, H);
 TinyGFX lcd(panel);
 
 void setup() {

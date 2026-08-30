@@ -253,7 +253,7 @@ x = -32768 で 32768 になり、int16_t に収まらない。**
 
 ## 縦詰めの速い経路
 
-`TinyGFXPanelPaged::pushVBitmap()`。ページ境界に揃った縦詰めは、この
+`TinyGFXDriverPaged::pushVBitmap()`。ページ境界に揃った縦詰めは、この
 パネルのバッファそのものなのでバイト複写で貼れる。
 
 | | CH32V003 |

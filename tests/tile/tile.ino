@@ -2,15 +2,15 @@
 //   whatever the band height, not one pixel differs from drawing directly
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
-#include <TinyGFX/PanelST7789.h>
-#include <TinyGFX/PanelMemory.h>
+#include <TinyGFX/DriverST7789.h>
+#include <TinyGFX/MemoryTarget.h>
 #include <TinyGFX/TileCanvas.h>
 #include <tgfx_test.h>
 
 static const int W = 48, H = 48;
 static uint16_t gram[W * H];
 TinyGFXBusCapture bus(gram, W, H);
-TinyGFXPanelST7789 panel(bus, W, H);
+TinyGFXDriverST7789 panel(bus, W, H);
 TinyGFX lcd(panel);
 
 static uint16_t band[W * 8];

@@ -10,7 +10,7 @@
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
 #include <TinyGFX/FontCell.h>
-#include <TinyGFX/PanelST7789.h>
+#include <TinyGFX/DriverST7789.h>
 #include <tgfx_test.h>
 
 #include "cli_font.h"
@@ -20,7 +20,7 @@ static const TinyGFXFontRef cliFont = {&font, &tinygfxFontCellOps};
 static const int W = 128, H = 16;
 static uint16_t gram[W * H];
 TinyGFXBusCapture bus(gram, W, H);
-TinyGFXPanelST7789 panel(bus, W, H);
+TinyGFXDriverST7789 panel(bus, W, H);
 TinyGFX lcd(panel);
 
 void setup() {

@@ -21,7 +21,7 @@
 //   - Edges clipped or shifted -> check the 320x240 constructor arguments
 #include <TinyGFX.h>
 #include <TinyGFX/BusSPI.h>
-#include <TinyGFX/PanelILI9342.h>
+#include <TinyGFX/panels/ILI9342_320x240.h>
 
 #include <TinyGFX/FontCell.h>
 #include "tgfx_clock.h"
@@ -38,7 +38,7 @@ static const int8_t PIN_SD_CS = 4; // the SD card shares this SPI bus; keep it d
 // SCK and MOSI are not given here: the core's SPI library uses the M5Stack
 // defaults (18 and 23). 40 MHz works, but start slower.
 TinyGFXBusSPI bus(SPI, PIN_DC, PIN_CS, /*freq*/ 24000000UL);
-TinyGFXPanelILI9342 panel(bus, 320, 240, PIN_RST);
+TinyGFXPanelILI9342_320x240 panel(bus, PIN_RST);
 TinyGFX lcd(panel);
 
 void setup()

@@ -25,15 +25,15 @@
 // them sets four values in its constructor. That is why adding a controller is
 // a few lines rather than another copy of this file.
 //
-// This class is not meant to be used directly - construct a TinyGFXPanelST7789
-// or a TinyGFXPanelILI9342.
+// This class is not meant to be used directly - construct a TinyGFXDriverST7789
+// or a TinyGFXDriverILI9342.
 #pragma once
 #include <stdint.h>
 
 #include "Color.h"
-#include "Panel.h"
+#include "Target.h"
 
-class TinyGFXPanelDcs : public TinyGFXPanel {
+class TinyGFXDriverDcs : public TinyGFXTarget {
  public:
   /// The module's GRAM origin offset. Give the value for rotation 0; the
   /// offsets for rotations 1-3 are derived from this and setGramSize().
@@ -131,12 +131,12 @@ class TinyGFXPanelDcs : public TinyGFXPanel {
   /// constructor arguments rather than setters - a controller states them once
   /// and a sketch overrides with setRgbOrder() / invertDisplay() if its
   /// particular module disagrees.
-  TinyGFXPanelDcs(TinyGFXBus& bus, int16_t w, int16_t h, int8_t rst, bool bgr, bool invert)
+  TinyGFXDriverDcs(TinyGFXBus& bus, int16_t w, int16_t h, int8_t rst, bool bgr, bool invert)
       : _bus(&bus), _natW(w), _natH(h), _rst(rst), _bgr(bgr), _invert(invert) {
     _width = w;
     _height = h;
   }
-  ~TinyGFXPanelDcs() = default;
+  ~TinyGFXDriverDcs() = default;
 
   void cmd(uint8_t c) {
     _bus->beginTransaction();
@@ -162,7 +162,7 @@ class TinyGFXPanelDcs : public TinyGFXPanel {
   bool _invert;
 };
 
-inline bool TinyGFXPanelDcs::init() {
+inline bool TinyGFXDriverDcs::init() {
   _bus->init();
   if (_rst >= 0) {
 #if defined(ARDUINO)
@@ -207,7 +207,7 @@ inline bool TinyGFXPanelDcs::init() {
 /// second would leave _offX / _offY derived from the older pair, and a module
 /// with an offset would draw in the wrong place until the next setRotation() -
 /// which for a sketch that never rotates is never.
-inline void TinyGFXPanelDcs::deriveOffsets() {
+inline void TinyGFXDriverDcs::deriveOffsets() {
   // The offset measured from the far side. This matters on modules whose
   // GRAM is larger than the panel.
   const int16_t gw = (_gramW > 0) ? _gramW : _natW;
@@ -224,7 +224,7 @@ inline void TinyGFXPanelDcs::deriveOffsets() {
   }
 }
 
-inline void TinyGFXPanelDcs::setRotation(uint8_t r) {
+inline void TinyGFXDriverDcs::setRotation(uint8_t r) {
   _rot = (uint8_t)(r & 3);
   uint8_t madctl;
   switch (_rot) {
@@ -241,7 +241,7 @@ inline void TinyGFXPanelDcs::setRotation(uint8_t r) {
   _bus->endTransaction();
 }
 
-inline void TinyGFXPanelDcs::setWindow(uint16_t xs, uint16_t ys, uint16_t xe, uint16_t ye) {
+inline void TinyGFXDriverDcs::setWindow(uint16_t xs, uint16_t ys, uint16_t xe, uint16_t ye) {
   xs = (uint16_t)(xs + _offX); xe = (uint16_t)(xe + _offX);
   ys = (uint16_t)(ys + _offY); ye = (uint16_t)(ye + _offY);
   uint8_t a[4];
@@ -252,7 +252,7 @@ inline void TinyGFXPanelDcs::setWindow(uint16_t xs, uint16_t ys, uint16_t xe, ui
   cmdData(0x2C, nullptr, 0);  // RAMWR
 }
 
-inline uint32_t TinyGFXPanelDcs::readPixels(uint16_t x, uint16_t y, uint16_t w, uint16_t h,
+inline uint32_t TinyGFXDriverDcs::readPixels(uint16_t x, uint16_t y, uint16_t w, uint16_t h,
                                             uint16_t* out) {
   if (w == 0 || h == 0 || out == nullptr) return 0;
   uint32_t i = 0;

@@ -1,6 +1,6 @@
 #include <TinyGFX.h>
 #include <TinyGFX/BusI2C.h>
-#include <TinyGFX/PanelSSD1306.h>
+#include <TinyGFX/DriverSSD1306.h>
 #include <TinyGFX/FontCell.h>
 #include <tgfx_digits.h>
 
@@ -9,7 +9,7 @@ static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps};
 
 static uint8_t fb[128 * 64 / 8];
 TinyGFXBusI2C bus(Wire, 0x3C);
-TinyGFXPanelSSD1306 panel(bus, fb, 128, 64);
+TinyGFXDriverSSD1306 panel(bus, fb, 128, 64);
 TinyGFX lcd(panel);
 
 void setup() {

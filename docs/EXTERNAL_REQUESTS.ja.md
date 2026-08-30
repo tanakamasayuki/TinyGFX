@@ -148,7 +148,7 @@ uint8_t MyPanelModel::feedByte(uint8_t b) {
 
 ```cpp
 TinyGFXBusSoftSPI  bus(SCK, MOSI, DC, CS);      // 本番と同じバス
-TinyGFXPanelST7789 panel(bus, 240, 240);        // 本番と同じパネル
+TinyGFXDriverST7789 panel(bus, 240, 240);        // 本番と同じパネル
 TinyGFX            lcd(panel);
 
 MyST7789Model model(SCK, MOSI, DC, CS, gram);   // ライブラリ側の模型。(2)(3) で作る
@@ -193,7 +193,7 @@ void setup() {
 依頼書に書いた受入条件のスケッチを実際に書いて動かした。**API の不足も回避策も無し。**
 
 ```text
-TinyGFX → PanelST7789 → 本番の TinyGFXBusSoftSPI / TinyGFXBusSPI → 線
+TinyGFX → DriverST7789 → 本番の TinyGFXBusSoftSPI / TinyGFXBusSPI → 線
         → TgfxPinProbe / TgfxSpiProbe（TinyGFX 側の模型）→ 仮想 GRAM → PPM
 ```
 

@@ -9,7 +9,7 @@
 // differently, and the picture must be the same.
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
-#include <TinyGFX/PanelST7789.h>
+#include <TinyGFX/DriverST7789.h>
 #include <TinyGFX/Image.h>
 #include <tgfx_test.h>
 #include "same_raw565.h"
@@ -23,7 +23,7 @@
 static const int W = 32, H = 32;
 static uint16_t gram[W * H];
 TinyGFXBusCapture bus(gram, W, H);
-TinyGFXPanelST7789 panel(bus, W, H);
+TinyGFXDriverST7789 panel(bus, W, H);
 TinyGFX lcd(panel);
 
 static uint16_t ref[W * H];

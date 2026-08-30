@@ -2,7 +2,7 @@
 //
 // Sold as an "SSD1306" more often than not, and mostly is one - same 128x64
 // glass, same page-addressed 1bpp memory, nearly the same init. Everything it
-// shares with the SSD1306 is in PanelPaged.h.
+// shares with the SSD1306 is in DriverPaged.h.
 //
 // Two things are genuinely different, and both are here.
 //
@@ -25,20 +25,47 @@
 #pragma once
 #include <stdint.h>
 
-#include "PanelPaged.h"
+#include "DriverPaged.h"
 
-class TinyGFXPanelSH1106 : public TinyGFXPanelPaged {
+// ---- what a panel header sets ---------------------------------------------
+//
+// A panel header (TinyGFX/panels/) defines these before including this file.
+// Every default below is **the controller's own reset value**, taken from the
+// datasheet - not the 0xF1 / 0x40 pair that circulates through most libraries,
+// which appears in no datasheet table at all (docs/GLOSSARY.md 4).
+//
+// COM_PINS is the one value that cannot be derived or defaulted away: it says
+// how the glass's COM lines are wired, sequential (0x02) or alternative
+// (0x12). **Every other row coming out as a stripe is what the wrong one looks
+// like.**
+#ifndef TINYGFX_SH1106_COM_PINS
+#define TINYGFX_SH1106_COM_PINS 0x12   // datasheet reset: alternative
+#endif
+#ifndef TINYGFX_SH1106_PRECHARGE
+#define TINYGFX_SH1106_PRECHARGE 0x22  // datasheet reset: phase1 = 2, phase2 = 2
+#endif
+#ifndef TINYGFX_SH1106_VCOMH
+#define TINYGFX_SH1106_VCOMH 0x20      // datasheet reset: 0.77 x Vcc
+#endif
+#ifndef TINYGFX_SH1106_CONTRAST
+#define TINYGFX_SH1106_CONTRAST 0xCF
+#endif
+#ifndef TINYGFX_SH1106_CLOCKDIV
+#define TINYGFX_SH1106_CLOCKDIV 0x80
+#endif
+
+// Marks that this driver is in the build. A panel header refuses to be the
+// second one for the same driver (docs/GLOSSARY.md 3).
+#define TINYGFX_DRIVER_SH1106_INCLUDED 1
+
+
+class TinyGFXDriverSH1106 : public TinyGFXDriverPaged {
  public:
-  /// `buffer` is w * h / 8 bytes - 1,024 for 128x64. See TinyGFXPanelPaged for
+  /// `buffer` is w * h / 8 bytes - 1,024 for 128x64. See TinyGFXDriverPaged for
   /// what `bufferPages` does.
-  TinyGFXPanelSH1106(TinyGFXBus& bus, uint8_t* buffer, int16_t w = 128, int16_t h = 64,
+  TinyGFXDriverSH1106(TinyGFXBus& bus, uint8_t* buffer, int16_t w = 128, int16_t h = 64,
                      int16_t bufferPages = 0)
-      : TinyGFXPanelPaged(bus, buffer, w, h, bufferPages) {}
-
-  /// Where column 0 of the picture sits in the controller's memory. 2 is right
-  /// for the usual 128-wide glass on 132 columns of RAM; set 0 if your module
-  /// turns out to be flush.
-  void setColumnOffset(uint8_t columns) { _col0 = columns; }
+      : TinyGFXDriverPaged(bus, buffer, w, h, bufferPages, 132) {}
 
   bool init() override;
 
@@ -50,12 +77,9 @@ class TinyGFXPanelSH1106 : public TinyGFXPanelPaged {
   void invertDisplay(bool invert) { cmd(invert ? 0xA7 : 0xA6); }
   void setSleep(bool sleep) { cmd(sleep ? 0xAE : 0xAF); }
   void setContrast(uint8_t value) { cmd(0x81); cmd(value); }
-
- private:
-  uint8_t _col0 = 2;
 };
 
-inline bool TinyGFXPanelSH1106::init() {
+inline bool TinyGFXDriverSH1106::init() {
   // Split in three because two of the bytes depend on how tall the glass is.
   // A 128x32 wants multiplex 0x1F and COM pins 0x02 where a 128x64 wants 0x3F
   // and 0x12; sending the 64-row pair to a 32-row panel squeezes the picture
@@ -63,7 +87,7 @@ inline bool TinyGFXPanelSH1106::init() {
   // hardcodes them.
   static const uint8_t kHead[] = {
       0xAE,        // display off
-      0xD5, 0x80,  // clock
+      0xD5, TINYGFX_SH1106_CLOCKDIV,  // clock
   };
   static const uint8_t kMid[] = {
       0xD3, 0x00,  // display offset
@@ -74,9 +98,9 @@ inline bool TinyGFXPanelSH1106::init() {
       0xC8,        // com scan dec
   };
   static const uint8_t kTail[] = {
-      0x81, 0xCF,  // contrast
-      0xD9, 0xF1,  // precharge
-      0xDB, 0x40,  // vcom detect
+      0x81, TINYGFX_SH1106_CONTRAST,  // contrast
+      0xD9, TINYGFX_SH1106_PRECHARGE,  // precharge
+      0xDB, TINYGFX_SH1106_VCOMH,  // vcom detect
       0xA4,        // resume from RAM
       0xA6,        // normal (not inverted)
       0xAF,        // display on
@@ -91,14 +115,14 @@ inline bool TinyGFXPanelSH1106::init() {
   _bus->writeCommand(multiplexRatio());
   for (uint8_t i = 0; i < sizeof(kMid); ++i) _bus->writeCommand(kMid[i]);
   _bus->writeCommand(0xDA);
-  _bus->writeCommand(comPinsConfig());
+  _bus->writeCommand(TINYGFX_SH1106_COM_PINS);
   for (uint8_t i = 0; i < sizeof(kTail); ++i) _bus->writeCommand(kTail[i]);
   _bus->endTransaction();
   clearBuffer(false);
   return true;
 }
 
-inline void TinyGFXPanelSH1106::display() {
+inline void TinyGFXDriverSH1106::display() {
   if (_dirtyHi < _dirtyLo) return;  // nothing changed
   // Dirty pages are tracked in buffer space; the screen may be further down.
   const int16_t base = (_bandPages != 0) ? _pageFirst : 0;

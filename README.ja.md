@@ -44,10 +44,10 @@ CH32V003（フラッシュ 16KB / RAM 2KB）で、**全機能を使っても +6.
 ```cpp
 #include <TinyGFX.h>
 #include <TinyGFX/BusSoftSPI.h>
-#include <TinyGFX/PanelST7789.h>
+#include <TinyGFX/panels/ST7789_240x240.h>
 
 TinyGFXBusSoftSPI  bus(/*sck*/5, /*mosi*/6, /*dc*/3, /*cs*/4);
-TinyGFXPanelST7789 panel(bus, 240, 240, /*rst*/2);
+TinyGFXPanelST7789_240x240 panel(bus, /*rst*/2);
 TinyGFX            lcd(panel);
 
 void setup() {
@@ -78,13 +78,13 @@ void loop() {}
 ```cpp
 #include <TinyGFX.h>
 #include <TinyGFX/BusI2C.h>
-#include <TinyGFX/PanelSSD1306.h>
+#include <TinyGFX/panels/SSD1306_128x64.h>
 #include <Wire.h>
 
-static uint8_t fb[128 * 64 / 8];        // 1,024 バイト。利用者が用意する
+static uint8_t fb[TinyGFXPanelSSD1306_128x64::kBufferBytes];        // 1,024 バイト。利用者が用意する
 
 TinyGFXBusI2C       bus(Wire, /*address*/0x3C);
-TinyGFXPanelSSD1306 panel(bus, fb, 128, 64);
+TinyGFXPanelSSD1306_128x64 panel(bus, fb);
 TinyGFX             lcd(panel);
 
 void setup() {
@@ -111,21 +111,26 @@ void loop() {}
 | | I2C（Wire） | `TinyGFX/BusI2C.h` |
 | | ソフト I2C（任意の GPIO 2 本） | `TinyGFX/BusSoftI2C.h` |
 | | コマンド列の記録（検証用） | `TinyGFX/BusCapture.h` |
-| パネル（カラー） | ST7789 | `TinyGFX/PanelST7789.h` |
-| | ILI9342C（M5Stack Core / BASIC） | `TinyGFX/PanelILI9342.h` |
-| | ILI9341 | `TinyGFX/PanelILI9341.h` |
-| パネル（モノクロ） | SSD1306 | `TinyGFX/PanelSSD1306.h` |
-| | SH1106 | `TinyGFX/PanelSH1106.h` |
-| パネル（その他） | RAM バッファ（オフスクリーン・帯・テスト用） | `TinyGFX/PanelMemory.h` |
+| パネル（カラー） | ST7789 | `TinyGFX/panels/ST7789_240x240.h` ほか |
+| | ILI9342C（M5Stack Core / BASIC） | `TinyGFX/panels/ILI9342_320x240.h` |
+| | ILI9341 | `TinyGFX/panels/ILI9341_240x320.h` |
+| パネル（モノクロ） | SSD1306 | `TinyGFX/panels/SSD1306_128x64.h` ほか |
+| | SH1106 | `TinyGFX/panels/SH1106_128x64.h` |
+| 描画先（その他） | RAM バッファ（オフスクリーン・帯・テスト用） | `TinyGFX/MemoryTarget.h` |
 | フォント | CellFont（H≤16 向けの外部仕様 v1） | `TinyGFX/FontCell.h` |
 | | u8g2 | `TinyGFX/FontU8g2.h` |
 | 画像 | 生 RGB565 / RLE / RLE+パレット / 1bpp（横・縦） | `TinyGFX/Image.h` |
 | 拡張 | 帯レンダリング（ちらつき対策） | `TinyGFX/TileCanvas.h` |
 | | `print` / `printf` / float | `TinyGFX/Print.h` |
 
-カラーパネルは `TinyGFX/PanelDcs.h`、モノクロパネルは `TinyGFX/PanelPaged.h`
-の上に乗っています。**同じ系統のコントローラを足す代金は実測 +0 バイト**なので、
-対応パネルは増やしやすいはずです。
+**パネルはプリセットです。** 「買った製品」を 1 枚 include すると、寸法・
+オフセット・COM 配線が入った状態で使えます。中身のドライバ
+（`TinyGFX/DriverDcs.h` / `TinyGFX/DriverPaged.h`）を直接使うこともできますが、
+その場合は値を自分で設定することになります。
+**同じ系統のコントローラを足す代金は実測 +0 バイト**なので、対応は増やしやすいはずです。
+
+用語（バス・パネル・ドライバ・プロトコル・ターゲット）は
+[docs/GLOSSARY.ja.md](docs/GLOSSARY.ja.md) にまとめてあります。
 
 **ソフト SPI とソフト I2C は、理由が違います。**
 
@@ -277,7 +282,7 @@ class MyDmaBus : public TinyGFXBus {
 };
 
 MyDmaBus bus;
-TinyGFXPanelST7789 panel(bus, 240, 240, /*rst*/2);
+TinyGFXPanelST7789_240x240 panel(bus, /*rst*/2);
 TinyGFX lcd(panel);
 ```
 
@@ -415,7 +420,7 @@ Arduino IDE のライブラリマネージャからはまだ入りません（�
 ```cpp
 #include <TinyGFX.h>
 #include <TinyGFX/BusSoftSPI.h>     // 使うバス
-#include <TinyGFX/PanelST7789.h>    // 使うパネル
+#include <TinyGFX/panels/ST7789_240x240.h>    // 使うパネル
 ```
 
 ## ドキュメント

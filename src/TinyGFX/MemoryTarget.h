@@ -7,12 +7,12 @@
 #pragma once
 #include <stdint.h>
 
-#include "Panel.h"
+#include "Target.h"
 
-class TinyGFXPanelMemory : public TinyGFXPanel {
+class TinyGFXMemoryTarget : public TinyGFXTarget {
  public:
   /// `buffer` needs current-width * rows pixels. `rows` defaults to h (full screen).
-  TinyGFXPanelMemory(uint16_t* buffer, int16_t w, int16_t h)
+  TinyGFXMemoryTarget(uint16_t* buffer, int16_t w, int16_t h)
       : _buf(buffer), _natW(w), _natH(h), _bufY0(0), _bufRows(h) {
     _width = w;
     _height = h;
