@@ -4,6 +4,16 @@
 // ship no SPI library at all, or where SPI will not link for the target
 // variant (the CH32V003 cores, for instance). It is slow, but it is the one
 // bus that works on every Arduino core.
+//
+// **A pin bus, so the pins are TinyGFX's** - the opposite of TinyGFXBusSPI,
+// where you hand over a peripheral you already began and TinyGFX only drives
+// DC and CS. Here all four pins are made outputs and driven from here, so
+// nothing else may use them (docs/GLOSSARY.md).
+//
+// "Soft" means TinyGFX does the bit-banging. It does not mean TinyGFXBusSPI is
+// necessarily hardware: that one takes whatever the core calls SPI, and
+// whether the core implements it in hardware is not something TinyGFX can see
+// or needs to.
 #pragma once
 #include <Arduino.h>
 

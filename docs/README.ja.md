@@ -11,7 +11,7 @@ TinyGFX の設計文書。**たたき台だが、フットプリントの数字�
 
 | 区分 | 言語 | 対象 |
 | --- | --- | --- |
-| 使う人が読むもの | 日英 | `../README.ja.md`、`GUIDE.ja.md`、[API.ja.md](API.ja.md)、`../examples/README.ja.md`、`../tests/README.ja.md` |
+| 使う人が読むもの | 日英 | `../README.ja.md`、`GUIDE.ja.md`、[API.ja.md](API.ja.md)、[GLOSSARY.ja.md](GLOSSARY.ja.md)、`../examples/README.ja.md`、`../tests/README.ja.md` |
 | 内部の記録・作業メモ | 日本語のみ | [REQUIREMENTS.ja.md](REQUIREMENTS.ja.md)、[CORE_DESIGN.ja.md](CORE_DESIGN.ja.md)、[DECISIONS.ja.md](DECISIONS.ja.md)、[FOOTPRINT.ja.md](FOOTPRINT.ja.md)、[OPTIMIZE.ja.md](OPTIMIZE.ja.md)、[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md)、[IMAGE_FORMAT.ja.md](IMAGE_FORMAT.ja.md)、[IMAGE_TOOL.ja.md](IMAGE_TOOL.ja.md)、[TEST_PLAN.ja.md](TEST_PLAN.ja.md)、[DEVELOPMENT_PLAN.ja.md](DEVELOPMENT_PLAN.ja.md)、[EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md)、[MANUAL_TEST.ja.md](MANUAL_TEST.ja.md) |
 | **コード中のコメント** | **英語のみ** | `../src/`、`../examples/`、`../tests/`、`../tools/`（2026-08-29 に完了。[DECISIONS.ja.md](DECISIONS.ja.md) D23） |
 
@@ -21,6 +21,7 @@ TinyGFX の設計文書。**たたき台だが、フットプリントの数字�
 
 | やりたいこと | 読む文書 |
 | --- | --- |
+| **語の意味を確かめる（バス・パネル・ドライバ・プロトコル・ターゲット）** | **[GLOSSARY.ja.md](GLOSSARY.ja.md)** |
 | **何を作るライブラリで、どこまでが責務なのか知る** | **[REQUIREMENTS.ja.md](REQUIREMENTS.ja.md)** |
 | **API の形と内部構造を知る** | **[CORE_DESIGN.ja.md](CORE_DESIGN.ja.md)** |
 | **なぜそう設計したのかを知る／論点を潰す** | **[DECISIONS.ja.md](DECISIONS.ja.md)** |
