@@ -5,14 +5,24 @@
 **A panel is a preset.** Include one from the catalogue and it usually just
 works ([GLOSSARY.md](GLOSSARY.md)).
 
-This is for when it does not. **Look up the symptom, get the one line to
-change.**
+This is for when it does not. **Look up the symptom, find what to change.**
+
+There are three kinds of fix.
+
+| | What it takes | Examples |
+| --- | --- | --- |
+| **A runtime call** | one line, anywhere | inversion, mirroring, colour order, offset |
+| **A different include** | pick another panel | COM pin layout (`_SeqCom`) |
+| **A `#define`** | one or two lines before the include | COM pin layout, pre-charge, VCOMH |
+
+**The COM pin layout, the pre-charge and VCOMH cannot be changed at runtime.**
+Those need a rebuild.
 
 ## How to use it
 
 1. **Get something on the screen first.** If anything at all is showing, look
    the symptom up below
-2. **Change one line at a time.** Once it is right, find the catalogue entry
+2. **Change one thing at a time.** Once it is right, find the catalogue entry
    that carries that value, or add your own (§4)
 3. **Tell us what worked.** In the catalogue, nobody has to look it up again
 
