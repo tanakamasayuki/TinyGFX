@@ -75,12 +75,16 @@ static const TinyGFXFontRef myFont = {&Name, &tinygfxFontCellOps, nullptr};
 
 ## パネルの原点オフセット
 
-240x240 や 135x240 の ST7789 モジュールは、コントローラの GRAM より小さいので
-原点がずれている。その場合は 2 つとも設定する。
+240x240 や 135x240 の ST7789 は、コントローラのメモリより小さいので原点がずれる。
+間違えると回転 2 と 3 の位置がおかしくなる。
+
+**パネルヘッダが持っている**ので、設定するものは無い。
 
 ```cpp
-panel.setGramSize(240, 320);   // コントローラの GRAM
-panel.setOffset(52, 40);       // 回転 0 のときの可視域の位置
+#include <TinyGFX/panels/ST7789_135x240.h>
+TinyGFXPanelST7789_135x240 panel(bus, /*rst*/2);
 ```
 
-回転 1〜3 のぶんは自動で導出される。
+それでもずれるときは `panel.setOffset(x, y)` と `panel.setGramSize(w, h)` で
+上書きできる。順序は自由で、`begin()` の前後どちらでもよい。回転 1〜3 は
+そこから導出される。[../docs/PANEL_TUNING.ja.md](../docs/PANEL_TUNING.ja.md) を参照。
