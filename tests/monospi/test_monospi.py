@@ -1,7 +1,7 @@
 """Does a page-addressed panel on SPI observe the bus etiquette?
 
 **Stops the P0 found in the 2026-08-29 design review from coming back.**
-`TinyGFXPanelPaged::beginTransaction()` and `endTransaction()` were empty, and
+`TinyGFXDriverPaged::beginTransaction()` and `endTransaction()` were empty, and
 `cmd()` did not go through a bus transaction either. I2C starts and stops on
 every transfer so nothing showed, and there was no SPI test, so nobody noticed.
 

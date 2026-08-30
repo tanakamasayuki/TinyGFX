@@ -129,8 +129,8 @@ standard Arduino way.
 The page-addressed monochrome panels (SSD1306, SH1106) **allocate nothing**.
 
 ```cpp
-static uint8_t fb[128 * 64 / 8];              // 1,024 B
-TinyGFXPanelSSD1306 panel(bus, fb, 128, 64);
+static uint8_t fb[TinyGFXPanelSSD1306_128x64::kBufferBytes];              // 1,024 B
+TinyGFXPanelSSD1306_128x64 panel(bus, fb);
 ```
 
 When that will not fit, draw a band at a time instead - 128 B for one page.
@@ -142,7 +142,7 @@ When that will not fit, draw a band at a time instead - 128 B for one page.
 
 | | |
 | --- | --- |
-| `TinyGFX(TinyGFXPanel& panel)` | |
+| `TinyGFX(TinyGFXTarget& panel)` | |
 | `bool begin()` | see the contract above |
 | `int16_t width()` / `height()` | **after rotation** |
 | `void setRotation(uint8_t r)` / `uint8_t getRotation()` | 0..3; 1 and 3 swap width and height |
@@ -246,7 +246,7 @@ formats and costs more (343-597 B measured). See
 [IMAGE_FORMAT.ja.md](IMAGE_FORMAT.ja.md).
 
 A page-addressed monochrome panel can take a page-aligned vertical bitmap
-directly through `TinyGFXPanelPaged::pushVBitmap()`. It returns false when the
+directly through `TinyGFXDriverPaged::pushVBitmap()`. It returns false when the
 position does not line up, so fall back to `drawImage()`.
 
 ### Raw arrays and generated assets - two entrances
@@ -274,12 +274,12 @@ Using both is less than the sum - they share the run coalescing and the
 
 ### Drawing offscreen (what other libraries call a sprite)
 
-**There is no separate API.** `TinyGFXPanelMemory` presents a RAM buffer as a
+**There is no separate API.** `TinyGFXMemoryTarget` presents a RAM buffer as a
 panel, so you build a `TinyGFX` on it, draw, and `pushImage()` the result.
 
 ```cpp
 static uint16_t sprBuf[16 * 16];              // 512 B
-TinyGFXPanelMemory sprPanel(sprBuf, 16, 16);
+TinyGFXMemoryTarget sprPanel(sprBuf, 16, 16);
 TinyGFX spr(sprPanel);
 
 spr.begin();
@@ -290,7 +290,7 @@ lcd.pushImage(10, 10, 16, 16, sprBuf);                  // paste it
 lcd.pushImage(10, 50, 16, 16, sprBuf, TFT_BLACK);       // paste it, black transparent
 ```
 
-`TinyGFXPanelMemory` also has `readPixel(x, y)` and `fillBuffer(color)`.
+`TinyGFXMemoryTarget` also has `readPixel(x, y)` and `fillBuffer(color)`.
 
 **Two bytes a pixel, so mind the size.** On the reference board (CH32V003, 2 KB
 of RAM) 16x16 is 512 B and **32x32 does not fit at 2,048 B** (measured). If what
@@ -303,7 +303,7 @@ you want is a whole screen without flicker, use the band rendering in
 
 | | |
 | --- | --- |
-| `TinyGFXTileCanvas(TinyGFXPanel& target, uint16_t* buffer, uint32_t bufferPixels)` | the buffer is yours |
+| `TinyGFXTileCanvas(TinyGFXTarget& target, uint16_t* buffer, uint32_t bufferPixels)` | the buffer is yours |
 | `bool begin()` / `setRotation(r)` | |
 | `TinyGFX& gfx()` | set the font and colours here; they survive across `render()` calls |
 | `render(callable)` | **any callable** - a lambda, say - taking one `TinyGFX&` |
@@ -443,7 +443,7 @@ to not carry what will not fit on the reference board.
 | `setSwapBytes` | **deliberately absent.** A runtime mode costs **+44 B and +4 B of RAM to sketches that never swap anything** (a branch per pixel). Call `tinygfx_swapBytes565(data, count)` instead: **0 B unless called, +32 B when it is** (D29) |
 | `drawNumber` | **+168 B would buy it** (measured). Integer to string |
 | Palettes, switchable colour depth | the core has no colour-depth abstraction (D4) |
-| `readPixel` | it lives on the panel: `TinyGFXPanelDcs::readPixels()`. **150us a pixel**, for debugging |
+| `readPixel` | it lives on the panel: `TinyGFXDriverDcs::readPixels()`. **150us a pixel**, for debugging |
 
 The last two are **measured, so they can be added the moment they are wanted.**
 Not before.

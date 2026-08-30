@@ -6,7 +6,7 @@
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
 #include <TinyGFX/FontCell.h>
-#include <TinyGFX/PanelST7789.h>
+#include <TinyGFX/DriverST7789.h>
 #include <tgfx_test.h>
 #include <tgfx_scene.h>
 #include <tgfx_digits.h>
@@ -15,7 +15,7 @@ static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps};
 
 static uint16_t gram[TGFX_SCENE_W * TGFX_SCENE_H];
 TinyGFXBusCapture bus(gram, TGFX_SCENE_W, TGFX_SCENE_H);
-TinyGFXPanelST7789 panel(bus, TGFX_SCENE_W, TGFX_SCENE_H);
+TinyGFXDriverST7789 panel(bus, TGFX_SCENE_W, TGFX_SCENE_H);
 TinyGFX lcd(panel);
 
 void setup() {

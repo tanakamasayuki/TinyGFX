@@ -16,7 +16,7 @@
 /// out differently from "a window you stream pixels into" gets to say so once,
 /// here, instead of paying a translation on every pixel. The default keeps the
 /// window protocol, so a panel that has nothing better to offer writes nothing.
-class TinyGFXPanel {
+class TinyGFXTarget {
  public:
   virtual bool init() { return false; }
   virtual void setRotation(uint8_t r) { (void)r; }
@@ -40,7 +40,7 @@ class TinyGFXPanel {
   int16_t height() const { return _height; }  // after rotation
 
  protected:
-  ~TinyGFXPanel() = default;
+  ~TinyGFXTarget() = default;
 
   int16_t _width = 0;
   int16_t _height = 0;

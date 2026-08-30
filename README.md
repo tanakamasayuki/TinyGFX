@@ -45,10 +45,10 @@ Anything you do not call costs nothing at all.
 ```cpp
 #include <TinyGFX.h>
 #include <TinyGFX/BusSoftSPI.h>
-#include <TinyGFX/PanelST7789.h>
+#include <TinyGFX/panels/ST7789_240x240.h>
 
 TinyGFXBusSoftSPI  bus(/*sck*/5, /*mosi*/6, /*dc*/3, /*cs*/4);
-TinyGFXPanelST7789 panel(bus, 240, 240, /*rst*/2);
+TinyGFXPanelST7789_240x240 panel(bus, /*rst*/2);
 TinyGFX            lcd(panel);
 
 void setup() {
@@ -75,13 +75,13 @@ drawing code does not change by a single line.
 ```cpp
 #include <TinyGFX.h>
 #include <TinyGFX/BusI2C.h>
-#include <TinyGFX/PanelSSD1306.h>
+#include <TinyGFX/panels/SSD1306_128x64.h>
 #include <Wire.h>
 
-static uint8_t fb[128 * 64 / 8];        // 1,024 bytes, supplied by you
+static uint8_t fb[TinyGFXPanelSSD1306_128x64::kBufferBytes];        // 1,024 bytes, supplied by you
 
 TinyGFXBusI2C       bus(Wire, /*address*/0x3C);
-TinyGFXPanelSSD1306 panel(bus, fb, 128, 64);
+TinyGFXPanelSSD1306_128x64 panel(bus, fb);
 TinyGFX             lcd(panel);
 
 void setup() {
@@ -108,21 +108,26 @@ More in [examples/](examples/).
 | | I2C (Wire) | `TinyGFX/BusI2C.h` |
 | | Software I2C (any two GPIOs) | `TinyGFX/BusSoftI2C.h` |
 | | Command-stream capture (for verification) | `TinyGFX/BusCapture.h` |
-| Panel (colour) | ST7789 | `TinyGFX/PanelST7789.h` |
-| | ILI9342C (M5Stack Core / BASIC) | `TinyGFX/PanelILI9342.h` |
-| | ILI9341 | `TinyGFX/PanelILI9341.h` |
-| Panel (monochrome) | SSD1306 | `TinyGFX/PanelSSD1306.h` |
-| | SH1106 | `TinyGFX/PanelSH1106.h` |
-| Panel (other) | RAM buffer (offscreen, tiled rendering, tests) | `TinyGFX/PanelMemory.h` |
+| Panel (colour) | ST7789 | `TinyGFX/panels/ST7789_240x240.h` and others |
+| | ILI9342C (M5Stack Core / BASIC) | `TinyGFX/panels/ILI9342_320x240.h` |
+| | ILI9341 | `TinyGFX/panels/ILI9341_240x320.h` |
+| Panel (monochrome) | SSD1306 | `TinyGFX/panels/SSD1306_128x64.h` and others |
+| | SH1106 | `TinyGFX/panels/SH1106_128x64.h` |
+| Target (other) | RAM buffer (offscreen, tiled rendering, tests) | `TinyGFX/MemoryTarget.h` |
 | Font | CellFont (external spec v1, for H≤16) | `TinyGFX/FontCell.h` |
 | | u8g2 | `TinyGFX/FontU8g2.h` |
 | Images | raw RGB565 / RLE / RLE+palette / 1bpp (horizontal, vertical) | `TinyGFX/Image.h` |
 | Extras | Tiled rendering (flicker-free) | `TinyGFX/TileCanvas.h` |
 | | `print` / `printf` / float | `TinyGFX/Print.h` |
 
-Colour panels sit on `TinyGFX/PanelDcs.h` and monochrome ones on
-`TinyGFX/PanelPaged.h`. **Adding another controller of the same family
-measures +0 bytes**, so the panel list is cheap to extend.
+**A panel is a preset.** Include the one product you bought and the dimensions,
+offsets and COM wiring come with it. You can drive the underlying driver
+(`TinyGFX/DriverDcs.h`, `TinyGFX/DriverPaged.h`) directly instead, but then the
+values are yours to set. **Adding another controller of the same family
+measures +0 bytes**, so the catalogue is cheap to grow.
+
+The vocabulary - bus, panel, driver, protocol, target - is in
+[docs/GLOSSARY.md](docs/GLOSSARY.md).
 
 **The software SPI and the software I2C are there for different reasons.**
 
@@ -275,7 +280,7 @@ class MyDmaBus : public TinyGFXBus {
 };
 
 MyDmaBus bus;
-TinyGFXPanelST7789 panel(bus, 240, 240, /*rst*/2);
+TinyGFXPanelST7789_240x240 panel(bus, /*rst*/2);
 TinyGFX lcd(panel);
 ```
 
@@ -417,7 +422,7 @@ your `libraries/` folder.
 ```cpp
 #include <TinyGFX.h>
 #include <TinyGFX/BusSoftSPI.h>     // the bus you use
-#include <TinyGFX/PanelST7789.h>    // the panel you use
+#include <TinyGFX/panels/ST7789_240x240.h>    // the panel you use
 ```
 
 ## Documentation

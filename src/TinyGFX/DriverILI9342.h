@@ -2,9 +2,9 @@
 //
 // A sibling of the ILI9341, except its GRAM is landscape from the start
 // (320x240). There are no modules with an origin offset, so setOffset() and
-// setGramSize() - inherited from PanelDcs - are left alone here.
+// setGramSize() - inherited from DriverDcs - are left alone here.
 //
-// Everything it shares with the other DCS controllers is in PanelDcs.h. What
+// Everything it shares with the other DCS controllers is in DriverDcs.h. What
 // is left here is what makes it an ILI9342C: a landscape 320x240 GRAM, BGR
 // order, and inversion on.
 //
@@ -20,10 +20,14 @@
 #pragma once
 #include <stdint.h>
 
-#include "PanelDcs.h"
+#include "DriverDcs.h"
 
-class TinyGFXPanelILI9342 : public TinyGFXPanelDcs {
+// Marks that this driver is in the build. A panel header refuses to be the
+// second one for the same driver (docs/GLOSSARY.md 3).
+#define TINYGFX_DRIVER_ILI9342_INCLUDED 1
+
+class TinyGFXDriverILI9342 : public TinyGFXDriverDcs {
  public:
-  TinyGFXPanelILI9342(TinyGFXBus& bus, int16_t w = 320, int16_t h = 240, int8_t rst = -1)
-      : TinyGFXPanelDcs(bus, w, h, rst, /*bgr*/ true, /*invert*/ true) {}
+  TinyGFXDriverILI9342(TinyGFXBus& bus, int16_t w = 320, int16_t h = 240, int8_t rst = -1)
+      : TinyGFXDriverDcs(bus, w, h, rst, /*bgr*/ true, /*invert*/ true) {}
 };

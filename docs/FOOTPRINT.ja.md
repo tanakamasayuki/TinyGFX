@@ -47,7 +47,7 @@ arduino-cli compile --fqbn <FQBN> --output-dir build --warnings none <sketch>
 | 構成 | 内容 |
 | --- | --- |
 | **base** | 空の `setup`/`loop` のみ（コアだけの下駄） |
-| **A** | base + BusSoftSPI + PanelST7789 + `begin` + `fillScreen` |
+| **A** | base + BusSoftSPI + DriverST7789 + `begin` + `fillScreen` |
 | **B** | A + `fillRect` / `drawPixel` / `drawFastHLine` / `drawFastVLine` |
 | **C** | B + `drawLine` / `drawRect` / 円 / 角丸 / 三角 |
 | **D** | C + `setFont` / `drawString`（TinyFont 固定ピッチ・連続、データ 208 B を含む） |

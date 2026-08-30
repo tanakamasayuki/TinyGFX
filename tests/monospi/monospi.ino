@@ -7,7 +7,7 @@
 // mode, CS dropped, and both put back afterwards, nothing appears on the screen
 // and an SD card on the same wires gets corrupted.
 //
-// The 2026-08-29 review found that TinyGFXPanelPaged was not doing this (P0).
+// The 2026-08-29 review found that TinyGFXDriverPaged was not doing this (P0).
 // There was only an I2C test, so nobody noticed.
 // **This test stops it coming back.**
 //
@@ -19,8 +19,8 @@
 #define TGFX_HOST_PROBE_SPI 1
 #include <TinyGFX.h>
 #include <TinyGFX/BusSPI.h>
-#include <TinyGFX/PanelSH1106.h>
-#include <TinyGFX/PanelSSD1306.h>
+#include <TinyGFX/DriverSH1106.h>
+#include <TinyGFX/DriverSSD1306.h>
 #include <tgfx_test.h>
 #include <tgfx_host_probe.h>
 #include <SPI.h>
@@ -92,7 +92,7 @@ void setup() {
   SPI.begin();  // the sketch owns the bus; TinyGFX never begins it
 
   TinyGFXBusSPI bus(SPI, PIN_DC, PIN_CS, 8000000UL);
-  TinyGFXPanelSSD1306 panel(bus, fb, W, H);
+  TinyGFXDriverSSD1306 panel(bus, fb, W, H);
   TinyGFX lcd(panel);
 
   SPI.setTransferHook(onByte, nullptr);
@@ -141,7 +141,7 @@ void setup() {
   // --- an SH1106 must observe the same etiquette ---------------------------
   {
     static uint8_t fb2[W * H / 8];
-    TinyGFXPanelSH1106 sh(bus, fb2, W, H);
+    TinyGFXDriverSH1106 sh(bus, fb2, W, H);
     TinyGFX shLcd(sh);
     bytesTotal = bytesOutsideTxn = bytesWithCsHigh = 0;
     shLcd.begin();

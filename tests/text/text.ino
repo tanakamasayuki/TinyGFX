@@ -5,7 +5,7 @@
 // encoded three different ways. See the equivalence check at the bottom.
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
-#include <TinyGFX/PanelST7789.h>
+#include <TinyGFX/DriverST7789.h>
 #include <tgfx_test.h>
 #include <TinyGFX/FontCell.h>
 #include <tgfx_digits.h>
@@ -19,7 +19,7 @@ static const TinyGFXFontRef chainFont = {&tgfxDigitsChain, &tinygfxFontCellOps};
 static const int W = 64, H = 32;
 static uint16_t gram[W * H];
 TinyGFXBusCapture bus(gram, W, H);
-TinyGFXPanelST7789 panel(bus, W, H);
+TinyGFXDriverST7789 panel(bus, W, H);
 TinyGFX lcd(panel);
 
 static const uint16_t FG = 0xFFFF;

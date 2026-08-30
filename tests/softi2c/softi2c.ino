@@ -15,7 +15,7 @@
 #include <TinyGFX.h>
 #include <TinyGFX/BusI2C.h>
 #include <TinyGFX/BusSoftI2C.h>
-#include <TinyGFX/PanelSSD1306.h>
+#include <TinyGFX/DriverSSD1306.h>
 #include <tgfx_test.h>
 #include <tgfx_host_probe.h>
 #include <Wire.h>
@@ -123,7 +123,7 @@ void setup() {
   for (int i = 0; i < W * PAGES; ++i) model[i] = 0;
   {
     TinyGFXBusSoftI2C bus(PIN_SDA, PIN_SCL, ADDR);
-    TinyGFXPanelSSD1306 panel(bus, fbSoft, W, H);
+    TinyGFXDriverSSD1306 panel(bus, fbSoft, W, H);
     TinyGFX lcd(panel);
     HostArduino::setPinReadHook(onRead, nullptr);
     HostArduino::setPinWriteHook(onWrite, nullptr);
@@ -145,7 +145,7 @@ void setup() {
   colStart = 0; colEnd = W - 1; curCol = 0; curPage = 0; pendingCmd = 0; argIndex = 0;
   {
     TinyGFXBusI2C bus(Wire, ADDR);
-    TinyGFXPanelSSD1306 panel(bus, fbWire, W, H);
+    TinyGFXDriverSSD1306 panel(bus, fbWire, W, H);
     TinyGFX lcd(panel);
     Wire.setWriteHook(onWire, nullptr);
     Wire.begin();

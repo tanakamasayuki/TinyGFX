@@ -125,8 +125,8 @@ lcd.begin();
 自分で確保しない。**
 
 ```cpp
-static uint8_t fb[128 * 64 / 8];              // 1,024 B
-TinyGFXPanelSSD1306 panel(bus, fb, 128, 64);
+static uint8_t fb[TinyGFXPanelSSD1306_128x64::kBufferBytes];              // 1,024 B
+TinyGFXPanelSSD1306_128x64 panel(bus, fb);
 ```
 
 RAM が足りなければ**帯**で描ける（1 ページ 128 B）。
@@ -138,7 +138,7 @@ RAM が足りなければ**帯**で描ける（1 ページ 128 B）。
 
 | | |
 | --- | --- |
-| `TinyGFX(TinyGFXPanel& panel)` | |
+| `TinyGFX(TinyGFXTarget& panel)` | |
 | `bool begin()` | 上記の契約 |
 | `int16_t width()` / `height()` | **回転を反映した**大きさ |
 | `void setRotation(uint8_t r)` / `uint8_t getRotation()` | 0..3。1 と 3 で幅高さが入れ替わる |
@@ -239,7 +239,7 @@ lcd.drawImage(&my_iconRef, 10, 10);
 343〜597 B）。詳細は [IMAGE_FORMAT.ja.md](IMAGE_FORMAT.ja.md)。
 
 ページ方式のモノクロパネルには、ページ境界に揃った縦詰めを直接貼る
-`TinyGFXPanelPaged::pushVBitmap()` もある。揃っていなければ `false` を
+`TinyGFXDriverPaged::pushVBitmap()` もある。揃っていなければ `false` を
 返すので、`drawImage()` に落とせばいい。
 
 ### 生データと生成物 —— 2 つの入口
@@ -266,12 +266,12 @@ lcd.drawImage(&my_iconRef, 10, 10);
 
 ### オフスクリーンに描く（スプライト相当）
 
-**専用の API は無い。** `TinyGFXPanelMemory` が RAM バッファをパネルとして
+**専用の API は無い。** `TinyGFXMemoryTarget` が RAM バッファをパネルとして
 見せるので、そこに `TinyGFX` を建てて描き、`pushImage()` で画面に戻す。
 
 ```cpp
 static uint16_t sprBuf[16 * 16];              // 512 B
-TinyGFXPanelMemory sprPanel(sprBuf, 16, 16);
+TinyGFXMemoryTarget sprPanel(sprBuf, 16, 16);
 TinyGFX spr(sprPanel);
 
 spr.begin();
@@ -282,7 +282,7 @@ lcd.pushImage(10, 10, 16, 16, sprBuf);                  // そのまま貼る
 lcd.pushImage(10, 50, 16, 16, sprBuf, TFT_BLACK);       // 黒を透過して貼る
 ```
 
-`TinyGFXPanelMemory` には `readPixel(x, y)` と `fillBuffer(color)` もある。
+`TinyGFXMemoryTarget` には `readPixel(x, y)` と `fillBuffer(color)` もある。
 
 **1 画素 2 バイトなので大きさに注意。** 基準機 CH32V003（RAM 2KB）では
 16x16 が 512 B で、**32x32 は 2,048 B になって載らない**（実測）。
@@ -295,7 +295,7 @@ lcd.pushImage(10, 50, 16, 16, sprBuf, TFT_BLACK);       // 黒を透過して貼
 
 | | |
 | --- | --- |
-| `TinyGFXTileCanvas(TinyGFXPanel& target, uint16_t* buffer, uint32_t bufferPixels)` | バッファは呼び出し側のもの |
+| `TinyGFXTileCanvas(TinyGFXTarget& target, uint16_t* buffer, uint32_t bufferPixels)` | バッファは呼び出し側のもの |
 | `bool begin()` / `setRotation(r)` | |
 | `TinyGFX& gfx()` | フォントや色をここで設定する。`render()` をまたいで残る |
 | `render(callable)` | **任意の callable**（ラムダなど）。引数は `TinyGFX&` 1 つ |
@@ -430,7 +430,7 @@ LovyanGFX 系（[LGFXVirtualCanvas](https://github.com/tanakamasayuki/LGFXVirtua
 | `setSwapBytes` | **入れない。** 実行時のモードは「使わないスケッチにも +44 B / RAM +4 B」（画素ごとの分岐）。代わりに `tinygfx_swapBytes565(data, count)` を呼ぶ。**呼ばなければ 0 B、呼べば +32 B**（D29） |
 | `drawNumber` | **+168 B で足せる**（実測）。整数から文字列への変換 |
 | パレット・色深度の切り替え | コアに色深度の抽象を持たない（D4） |
-| `readPixel` | パネル側にある。`TinyGFXPanelDcs::readPixels()`。**1 画素 150us** のデバッグ用 |
+| `readPixel` | パネル側にある。`TinyGFXDriverDcs::readPixels()`。**1 画素 150us** のデバッグ用 |
 
 下 2 つは**測ってあるので、要ると分かったら足せる。** 測る前に足さない。
 

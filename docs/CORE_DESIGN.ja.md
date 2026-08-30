@@ -33,11 +33,11 @@ Bus              転送（SPI の叩き方・DC / CS）
 ```cpp
 #include <TinyGFX.h>
 #include <TinyGFX/BusSoftSPI.h>
-#include <TinyGFX/PanelST7789.h>
+#include <TinyGFX/DriverST7789.h>
 #include "myfont.h"                    // フォントはスケッチ側に置く（D17）
 
 TinyGFXBusSoftSPI  bus(/*sck*/5, /*mosi*/6, /*dc*/3, /*cs*/4);
-TinyGFXPanelST7789 panel(bus, 240, 240, /*rst*/2);
+TinyGFXDriverST7789 panel(bus, 240, 240, /*rst*/2);
 TinyGFX            lcd(panel);
 
 void setup() {
@@ -202,7 +202,7 @@ int16_t fontHeight() const;
 ## 5. Panel インターフェース
 
 ```cpp
-class TinyGFXPanel {
+class TinyGFXTarget {
 public:
   virtual bool init() = 0;
   virtual void setRotation(uint8_t r) = 0;
@@ -234,9 +234,9 @@ Panel が持つ状態:
 
 **回転はコントローラの MADCTL でやる。** ソフトで座標変換しない（フラッシュも時間も食うため）。
 
-実装は `TinyGFXPanelST7789` / `TinyGFXPanelILI9342`（カラー・実機）、
-`TinyGFXPanelSSD1306`（モノクロ・実機。D21）、
-`TinyGFXPanelMemory`（RAM バッファ。テストと帯レンダリング）。
+実装は `TinyGFXDriverST7789` / `TinyGFXDriverILI9342`（カラー・実機）、
+`TinyGFXDriverSSD1306`（モノクロ・実機。D21）、
+`TinyGFXMemoryTarget`（RAM バッファ。テストと帯レンダリング）。
 
 ## 6. Bus インターフェース
 
@@ -278,7 +278,7 @@ public:
 
 ### 7.2 なぜテンプレートにしないか
 
-`TinyGFX<PanelST7789<BusSPI>>` の形なら間接呼び出しが消えて最速・最小になる可能性はある。採らない理由:
+`TinyGFX<DriverST7789<BusSPI>>` の形なら間接呼び出しが消えて最速・最小になる可能性はある。採らない理由:
 
 - **サイズが読めなくなる。** inline 展開が効きすぎると、呼び出し箇所ごとに転送ループが複製されてかえって増える。構成 A〜E の積み上げ管理がやりにくい。
 - ユーザーが書く型名とコンパイルエラーが重くなる。
@@ -290,7 +290,7 @@ public:
 
 ```cpp
 #define TINYGFX_STATIC_BUS   TinyGFXBusSPI
-#define TINYGFX_STATIC_PANEL TinyGFXPanelST7789
+#define TINYGFX_STATIC_PANEL TinyGFXDriverST7789
 ```
 
 定義されると `TinyGFXBus*` の代わりに具象型の参照を持ち、間接呼び出しが直接呼び出しになる。**1 スケッチ 1 パネルの制約と引き換え**。API は変わらない。
@@ -342,7 +342,7 @@ void TinyGFXBusSPI::writeColor(uint16_t color, uint32_t count) {
 | オブジェクト | 想定サイズ |
 | --- | --- |
 | `TinyGFX` | カーソル・色・テキスト設定・クリップ矩形・Panel ポインタ = **約 24 B** |
-| `TinyGFXPanel*` 具象 | 解像度・オフセット・回転・RST ピン・Bus ポインタ・vptr = **約 16 B** |
+| `TinyGFXTarget*` 具象 | 解像度・オフセット・回転・RST ピン・Bus ポインタ・vptr = **約 16 B** |
 | `TinyGFXBusSPI` | ピン 4 本・vptr = **約 12 B** |
 
 合計 **50 B 前後**。目標は [REQUIREMENTS.ja.md](REQUIREMENTS.ja.md) §8 の 40 B なので、**現状の見積もりでは超えている。** クリップ矩形やテキスト設定を削るか、目標を直すかは Phase 1 で決める。
@@ -524,7 +524,7 @@ lcd.println(3.14f);           // ここまで来ると浮動小数点書式化�
 
 ```text
 TinyGFXTileCanvas
-  ├── TinyGFXPanelMemory   ← TinyGFXPanel の実装。RAM バッファへ書く
+  ├── TinyGFXMemoryTarget   ← TinyGFXTarget の実装。RAM バッファへ書く
   │     └── TinyGFX        ← 描画コアはこれに向かって描く（コアは何も知らない）
   └── 実パネル（ST7789 など）← 帯ができたらここへ転送する
 ```
@@ -556,7 +556,7 @@ canvas.render(scene, &state);                        // scene が帯の数だけ
 
 ### 12.4 テストにも効く
 
-`TinyGFXPanelMemory` を**全画面サイズ**で使えば、ホスト上でそのままフレームバッファ検証になる。
+`TinyGFXMemoryTarget` を**全画面サイズ**で使えば、ホスト上でそのままフレームバッファ検証になる。
 描画コードを関数にする形が強制されるので、同じ関数を実機とテストの両方から呼べる
 （[TEST_PLAN.ja.md](TEST_PLAN.ja.md) §2）。
 
@@ -581,7 +581,7 @@ SSD1306 系の I2C は「制御バイト + ペイロード」なので、既存�
 
 ### 13.2 モノクロは Panel が引き受ける
 
-**描画 API は RGB565 のまま。** `TinyGFXPanelSSD1306` が「0 でなければ点灯」で 1bpp に落とす。
+**描画 API は RGB565 のまま。** `TinyGFXDriverSSD1306` が「0 でなければ点灯」で 1bpp に落とす。
 色深度の抽象化はコアに入れない（[DECISIONS.ja.md](DECISIONS.ja.md) D4 / D21）。
 
 SPI のカラーパネルとの違いは 2 つある。
@@ -594,7 +594,7 @@ SPI のカラーパネルとの違いは 2 つある。
 ```cpp
 static uint8_t fb[128 * 64 / 8];        // 1,024 バイト。利用者が用意する
 TinyGFXBusI2C bus(0x3C);
-TinyGFXPanelSSD1306 panel(bus, fb, 128, 64);
+TinyGFXDriverSSD1306 panel(bus, fb, 128, 64);
 TinyGFX lcd(panel);
 
 lcd.fillRect(8, 8, 32, 8, TFT_WHITE);

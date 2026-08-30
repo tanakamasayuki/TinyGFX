@@ -1,6 +1,6 @@
 """ILI9341 - **the one panel that had no test** (added 2026-08-29).
 
-The ILI9341 is 21 lines, almost all of it inherited from `PanelDcs`. Only three
+The ILI9341 is 21 lines, almost all of it inherited from `DriverDcs`. Only three
 things separate it from an ILI9342C:
 
 1. a portrait GRAM (240x320)

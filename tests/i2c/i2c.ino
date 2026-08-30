@@ -1,6 +1,6 @@
 // A monochrome OLED on I2C (SSD1306), end to end.
 //
-//   TinyGFX -> PanelSSD1306 -> the real TinyGFXBusI2C -> Wire
+//   TinyGFX -> DriverSSD1306 -> the real TinyGFXBusI2C -> Wire
 //           -> the host's Wire probe -> a model of an SSD1306 -> bitmap -> PPM
 //
 // The point is what differs from a colour panel on SPI:
@@ -9,7 +9,7 @@
 //   - only the pages that changed go out
 #include <TinyGFX.h>
 #include <TinyGFX/BusI2C.h>
-#include <TinyGFX/PanelSSD1306.h>
+#include <TinyGFX/DriverSSD1306.h>
 #include <tgfx_test.h>
 #include <TinyGFX/FontCell.h>
 #include <tgfx_digits.h>
@@ -25,12 +25,12 @@ static uint8_t fast[W * H / 8];
 static uint8_t whole[W * H / 8];
 static uint8_t bandBuf[W];  // one page
 TinyGFXBusI2C bus(Wire, ADDR);
-TinyGFXPanelSSD1306 panel(bus, fb, W, H);
+TinyGFXDriverSSD1306 panel(bus, fb, W, H);
 TinyGFX lcd(panel);
 
 // The same panel again, but told its buffer is a single page. Same bus, so the
 // model on the other end sees both.
-TinyGFXPanelSSD1306 bandPanel(bus, bandBuf, W, H, 1);
+TinyGFXDriverSSD1306 bandPanel(bus, bandBuf, W, H, 1);
 TinyGFX bandLcd(bandPanel);
 
 // ---- a model of the receiver, kept on this side. The core knows no SSD1306 -
@@ -231,14 +231,19 @@ void setup() {
     tgfxReport("banded_diff", diff);
   }
 
-  // --- the init sequence must follow the panel height -----------------------
+  // --- the multiplex ratio must follow the height ---------------------------
   //
   // **P1 of the 2026-08-29 design review.** The init sequence was hard-coded
   // for 128x64 while the constructor took any w / h. Sending a 64-row multiplex
   // ratio to a 128x32 squashes the picture into half the glass.
+  //
+  // The multiplex ratio is **derived** - height minus one on every module ever
+  // measured - so a bare driver gets it right at any size. The COM pin layout
+  // is not derivable and belongs to the panel, so it is checked in
+  // tests/panels/ where a panel header can set it.
   {
     static uint8_t fb32[128 * 32 / 8];
-    TinyGFXPanelSSD1306 p32(bus, fb32, 128, 32);
+    TinyGFXDriverSSD1306 p32(bus, fb32, 128, 32);
     TinyGFX g32(p32);
     muxArg = comArg = 0xFF;
     g32.begin();
@@ -246,7 +251,7 @@ void setup() {
     tgfxReport("com32", (long)comArg);
 
     muxArg = comArg = 0xFF;
-    TinyGFXPanelSSD1306 p64(bus, fb, 128, 64);
+    TinyGFXDriverSSD1306 p64(bus, fb, 128, 64);
     TinyGFX g64(p64);
     g64.begin();
     tgfxReport("mux64", (long)muxArg);
@@ -259,19 +264,19 @@ void setup() {
   // owns, and the dimensions are constructor arguments. **Better to fail than
   // to quietly draw a broken picture.**
   {
-    TinyGFXPanelSSD1306 pnull(bus, nullptr, 128, 64);
+    TinyGFXDriverSSD1306 pnull(bus, nullptr, 128, 64);
     TinyGFX g(pnull);
     tgfxReport("begin_null_buffer", g.begin() ? 1 : 0);
   }
   {
     static uint8_t fb60[128 * 8];
-    TinyGFXPanelSSD1306 podd(bus, fb60, 128, 60);  // not a multiple of 8
+    TinyGFXDriverSSD1306 podd(bus, fb60, 128, 60);  // not a multiple of 8
     TinyGFX g(podd);
     tgfxReport("begin_odd_height", g.begin() ? 1 : 0);
   }
   {
     static uint8_t fbz[128];
-    TinyGFXPanelSSD1306 pzero(bus, fbz, 0, 64);
+    TinyGFXDriverSSD1306 pzero(bus, fbz, 0, 64);
     TinyGFX g(pzero);
     tgfxReport("begin_zero_width", g.begin() ? 1 : 0);
   }
@@ -279,7 +284,7 @@ void setup() {
     // A sound configuration must pass (so the three above cannot be passing
     // by always returning false)
     static uint8_t fbok[128 * 64 / 8];
-    TinyGFXPanelSSD1306 pok(bus, fbok, 128, 64);
+    TinyGFXDriverSSD1306 pok(bus, fbok, 128, 64);
     TinyGFX g(pok);
     tgfxReport("begin_ok", g.begin() ? 1 : 0);
   }

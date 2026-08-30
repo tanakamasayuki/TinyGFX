@@ -27,7 +27,7 @@
 
 class TinyGFXPrint : public TinyGFX, public Print {
  public:
-  explicit TinyGFXPrint(TinyGFXPanel& panel) : TinyGFX(panel) {}
+  explicit TinyGFXPrint(TinyGFXTarget& panel) : TinyGFX(panel) {}
 
   using TinyGFX::setTextSize;
   /// Fractional text size. Kept out of the core because it drags in float.

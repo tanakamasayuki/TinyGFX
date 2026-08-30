@@ -7,10 +7,10 @@
 // a CH32V003 (construct C in docs/FOOTPRINT.ja.md).
 #include <TinyGFX.h>
 #include <TinyGFX/BusSoftSPI.h>
-#include <TinyGFX/PanelST7789.h>
+#include <TinyGFX/panels/ST7789_240x240.h>
 
 TinyGFXBusSoftSPI bus(/*sck*/5, /*mosi*/6, /*dc*/3, /*cs*/4);
-TinyGFXPanelST7789 panel(bus, 240, 240, /*rst*/2);
+TinyGFXPanelST7789_240x240 panel(bus, /*rst*/2);
 TinyGFX lcd(panel);
 
 void setup() {

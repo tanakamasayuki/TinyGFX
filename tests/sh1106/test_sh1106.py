@@ -8,7 +8,7 @@ probe can see both.
 - **no column/page range commands (0x21 / 0x22).** The cursor is placed per
   page and one page is streamed at a time
 
-Everything shared (`PanelPaged`) is the same code the SSD1306 uses, so drawing
+Everything shared (`DriverPaged`) is the same code the SSD1306 uses, so drawing
 **the same picture on both, decoding it, and requiring not one bit of
 difference** isolates the transfer layer on its own.
 

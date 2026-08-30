@@ -25,7 +25,7 @@ HEAD = '''// **Does a generated image header draw exactly the converter's expect
 // Drop <name>.h and <name>.ppm into pairs/ and the next run picks them up.
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
-#include <TinyGFX/PanelMemory.h>
+#include <TinyGFX/MemoryTarget.h>
 #include <TinyGFX/Image.h>
 #include <tgfx_test.h>
 '''
@@ -33,7 +33,7 @@ HEAD = '''// **Does a generated image header draw exactly the converter's expect
 BODY = '''
 static const int W = %(w)d, H = %(h)d;
 static uint16_t gram[W * H];
-TinyGFXPanelMemory panel(gram, W, H);
+TinyGFXMemoryTarget panel(gram, W, H);
 TinyGFX lcd(panel);
 
 void setup() {

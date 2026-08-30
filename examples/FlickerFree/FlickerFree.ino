@@ -8,15 +8,15 @@
 // whole-screen.
 #include <TinyGFX.h>
 #include <TinyGFX/BusSoftSPI.h>
-#include <TinyGFX/PanelST7789.h>
-#include <TinyGFX/PanelMemory.h>
+#include <TinyGFX/panels/ST7789_240x240.h>
+#include <TinyGFX/MemoryTarget.h>
 #include <TinyGFX/TileCanvas.h>
 
 static const int16_t WIDTH = 240;
 static const int16_t HEIGHT = 240;
 
 TinyGFXBusSoftSPI bus(/*sck*/5, /*mosi*/6, /*dc*/3, /*cs*/4);
-TinyGFXPanelST7789 panel(bus, WIDTH, HEIGHT, /*rst*/2);
+TinyGFXPanelST7789_240x240 panel(bus, /*rst*/2);
 
 // The band buffer. All it costs is width * rows * 2 bytes.
 //

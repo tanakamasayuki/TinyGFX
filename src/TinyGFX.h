@@ -5,7 +5,7 @@
 //
 //   #include <TinyGFX.h>
 //   #include <TinyGFX/BusSPI.h>
-//   #include <TinyGFX/PanelST7789.h>
+//   #include <TinyGFX/DriverST7789.h>
 //
 // Whatever you do not include is not linked in either (docs/CORE_DESIGN.ja.md 7.4).
 //

@@ -29,14 +29,14 @@
 #include <TinyGFX/BusCapture.h>
 #include <TinyGFX/BusSPI.h>
 #include <TinyGFX/FontCell.h>
-#include <TinyGFX/PanelILI9342.h>
+#include <TinyGFX/DriverILI9342.h>
 #include <tgfx_scene.h>
 #include <tgfx_digits.h>
 
 static const int8_t PIN_DC = 27, PIN_CS = 14, PIN_RST = 33, PIN_BL = 32, PIN_SD_CS = 4;
 
 TinyGFXBusSPI bus(SPI, PIN_DC, PIN_CS, /*freq*/ 24000000UL);
-TinyGFXPanelILI9342 panel(bus, 320, 240, PIN_RST);
+TinyGFXDriverILI9342 panel(bus, 320, 240, PIN_RST);
 TinyGFX lcd(panel);
 
 static const TinyGFXFontRef digitsFont = {&tgfxDigits, &tinygfxFontCellOps};
@@ -114,7 +114,7 @@ TEST_CASE(test_readback_solid) {
 /// MADCTL remaps the access order, it does not move what is already in GRAM,
 /// so rotation 0 gives a fixed frame to look at what physically landed where.
 ///
-/// Derived from the MADCTL table in PanelILI9342.h (MV transposes, MX flips
+/// Derived from the MADCTL table in DriverILI9342.h (MV transposes, MX flips
 /// the column, MY flips the row), for a 320x240 landscape GRAM:
 ///
 ///   rotation 0  MADCTL 0        (lx, ly)
@@ -169,7 +169,7 @@ TEST_CASE(test_rotation_maps) {
 /// wire is out of scope.**
 TEST_CASE(test_capture_scene) {
   TinyGFXBusCapture cap(capBuf, TGFX_SCENE_W, TGFX_SCENE_H);
-  TinyGFXPanelILI9342 capPanel(cap, TGFX_SCENE_W, TGFX_SCENE_H);
+  TinyGFXDriverILI9342 capPanel(cap, TGFX_SCENE_W, TGFX_SCENE_H);
   TinyGFX g(capPanel);
   g.begin();
   cap.fill(0);

@@ -32,19 +32,19 @@
 
 ## A / I. パネルが `fillRect` を奪える形にする → **済（2026-08-28）**
 
-`TinyGFXPanel` に `fillRect` を 8 個目の仮想関数として追加し、`TinyGFX::fillRect`
+`TinyGFXTarget` に `fillRect` を 8 個目の仮想関数として追加し、`TinyGFX::fillRect`
 はクリップ後にそこへ投げるだけにした。既定は従来どおり窓 + `writeColor` なので、
 **何もしないパネルは何も書かなくていい。**
 
-`TinyGFXPanelSSD1306` がそれを奪う。以前は `writeColor` の中で
+`TinyGFXDriverSSD1306` がそれを奪う。以前は `writeColor` の中で
 「窓ぜんぶを 1 色で塗る呼び出しか？」を判定して `fillWindow` に分岐していたが、
 その判定と窓の保存（`_xs/_ys/_xe/_ye`、カーソル、`windowPixels()`）が丸ごと
 不要になった。
 
 | | 変更前 | 変更後 |
 | --- | --- | --- |
-| `PanelSSD1306::writeColor` | 736 | **76** |
-| `PanelSSD1306::fillRect` | — | 580 |
+| `DriverSSD1306::writeColor` | 736 | **76** |
+| `DriverSSD1306::fillRect` | — | 580 |
 | `TinyGFX::fillRect` | 280 | 220 |
 
 ### 結果は**モノクロが得をしてカラーが損をする**
@@ -275,7 +275,7 @@ vtable スロットを払うだけで `drawPixel` の恩恵を受けない。予
 ### 実装は仮想関数 3 つ
 
 ```cpp
-class TinyGFXPanel {
+class TinyGFXTarget {
   // 既定は今と同じ。パネルが override して奪う
   virtual void fillRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t c) {
     setWindow(x, y, x + w - 1, y + h - 1);

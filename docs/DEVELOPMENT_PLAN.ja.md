@@ -14,7 +14,8 @@
 | リポジトリ整備 | **完了**（§4） |
 | 描画コア `src/TinyGFX/Gfx.h` | **実装済み。** 全プリミティブ + クリップ + 回転 + 画像 + 文字 |
 | Bus | `BusSoftSPI`（既定）/ `BusSPI` / `BusI2C` / `BusCapture` **実装済み** |
-| Panel | `PanelST7789` / `PanelILI9341` / `PanelILI9342` / `PanelSSD1306` / `PanelSH1106` / `PanelMemory` **実装済み** |
+| ドライバ | `DriverST7789` / `DriverILI9341` / `DriverILI9342` / `DriverSSD1306` / `DriverSH1106` / `MemoryTarget` **実装済み** |
+| パネル（プリセット） | `panels/` に 7 枚 **実装済み**（D34）。ST7789 240x240・135x240 / ILI9342 320x240 / ILI9341 240x320 / SSD1306 128x64・128x32 / SH1106 128x64。**実機確認済みは ILI9342 の 1 枚だけ** |
 | 帯レンダリング `TileCanvas.h` | **実装済み**（D16） |
 | `Print.h`（拡張） | **実装済み** |
 | フォント | **CellFont v1 へ移行（2026-08-28、D17 再改訂）。** 形式の仕様は LGFXFontToolJs 側に切り出し、TinyGFX はその描画器の 1 実装になった。頭ブロック・形式内連鎖・U+FFFD 退避・ベースライン基準を取り込んで **+248 B**（[FONT_FORMAT.ja.md](FONT_FORMAT.ja.md)） |
@@ -47,7 +48,7 @@
 
 ### P0-1 は指摘の見立てとは違った
 
-`TinyGFXPanelPaged::beginTransaction()` を `_bus` に転送するのが直しに見えるが、
+`TinyGFXDriverPaged::beginTransaction()` を `_bus` に転送するのが直しに見えるが、
 **それは誤り。** ページ方式パネルは `startWrite()` 〜 `endWrite()` の間に
 バスへ 1 バイトも出さない（ローカルのフレームバッファを触るだけ）。そこで
 SPI トランザクションを開くと、描画の計算のあいだ中 CS を握ることになり、
@@ -107,7 +108,7 @@ I2C は転送ごとに開始と停止をするので露見せず、**SPI のテ�
 
 ### フェーズ 1 — 出力の芯
 
-`TinyGFXBus` / `TinyGFXBusSPI` / `TinyGFXPanel` / `TinyGFXPanelST7789` / `setAddrWindow` / `writeColor` / `fillScreen` / `fillRect` / `drawPixel` / `drawFastHLine` / `drawFastVLine`。
+`TinyGFXBus` / `TinyGFXBusSPI` / `TinyGFXTarget` / `TinyGFXDriverST7789` / `setAddrWindow` / `writeColor` / `fillScreen` / `fillRect` / `drawPixel` / `drawFastHLine` / `drawFastVLine`。
 
 **実装済み。`capture/` `window/` `fill/` が通っている。**
 **残るのは実機 M1。** 初期化列と SPI モードは実機でしか確かめられない。

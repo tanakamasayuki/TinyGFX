@@ -15,14 +15,14 @@
 #include <SPI.h>
 #include <TinyGFX.h>
 #include <TinyGFX/BusSPI.h>
-#include <TinyGFX/PanelILI9342.h>
+#include <TinyGFX/DriverILI9342.h>
 
 static const int8_t PIN_DC = 27, PIN_CS = 14, PIN_RST = 33, PIN_BL = 32, PIN_SD_CS = 4;
 static const uint8_t PIN_SCK = 18, PIN_SDA = 23;
 static const uint32_t WRITE_HZ = 24000000UL;
 
 TinyGFXBusSPI bus(SPI, PIN_DC, PIN_CS, WRITE_HZ);
-TinyGFXPanelILI9342 panel(bus, 320, 240, PIN_RST);
+TinyGFXDriverILI9342 panel(bus, 320, 240, PIN_RST);
 TinyGFX lcd(panel);
 
 static const uint16_t WANT[4] = {TFT_RED, TFT_GREEN, TFT_BLUE, TFT_WHITE};

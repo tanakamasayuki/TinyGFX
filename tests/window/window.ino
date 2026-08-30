@@ -6,13 +6,13 @@
 // Whether that value is right can only be found out on hardware (MANUAL_TEST M2).
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
-#include <TinyGFX/PanelST7789.h>
+#include <TinyGFX/DriverST7789.h>
 #include <tgfx_test.h>
 
 static uint16_t gram[8 * 8];
 // Models a 135x240 ST7789 module: a 240x320 GRAM, visible from (52, 40)
 TinyGFXBusCapture bus(gram, 8, 8);
-TinyGFXPanelST7789 panel(bus, 135, 240);
+TinyGFXDriverST7789 panel(bus, 135, 240);
 TinyGFX lcd(panel);
 
 static void probe(const char* prefix, uint8_t r) {
@@ -56,7 +56,7 @@ void setup() {
   // rotates would never get one. The probe() above goes through setRotation()
   // every time, which is how this path stayed unexamined.
   {
-    TinyGFXPanelST7789 late(bus, 135, 240);
+    TinyGFXDriverST7789 late(bus, 135, 240);
     TinyGFX g(late);
     g.begin();                     // this gets as far as setRotation(0)
     late.setGramSize(240, 320);
@@ -68,7 +68,7 @@ void setup() {
   {
     // The same in the other order (whichever comes second must not derive
     // from the older pair)
-    TinyGFXPanelST7789 swap(bus, 135, 240);
+    TinyGFXDriverST7789 swap(bus, 135, 240);
     TinyGFX g(swap);
     g.begin();
     swap.setOffset(52, 40);
@@ -80,7 +80,7 @@ void setup() {
   {
     // Calling them before begin() must work too (they touch no bus, so the
     // order is free)
-    TinyGFXPanelST7789 early(bus, 135, 240);
+    TinyGFXDriverST7789 early(bus, 135, 240);
     TinyGFX g(early);
     early.setGramSize(240, 320);
     early.setOffset(52, 40);

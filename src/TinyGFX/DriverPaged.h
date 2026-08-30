@@ -28,7 +28,7 @@
 //
 // **What a controller has to supply for itself is init() and display().** They
 // are not virtual: a sketch calls display() on the concrete panel it declared,
-// never through a TinyGFXPanel*, so each panel simply has its own and nobody
+// never through a TinyGFXTarget*, so each panel simply has its own and nobody
 // pays for a vtable slot. The page-addressing commands genuinely differ - an
 // SSD1306 can be handed a column and page *range* (0x21 / 0x22) and then
 // streamed, while an SH1106 has no such command and needs its cursor set per
@@ -51,11 +51,20 @@
 #define TINYGFX_MONO_FAST_FILL 1
 #endif
 
-#include "Panel.h"
+#include "Target.h"
 #include "Progmem.h"
 
-class TinyGFXPanelPaged : public TinyGFXPanel {
+class TinyGFXDriverPaged : public TinyGFXTarget {
  public:
+  /// Where column 0 of the picture sits in the controller's memory.
+  ///
+  /// Derived by the driver as "the glass sits centred in RAM", which is right
+  /// for every module measured but one. **Set it when the picture comes out
+  /// shifted sideways with a stripe of rubbish down an edge** - that is what
+  /// this looks like when it is wrong (docs/GLOSSARY.md 4).
+  void setColumnOffset(uint8_t columns) { _col0 = columns; }
+  uint8_t columnOffset() const { return _col0; }
+
   void setRotation(uint8_t r) override {
     _rotation = (uint8_t)(r & 3);
     if (_rotation & 1) { _width = _natH; _height = _natW; }
@@ -162,7 +171,7 @@ class TinyGFXPanelPaged : public TinyGFXPanel {
   /// panel.display();
   /// ```
   ///
-  /// Deliberately **not** virtual and not part of TinyGFXPanel: a colour panel
+  /// Deliberately **not** virtual and not part of TinyGFXTarget: a colour panel
   /// has no such layout, and making it virtual would charge every panel for a
   /// vtable slot it can never use (the fillRect seam cost +40 B that way).
   ///
@@ -236,14 +245,19 @@ class TinyGFXPanelPaged : public TinyGFXPanel {
   /// Pass `bufferPages` to hand over less than that - `w * bufferPages` bytes -
   /// and drive the panel a band at a time with setBandPage(). One page is 8
   /// rows, so a 128x64 needs 128 bytes per page instead of 1,024 for the lot.
-  TinyGFXPanelPaged(TinyGFXBus& bus, uint8_t* buffer, int16_t w, int16_t h, int16_t bufferPages)
+  /// `ramWidth` is how wide the controller's memory is, which is not always how
+  /// wide the glass is: an SSD1306 has 128 columns and an SH1106 has 132. The
+  /// column offset follows from the difference.
+  TinyGFXDriverPaged(TinyGFXBus& bus, uint8_t* buffer, int16_t w, int16_t h, int16_t bufferPages,
+                     int16_t ramWidth)
       : _bus(&bus), _buf(buffer), _natW(w), _natH(h) {
+    _col0 = (ramWidth > w) ? (uint8_t)((ramWidth - w) / 2) : (uint8_t)0;
     _width = w;
     _height = h;
     _pages = (int16_t)(h >> 3);
     _bandPages = (bufferPages > 0 && bufferPages < _pages) ? bufferPages : 0;
   }
-  ~TinyGFXPanelPaged() = default;
+  ~TinyGFXDriverPaged() = default;
 
   /// One command, in a transaction of its own. For a sketch calling
   /// invertDisplay() and friends outside any drawing burst.
@@ -270,15 +284,10 @@ class TinyGFXPanelPaged : public TinyGFXPanel {
     return true;
   }
 
-  /// The multiplex ratio and COM pin layout for this height.
-  ///
-  /// The rest of the init sequence is the same for every size, but these two
-  /// are not: a 128x32 wants 0x1F / 0x02 where a 128x64 wants 0x3F / 0x12.
-  /// Sending the 64-row values to a 32-row panel gives a picture squeezed into
-  /// half the glass, which is the usual symptom of a library that hardcodes
-  /// them.
+  /// The multiplex ratio. **Derived, never configured**: it is the height minus
+  /// one on every module measured (docs/GLOSSARY.md 4). Send a 64-row value to
+  /// a 32-row panel and the picture is squeezed into half the glass.
   uint8_t multiplexRatio() const { return (uint8_t)(_natH - 1); }
-  uint8_t comPinsConfig() const { return (_natH == 32) ? (uint8_t)0x02 : (uint8_t)0x12; }
 
   /// Logical coordinates to buffer coordinates. Rotation lives here.
   void toBuffer(int16_t x, int16_t y, int16_t* fx, int16_t* fy) const {
@@ -316,6 +325,7 @@ class TinyGFXPanelPaged : public TinyGFXPanel {
   }
 
   TinyGFXBus* _bus;
+  uint8_t _col0 = 0;
   uint8_t* _buf;
   int16_t _natW, _natH, _pages;
   int16_t _pageFirst = 0;

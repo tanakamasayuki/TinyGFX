@@ -12,10 +12,10 @@
 // there instead, as in the HelloWorld example.
 #include <TinyGFX.h>
 #include <TinyGFX/BusSPI.h>
-#include <TinyGFX/PanelST7789.h>
+#include <TinyGFX/panels/ST7789_240x240.h>
 
 TinyGFXBusSPI bus(SPI, /*dc*/3, /*cs*/4, /*freq*/24000000UL);
-TinyGFXPanelST7789 panel(bus, 240, 240, /*rst*/2);
+TinyGFXPanelST7789_240x240 panel(bus, /*rst*/2);
 TinyGFX lcd(panel);
 
 void setup() {

@@ -1,6 +1,6 @@
 // The real bus implementations, end to end on the host.
 //
-//   TinyGFX -> PanelST7789 -> **TinyGFXBusSoftSPI / TinyGFXBusSPI** -> the wire
+//   TinyGFX -> DriverST7789 -> **TinyGFXBusSoftSPI / TinyGFXBusSPI** -> the wire
 //            -> a model of the panel -> a virtual GRAM -> PPM
 //
 // Only at this point can bit order, when DC drops, and CS during a transaction
@@ -10,7 +10,7 @@
 #include <TinyGFX/BusCapture.h>
 #include <TinyGFX/BusSoftSPI.h>
 #include <TinyGFX/BusSPI.h>
-#include <TinyGFX/PanelST7789.h>
+#include <TinyGFX/DriverST7789.h>
 #include <tgfx_test.h>
 #include <tgfx_host_probe.h>
 
@@ -33,7 +33,7 @@ void setup() {
   // ---- software SPI: the default bus on a CH32V003 -----------------------
   {
     TinyGFXBusSoftSPI bus(PIN_SCK, PIN_MOSI, PIN_DC, PIN_CS);
-    TinyGFXPanelST7789 panel(bus, W, H);
+    TinyGFXDriverST7789 panel(bus, W, H);
     TinyGFX lcd(panel);
     TgfxPinProbe probe(sink, PIN_SCK, PIN_MOSI, PIN_DC, PIN_CS);
     probe.attach();
@@ -53,7 +53,7 @@ void setup() {
   // ---- hardware SPI --------------------------------------------------------
   {
     TinyGFXBusSPI bus(SPI, PIN_DC, PIN_CS, 24000000UL);
-    TinyGFXPanelST7789 panel(bus, W, H);
+    TinyGFXDriverST7789 panel(bus, W, H);
     TinyGFX lcd(panel);
     TgfxSpiProbe probe(sink, PIN_DC);
     probe.attach();

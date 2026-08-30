@@ -4,7 +4,7 @@
 // Also shows that a different format goes through setFont just the same.
 #include <TinyGFX.h>
 #include <TinyGFX/BusCapture.h>
-#include <TinyGFX/PanelST7789.h>
+#include <TinyGFX/DriverST7789.h>
 #include <TinyGFX/FontU8g2.h>
 #include <tgfx_test.h>
 
@@ -17,7 +17,7 @@ static const TinyGFXFontRef u8g2CjkFont = {u8g2Cjk, &tinygfxFontU8g2Ops};
 static const int W = 80, H = 24;
 static uint16_t gram[W * H];
 TinyGFXBusCapture bus(gram, W, H);
-TinyGFXPanelST7789 panel(bus, W, H);
+TinyGFXDriverST7789 panel(bus, W, H);
 TinyGFX lcd(panel);
 
 void setup() {

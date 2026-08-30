@@ -60,6 +60,7 @@ tests/
   tile/               帯の行数を変えても直接描画と同じ（不変条件）
   text/               文字。戻り値・倍角・収録外・背景色つき・透過
   fontchain/          CellFont の連鎖・U+FFFD 退避・ベースライン揃え
+  panels/             パネルのカタログ。プリセットが実際に運んでいる値
   utf8/               UTF-8 の復号。列ごとにコードポイントと消費バイト数を直接見る
   textwrap/           右端での自動折り返し（`TINYGFX_TEXT_WRAP=1`。既定では入っていない）
   image/              pushImage の配置・切り取り・透過・バイト順の入れ替え

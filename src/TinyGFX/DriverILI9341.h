@@ -1,7 +1,7 @@
 // TinyGFX - ILI9341 panel (the 2.4"/2.8" SPI breakouts)
 //
 // The ILI9342C's sibling with a portrait GRAM: 240x320 instead of 320x240.
-// Everything it shares with the other DCS controllers is in PanelDcs.h.
+// Everything it shares with the other DCS controllers is in DriverDcs.h.
 //
 // Three things make it an ILI9341 rather than an ILI9342C:
 //   1. 240x320 GRAM
@@ -26,12 +26,16 @@
 #pragma once
 #include <stdint.h>
 
-#include "PanelDcs.h"
+#include "DriverDcs.h"
 
-class TinyGFXPanelILI9341 : public TinyGFXPanelDcs {
+// Marks that this driver is in the build. A panel header refuses to be the
+// second one for the same driver (docs/GLOSSARY.md 3).
+#define TINYGFX_DRIVER_ILI9341_INCLUDED 1
+
+class TinyGFXDriverILI9341 : public TinyGFXDriverDcs {
  public:
-  TinyGFXPanelILI9341(TinyGFXBus& bus, int16_t w = 240, int16_t h = 320, int8_t rst = -1)
-      : TinyGFXPanelDcs(bus, w, h, rst, /*bgr*/ true, /*invert*/ false) {
+  TinyGFXDriverILI9341(TinyGFXBus& bus, int16_t w = 240, int16_t h = 320, int8_t rst = -1)
+      : TinyGFXDriverDcs(bus, w, h, rst, /*bgr*/ true, /*invert*/ false) {
     setMirror(true, false);
   }
 };
