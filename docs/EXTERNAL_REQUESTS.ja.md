@@ -15,6 +15,8 @@
 | [E8](#e8) | LGFXFontToolJs | ~~`--format u8g2` の C 出力が LovyanGFX 依存~~ **解決（2.2.2 の `--no-wrapper`）** | — | しない |
 | [E5](#e5) | arduino-library-release-toolkit | リリース資産の同期（既に取り込み済み） | 低 | しない |
 | [E6](#e6) | 外部レジストリ | ライブラリ名 `TinyGFX` の重複確認 → **確認済み・問題なし** | 済 | 解消 |
+| [E9](#e9) | GfxImageToolJs | **一括モードで形式が総当たりされない。** 実測 2.08 倍 | 高 | **する** |
+| [E10](#e10) | GfxImageToolJs | 検証用に「変換後の画素」を出す口が無い（仕様書 §15.2 のオラクル） | 中 | **する** |
 
 ---
 
@@ -491,3 +493,86 @@ cellfont の出力は `LGFXFT_PROGMEM` を自前で定義して（`PROGMEM` か�
 仕様 §12.1 は **`CELLFONT_PROGMEM` を描画器が提供する**と決めていて、
 描画器がそこにセクション属性などを入れたときに効かなくなる。
 いまは AVR で `PROGMEM` に展開されるので動いている。**優先度は低い。**
+
+---
+
+## E9. GfxImageToolJs — 一括モードで形式が総当たりされない {#e9}
+
+**2026-08-30、リリース前の CLI（`bin/gfx-image-tool.js`）で確認。**
+
+### 症状
+
+**1 枚ずつビルドすると形式を総当たりして選ぶが、フォルダを渡すと全部 raw565 になる。**
+
+```sh
+# 1 枚ずつ
+gfx-image-tool build icon.png  --target tinygfx --json   # -> rlepal4, 158 B
+gfx-image-tool build alpha.png --target tinygfx --json   # -> rlepal4,  61 B
+gfx-image-tool build mono.png  --target tinygfx --json   # -> rlepal4,  93 B
+
+# フォルダごと
+gfx-image-tool inspect ./src --target tinygfx
+#   icon.png    raw565  2048 B
+#   alpha.png   raw565  1152 B
+#   mono.png    raw565  2048 B
+```
+
+| 画像 | 一括 | 個別 |
+| --- | ---: | ---: |
+| alpha 24x24 | raw565 1,152 | **rlepal4 61** |
+| icon 32x32 | raw565 2,048 | **rlepal4 158** |
+| mono 64x16 | raw565 2,048 | **rlepal4 93** |
+| photo 48x32 | raw565 3,072 | raw565 3,072 |
+| データ計 | **8,320** | **3,384** |
+| デコーダ | 400 | 800（2 形式） |
+| **総計** | **8,720** | **4,184** |
+
+**2.08 倍。** `--target tinygfx` を `.imagesconfig` に書いても、`[color] format` 行を
+コメントアウトしても変わらなかった。
+
+### さらに、報告そのものが食い違う
+
+一括モードは各行にこう出す:
+
+```
+optimize icon.png: raw565:2048 -> raw565 (+0 B vs individual)
+```
+
+**「個別なら raw565」と言っているが、個別ビルドは rlepal4 を選ぶ。**
+比較対象の「individual」も総当たりを通っていないように見える。
+
+### なぜ重要か
+
+**一括で選ぶことが、この形式群の設計の前提**である。デコーダ代は画像ごとではなく
+**形式ごとに 1 回**なので、1 枚ずつ最小化すると形式が散らばって総量で損をする ——
+それを避けるために一括最適化を依頼した（[IMAGE_FORMAT.ja.md](IMAGE_FORMAT.ja.md)）。
+いまはその逆で、**一括のほうが 2 倍大きい。**
+
+### 単体ビルドは正しく動いている
+
+`--decoder-cost` は効く（100 にすると total が 493 → 193）。`--json` は
+`format` / `bytes` / `decoderBytes` / `totalBytes` に加えて
+`vblit: {selected, alignedBytes, genericBytes}` まで返す。**必要な情報は揃っている。**
+
+## E10. GfxImageToolJs — 「変換後の画素」を出す口 {#e10}
+
+仕様書 §15.2 のオラクルは、**ツールが出した期待画像**と TinyGFX が描いた結果を
+突き合わせる形になっている。**自作の encode と decode の往復では、両者が同じ
+勘違いをしていたら一致してしまう**ため。
+
+いまの CLI に画像を書き出す口が無いので、`--emit-reference <path.ppm>` のような
+ものが要る。中身は**減色・2 値化・ディザのあとの画素**（元画像ではない）。
+
+### いま何ができていて、何ができていないか
+
+**代わりに「変換元から期待画像を作る」方法で 5 形式を検証し、すべて一致した**
+（`tests/image_oracle/`。raw565 / rlepal4 ×3 / bitmap1h / bitmap1v）。
+RGB888→RGB565 も 1bpp の閾値も決定的な変換なので、符号化器を再実装せずに
+期待画像を作れる。
+
+**この方法が使えないのは 2 つ。**
+
+- **ディザ**（`--dither floyd-steinberg` など）—— 誤差拡散の実装依存
+- **減色**（色数がパレットを超えるとき）—— どの色を残すかの選択
+
+**そこはツールの出力が無いと検証できない。**

@@ -15,13 +15,13 @@
 #include <TinyGFX/MemoryTarget.h>
 #include <TinyGFX/Image.h>
 #include <tgfx_test.h>
-#include "pairs/icon_raw565.h"
-#include "pairs/icon_rle565.h"
-#include "pairs/icon_rlepal4.h"
-#include "pairs/mono_h.h"
-#include "pairs/mono_v.h"
+#include "pairs/tool_alpha.h"
+#include "pairs/tool_bitmap_h.h"
+#include "pairs/tool_bitmap_v.h"
+#include "pairs/tool_icon.h"
+#include "pairs/tool_photo.h"
 
-static const int W = 32, H = 32;
+static const int W = 64, H = 32;
 static uint16_t gram[W * H];
 TinyGFXMemoryTarget panel(gram, W, H);
 TinyGFX lcd(panel);
@@ -31,30 +31,30 @@ void setup() {
   tgfxTestBegin("image_oracle");
   lcd.begin();
 
-  // ---- icon_raw565 ----
+  // ---- tool_alpha ----
   panel.fillBuffer(0x0000);
-  lcd.drawImage(&icon_raw565Ref, 0, 0);
-  tgfxShot("icon_raw565", gram, W, H);
+  lcd.drawImage(&tool_alphaRef, 0, 0);
+  tgfxShot("tool_alpha", gram, W, H);
 
-  // ---- icon_rle565 ----
+  // ---- tool_bitmap_h ----
   panel.fillBuffer(0x0000);
-  lcd.drawImage(&icon_rle565Ref, 0, 0);
-  tgfxShot("icon_rle565", gram, W, H);
+  lcd.drawImage(&tool_bitmap_hRef, 0, 0);
+  tgfxShot("tool_bitmap_h", gram, W, H);
 
-  // ---- icon_rlepal4 ----
+  // ---- tool_bitmap_v ----
   panel.fillBuffer(0x0000);
-  lcd.drawImage(&icon_rlepal4Ref, 0, 0);
-  tgfxShot("icon_rlepal4", gram, W, H);
+  lcd.drawImage(&tool_bitmap_vRef, 0, 0);
+  tgfxShot("tool_bitmap_v", gram, W, H);
 
-  // ---- mono_h ----
+  // ---- tool_icon ----
   panel.fillBuffer(0x0000);
-  lcd.drawImage(&mono_hRef, 0, 0);
-  tgfxShot("mono_h", gram, W, H);
+  lcd.drawImage(&tool_iconRef, 0, 0);
+  tgfxShot("tool_icon", gram, W, H);
 
-  // ---- mono_v ----
+  // ---- tool_photo ----
   panel.fillBuffer(0x0000);
-  lcd.drawImage(&mono_vRef, 0, 0);
-  tgfxShot("mono_v", gram, W, H);
+  lcd.drawImage(&tool_photoRef, 0, 0);
+  tgfxShot("tool_photo", gram, W, H);
 
   tgfxTestDone();
 }
