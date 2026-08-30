@@ -398,14 +398,14 @@ while (*p) {
 
 | マクロ | 既定 | 0 にすると | CH32V003 |
 | --- | --- | --- | ---: |
-| `TINYGFX_FONT_BG` | 1 | `setTextColor` の第 2 引数が効かなくなる | −108 |
-| `TINYGFX_FONT_SCALE` | 1 | `setTextSize(2)` 以上が効かなくなる | −116 |
-| `TINYGFX_FONT_CHAIN` | 1 | `CellFont::next` の連鎖を辿らない | −16 |
+| `TINYGFX_FONT_BG` | 1 | `setTextColor` の第 2 引数が効かなくなる | −104 |
+| `TINYGFX_FONT_SCALE` | 1 | `setTextSize(2)` 以上が効かなくなる | −100 |
+| `TINYGFX_FONT_CHAIN` | 1 | `CellFont::next` の連鎖を辿らない | −8 |
 | `TINYGFX_FONT_UTF8` | 1 | 文字列をバイト単位（Latin-1）で読む | **−148**（`TinyGFXPrint` も使っていれば −292） |
 | `TINYGFX_TEXT_WRAP` | **0** | （1 で `TinyGFXPrint::setTextWrap()` が現れる） | **+164** |
 | `TINYGFX_FONT_SPARSE` | 1 | 疎索引のフォントが**描けなくなる** | フォント次第 |
 | `TINYGFX_FONT_RECORDS` | 1 | 可変ピッチのフォントが**描けなくなる** | フォント次第 |
-| `TINYGFX_MONO_FAST_FILL` | 1 | モノクロの塗りが 1 画素ずつになる | −428 |
+| `TINYGFX_MONO_FAST_FILL` | 1 | モノクロの塗りが 1 画素ずつになる | −408 |
 | `TINYGFX_FILL_CHUNK` | 0 | （1 以上でまとめ書き。速度のみ） | — |
 
 **`SPARSE` と `RECORDS` はフォントと合っていないと違うグリフを描く。**

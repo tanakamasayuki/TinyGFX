@@ -63,6 +63,7 @@ tests/
   panels/             パネルのカタログ。プリセットが実際に運んでいる値
   utf8/               UTF-8 の復号。列ごとにコードポイントと消費バイト数を直接見る
   textwrap/           右端での自動折り返し（`TINYGFX_TEXT_WRAP=1`。既定では入っていない）
+  panels_seqcom/      `_SeqCom` の検査。同じドライバ・同じ寸法で値だけ違う場合
   image/              pushImage の配置・切り取り・透過・バイト順の入れ替え
   image_fmt/          同じ絵をどの形式で符号化しても 1 画素も違わないこと
   image_oracle/       変換ツールの出力を、ツール自身の期待画像と突き合わせる
