@@ -25,7 +25,7 @@ static const CellImage alpha TINYGFX_IMAGE_PROGMEM = {
   57,
   0x0000,
   2,
-  0,
+  1,
 };
 
 static const TinyGFXImageRef alphaRef = {&alpha, &tinygfxImageRlepal4Ops};

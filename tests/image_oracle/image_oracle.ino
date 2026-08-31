@@ -28,7 +28,7 @@ void setup() {
   lcd.begin();
 
   // ---- alpha (Rlepal4) ----
-  panel.fillBuffer(0x0000);
+  panel.fillBuffer(0xf81f);
   lcd.drawImage(&alphaRef, 0, 0);
   tgfxShot("alpha", gram, W, H);
 
@@ -38,7 +38,7 @@ void setup() {
   tgfxShot("bands", gram, W, H);
 
   // ---- grad (Bitmap1h) ----
-  panel.fillBuffer(0x0000);
+  panel.fillBuffer(0xf81f);
   lcd.drawImage(&gradRef, 0, 0);
   tgfxShot("grad", gram, W, H);
 
@@ -48,12 +48,12 @@ void setup() {
   tgfxShot("icon", gram, W, H);
 
   // ---- mono_h (Bitmap1h) ----
-  panel.fillBuffer(0x0000);
+  panel.fillBuffer(0xf81f);
   lcd.drawImage(&mono_hRef, 0, 0);
   tgfxShot("mono_h", gram, W, H);
 
   // ---- mono_v (Bitmap1v) ----
-  panel.fillBuffer(0x0000);
+  panel.fillBuffer(0xf81f);
   lcd.drawImage(&mono_vRef, 0, 0);
   tgfxShot("mono_v", gram, W, H);
 

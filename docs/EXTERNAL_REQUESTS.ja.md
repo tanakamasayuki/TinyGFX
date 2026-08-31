@@ -17,6 +17,8 @@
 | [E6](#e6) | 外部レジストリ | ライブラリ名 `TinyGFX` の重複確認 → **確認済み・問題なし** | 済 | 解消 |
 | [E9](#e9) | GfxImageToolJs | ~~一括モードで形式が総当たりされない~~ **解決（フォルダ出力の修正）。実測 8,720 → 4,184 B** | — | しない |
 | [E10](#e10) | GfxImageToolJs | ~~「変換後の画素」を出す口が無い~~ **解決（`--preview`）。ディザと減色を検証できるようになった** | — | しない |
+| [E11](#e11) | GfxImageToolJs | **フォルダ変換だと透過が黙って落ちる。** 単体変換とは結果が違う | 高 | しない |
+| [E12](#e12) | GfxImageToolJs | フォルダ変換で相対 `--out` の基準がずれる（`--preview` と違う） | 中 | しない |
 
 ---
 
@@ -645,3 +647,69 @@ rle565 が未検証だった）。
 `regen.py --check` が、ツールの出力が変わったのに `generated/` と `expected/`
 が古いままの状態を落とす。**committed のまま比較を続けて「昨日の答え」に
 通ってしまう**のを防ぐため。ツールが入っていない環境では skip する。
+
+---
+
+## E11. GfxImageToolJs — フォルダ変換だと透過が黙って落ちる {#e11}
+
+**2026-08-31 確認。** 同じ PNG が、**ファイルとして渡すか、フォルダとして渡すかで
+違う結果になる。**
+
+```sh
+# ファイルとして渡す -> 透過が残る
+gfx-image-tool build alpha.png --target tinygfx --out a.h
+#   -> CellImage.hasTransparent = 1
+
+# フォルダとして渡す -> 透過が落ちる（.imagesconfig 無しでも同じ）
+gfx-image-tool build ./src --target tinygfx --out gen
+#   -> CellImage.hasTransparent = 0
+```
+
+`[alpha] mode` の既定が `none` で、**アルファ値を持つ PNG でも黙って matte
+（既定は黒）に合成される。** 警告も出ない。
+
+### なぜ効くか
+
+**透過は「絵の見た目」ではなく「背景を残すかどうか」なので、絵を見ても気づけない。**
+黒い背景に描いている限り、透過が落ちていても同じ絵に見える。**別の色の上に
+重ねた瞬間に、初めて四角い黒地が出てくる。**
+
+`tests/image_oracle/` でこれを踏んだ。透過つきの 1 枚を入れていたのに
+`hasTransparent = 0` で通っていて、**「透過色がヘッダに乗るか」を見ているつもりで
+何も見ていなかった。** いまは `alpha_mode = color-key` を明示したうえで、
+**マゼンタの上に描いて**突き合わせている（黒の上では、透過を無視するデコーダでも
+一致してしまうため）。
+
+### 頼みたいこと
+
+**フォルダでも単体と同じ既定にしてほしい** —— アルファチャンネルを持つ入力なら
+`color-key` を既定にする。それが仕様として難しければ、せめて
+**「アルファを落とした」と警告を出す**だけでも踏まなくなる。
+
+`[alpha] mode = color-key` を書けば正しく出るので、**回避はできている。**
+
+## E12. GfxImageToolJs — フォルダ変換で相対 `--out` の基準がずれる {#e12}
+
+**2026-08-31 確認。** 1 つのコマンドラインに書いた 2 つの相対パスが、
+**別々の場所を基準に解決される。**
+
+```sh
+cd /tmp/work
+gfx-image-tool build sources --out outdir --preview prevdir
+#   outdir/images.h        written   -> 実際は /tmp/work/sources/outdir/images.h
+#   ../prevdir/alpha.png   written   -> /tmp/work/prevdir/alpha.png
+```
+
+**`--out` は入力フォルダ基準、`--preview` はカレント基準。** 単体変換では
+両方ともカレント基準なので、フォルダ変換だけの挙動。
+
+表示も紛らわしい。他の行は入力フォルダからの相対（`../prevdir/`）で出るのに、
+ヘッダの行だけ `outdir/images.h` と出るので、**カレントに書かれたように読める。**
+
+### 実害
+
+`--check` が通らなくなる。同じ相対パスで `build` した直後に `--check` すると
+**`missingOutput`** と言われる（`build` が書いた場所と `--check` が見る場所が違う）。
+絶対パスにすれば直るので、`tests/image_oracle/regen.py` は絶対パスで呼んでいる。
+
+**カレント基準に揃えてほしい**（`--preview` と、単体変換に合わせる形）。

@@ -152,6 +152,19 @@ gfx-image-tool build sources --out generated --preview expected
 ツールが出した画素と突き合わせるしかない（`tests/image_oracle/`、
 [EXTERNAL_REQUESTS.ja.md](EXTERNAL_REQUESTS.ja.md) E9・E10）。
 
+ほかに確かめたこと:
+
+| 項目 | 結果 |
+| --- | --- |
+| **共有デコーダの割引** | **実装済み。** bitmap1h + bitmap1v で 800 ではなく **520 B**（400 × 1.3）。[IMAGE_FORMAT.ja.md](IMAGE_FORMAT.ja.md) §2 で頼んだとおり |
+| **出力の再現性** | 2 回走らせて **1 バイトも違わない**。絶対パスも日時もヘッダに入らない ——「生成物を commit して `--check` で古さを見る」運用が成立する |
+| フォルダ変換の `--json` | 候補・個別最小・選択が全部出る |
+| `--preview-layout comparison` | 元画像と並べた 2 倍幅の PNG。**目で見る用**で、オラクルには使えない |
+
+**残っている 2 つは [E11](EXTERNAL_REQUESTS.ja.md#e11)（フォルダ変換で透過が
+落ちる）と [E12](EXTERNAL_REQUESTS.ja.md#e12)（相対 `--out` の基準）。**
+どちらも回避できているのでブロックはしない。
+
 ## いまあるもの
 
 `tools/img2h.py` が**実験用の最小実装**。総当たり・一括・集合最適化・
