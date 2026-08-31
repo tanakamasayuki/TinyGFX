@@ -17,6 +17,9 @@ target = tinygfx
 [input]
 patterns = *.png
 
+[preview]
+output_dir = ../expected
+
 # --- one image per decoder -------------------------------------------------
 
 # 48x32 photograph, 1535 colours. Nothing compresses, so this is the raw case.
@@ -36,13 +39,10 @@ format = rlepal4
 # 2 colours plus transparency. **The colour key travels in the header**, so
 # this is where a wrong transparent index would show.
 #
-# `alpha_mode` is not optional: **a folder conversion drops transparency
-# unless it is asked for**, and the same file converted on its own keeps it.
-# Without this line the header comes out with hasTransparent = 0 and the case
-# proves nothing.
+# **Nothing here asks for the transparency to be kept**, deliberately: an input
+# with an alpha channel keeps it by default, and this case is what says so.
 [image "alpha.png"]
 format = rlepal4
-alpha_mode = color-key
 
 # The same 64x16 image twice, packed both ways. Two decoders, one picture:
 # **if the bit order were wrong, only one of the two would fail.**
@@ -51,6 +51,23 @@ format = bitmap1h
 
 [image "mono_v.png"]
 format = bitmap1v
+
+# --- sizes whose last byte is a partial one ---------------------------------
+
+# **Nothing here is a multiple of 8.** A decoder that walks whole bytes to the
+# end of a row draws rubbish in the remainder, or steps into the next row.
+# 31 wide is 3 bytes and 7 bits; 13 tall is one page and 5 rows.
+
+[image "odd_h.png"]
+format = bitmap1h
+
+[image "odd_v.png"]
+format = bitmap1v
+
+# 17 colours across 23 pixels, so the runs are short and every row ends
+# mid-run. Too many colours for a palette, which is what forces rle565.
+[image "odd_rle.png"]
+format = rle565
 
 # --- the two the tool alone can answer -------------------------------------
 

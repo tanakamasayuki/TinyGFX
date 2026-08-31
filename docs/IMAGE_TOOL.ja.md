@@ -160,10 +160,17 @@ gfx-image-tool build sources --out generated --preview expected
 | **出力の再現性** | 2 回走らせて **1 バイトも違わない**。絶対パスも日時もヘッダに入らない ——「生成物を commit して `--check` で古さを見る」運用が成立する |
 | フォルダ変換の `--json` | 候補・個別最小・選択が全部出る |
 | `--preview-layout comparison` | 元画像と並べた 2 倍幅の PNG。**目で見る用**で、オラクルには使えない |
+| **`--check`** | ヘッダとプレビューの両方を見て、食い違ったファイル名を出し、2 で終了する |
+| 記号の衝突検査 | **両方のファイル名を出す**（`my icon.png and my_icon.png`）。`sub/icon.png` は `sub_icon` |
+| 8 の倍数でない寸法 | 31x17・13x13・23x7 が全形式で通る（`tests/image_oracle/`） |
 
-**残っている 2 つは [E11](EXTERNAL_REQUESTS.ja.md#e11)（フォルダ変換で透過が
-落ちる）と [E12](EXTERNAL_REQUESTS.ja.md#e12)（相対 `--out` の基準）。**
-どちらも回避できているのでブロックはしない。
+**回避は 1 つも要らなくなった。** 透過も出力先も `--check` も、ツールの既定と
+設定ファイルだけで済んでいる（[E11](EXTERNAL_REQUESTS.ja.md#e11)・
+[E12](EXTERNAL_REQUESTS.ja.md#e12) は解決済み）。
+
+**残っているのは [E13](EXTERNAL_REQUESTS.ja.md#e13)**（元画像を消しても出力が
+残り、`--check` が最新と言う）**と [E14](EXTERNAL_REQUESTS.ja.md#e14)**（数字で
+始まる名前が `_2nd` になる）。どちらもブロックしない。
 
 ## いまあるもの
 

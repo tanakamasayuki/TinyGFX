@@ -57,6 +57,21 @@ void setup() {
   lcd.drawImage(&mono_vRef, 0, 0);
   tgfxShot("mono_v", gram, W, H);
 
+  // ---- odd_h (Bitmap1h) ----
+  panel.fillBuffer(0xf81f);
+  lcd.drawImage(&odd_hRef, 0, 0);
+  tgfxShot("odd_h", gram, W, H);
+
+  // ---- odd_rle (Rle565) ----
+  panel.fillBuffer(0x0000);
+  lcd.drawImage(&odd_rleRef, 0, 0);
+  tgfxShot("odd_rle", gram, W, H);
+
+  // ---- odd_v (Bitmap1v) ----
+  panel.fillBuffer(0xf81f);
+  lcd.drawImage(&odd_vRef, 0, 0);
+  tgfxShot("odd_v", gram, W, H);
+
   // ---- photo (Raw565) ----
   panel.fillBuffer(0x0000);
   lcd.drawImage(&photoRef, 0, 0);
