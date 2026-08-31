@@ -22,6 +22,7 @@
 | [E13](#e13) | GfxImageToolJs | ~~元画像を消しても出力が残る~~ **解決。マニフェストで追跡し、`build` が消す** | — | しない |
 | [E14](#e14) | GfxImageToolJs | ~~数字で始まる名前が `_2nd` になる~~ **解決（`img_2nd`）** | — | しない |
 | [E15](#e15) | GfxImageToolJs | ~~マニフェストが無いとき全行 `upToDate` なのに落ちる~~ **解決** | — | しない |
+| [E16](#e16) | GfxImageToolJs | preview のマニフェストだけ出力先にドットファイルで残る（header は cache に移った） | 中 | しない |
 
 ---
 
@@ -849,9 +850,9 @@ commit しているので、この 2 つも一緒に commit する必要があ�
 
 ---
 
-## GfxImageToolJs — 依頼はすべて解決（2026-08-31 時点）
+## GfxImageToolJs — E9〜E15 は解決（2026-08-31 時点）
 
-E9〜E15 の 7 件は全部閉じた。**TinyGFX 側に回避は 1 つも残っていない。**
+7 件とも閉じた。**TinyGFX 側に回避は 1 つも残っていない。**
 
 `--preview-layout both`（利用者からの依頼で追加）も確認した。`<名前>.png` と
 `<名前>.comparison.png`（元画像と並べた 2 倍幅）の両方が出て、**マニフェストが
@@ -866,3 +867,44 @@ E9〜E15 の 7 件は全部閉じた。**TinyGFX 側に回避は 1 つも残っ�
 **`tests/image_oracle/` は `converted`（既定）のまま。** 比較画像はテストが
 読まないうえ、`sources/` と `expected/` が並んで commit されているので、
 **目で見るぶんには 2 つのファイルを開けば足りる。** 生成物を倍にする理由が無い。
+
+---
+
+## E16. GfxImageToolJs — preview のマニフェストだけ出力先に残る {#e16}
+
+**2026-08-31、フォルダ構成の変更後に確認。** [E13](#e13) で入ったマニフェストの
+置き場が、**header と preview で分かれている。**
+
+```
+images/.gfx-image-tool/headers.json          <- 使い捨て cache。init が .gitignore に入れる
+../shots/.gfx-image-tool-previews.json       <- 出力先にドットファイルで残る
+```
+
+header 側は cache に移って、**利用者が触るディレクトリから消えた。** これは
+[E15](#e15) の踏み方（ドットファイルの commit 漏れ）ごと無くなるので良い変更。
+**preview 側だけ元のまま**なので、そちらでは E15 と同じことが起きる。
+
+### 効くのは preview を commit するとき
+
+プレビューを使い捨て cache に置くなら問題にならないが、**変換結果を人が見る／
+レビューする目的なら出力先は commit するディレクトリになる。** TinyGFX 側は
+まさにそれで、`tests/image_oracle/expected/` が突き合わせの片側なので commit
+している。そこにツールのドットファイルが 1 つ混じる。
+
+**`images/.gfx-image-tool/previews.json` に揃えてほしい。** header と同じ理屈が
+そのまま当てはまる。
+
+### ついでに小さい話 — `[preview]` の既定
+
+`init` が置く雛形は `layout = converted` だけ有効で `output_dir` はコメント:
+
+```ini
+[preview]
+# output_dir = .gfx-image-tool/previews
+layout = converted
+```
+
+この状態で `--preview-layout` を渡すと
+`--preview-layout requires --preview or [preview] output_dir.` で止まる。
+**コメントされた行が既定値に見える**が、実際はプレビューそのものが無効。
+エラーメッセージが正確なので実害は小さい。

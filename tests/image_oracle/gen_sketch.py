@@ -1,11 +1,15 @@
 """Builds the verification sketch from what the converter wrote.
 
-Reads `generated/images.h` - **one bundled header holding every image**, which
-is what GfxImageToolJs emits for a folder - and pairs each `TinyGFXImageRef` in
-it with the picture of the same name in `expected/`.
+Reads `images.h` - **one bundled header holding every image**, which is what
+GfxImageToolJs emits for a project - and pairs each `TinyGFXImageRef` in it
+with the picture of the same name in `expected/`.
+
+The layout is the tool's own: sources in `images/`, the bundle beside it. **This
+sketch is arranged the way a user's sketch is**, so the include under test is
+the include they will write.
 
 The generator exists so that **adding a case needs no code**: drop a `.png` in
-`sources/`, name it in `.imagesconfig`, run `regen.py`. It runs at pytest
+`images/`, name it in `images/.imagesconfig`, run `regen.py`. It runs at pytest
 collection time and writes `image_oracle.ino`.
 """
 
@@ -13,7 +17,7 @@ import re
 from pathlib import Path
 
 HERE = Path(__file__).parent
-GENERATED = HERE / "generated" / "images.h"
+GENERATED = HERE / "images.h"
 EXPECTED = HERE / "expected"
 
 # `static const TinyGFXImageRef iconRef = {&icon, &tinygfxImageRlepal4Ops};`
@@ -87,7 +91,7 @@ def cases():
         png = EXPECTED / f"{name}.png"
         if not png.exists():
             raise FileNotFoundError(
-                f"{name} is in generated/images.h with no expected/{name}.png. "
+                f"{name} is in images.h with no expected/{name}.png. "
                 "Run regen.py")
         with Image.open(png) as im:
             w, h = im.size
@@ -112,6 +116,6 @@ def build():
     body = "".join(CASE % {"name": n, "ops": o, "bg": bg}
                    for n, _, _, o, bg in found)
     (HERE / "image_oracle.ino").write_text(
-        HEAD + '#include "generated/images.h"\n'
+        HEAD + '#include "images.h"\n'
         + BODY % {"w": w, "h": h, "cases": body})
     return found

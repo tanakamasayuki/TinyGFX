@@ -170,10 +170,22 @@ gfx-image-tool build sources --out generated --preview expected
 ツールの既定と設定ファイルだけで済んでいる
 （[E11](EXTERNAL_REQUESTS.ja.md#e11)〜[E14](EXTERNAL_REQUESTS.ja.md#e14) 解決済み）。
 
-**マニフェストは commit すること。** `.gfx-image-tool-headers.json` /
-`.gfx-image-tool-previews.json` はドットファイルなので漏らしやすい。無くても
-`build` が作り直して警告を出し、`--check` は `missing manifest` と名前で出すが、
-**そのビルドでは古いファイルの検出だけができない。**
+**構成が変わった（2026-08-31）。** プロジェクトルートの直下に `images/` を置き、
+元画像と `.imagesconfig` をそこに入れる。既定の出力は `images/` の隣の `images.h`。
+
+```
+MySketch/
+  images.h          <- バンドル出力
+  images/
+    .imagesconfig
+    .gitignore      <- .gfx-image-tool/ を除外（init が置く）
+    .gfx-image-tool/  <- 使い捨て cache。header のマニフェストはここ
+    <元画像>
+```
+
+**header のマニフェストは cache に移った**ので commit の対象から外れた。
+preview のマニフェストだけは出力先にドットファイルで残る
+（[E16](EXTERNAL_REQUESTS.ja.md#e16)）。
 
 `--preview-layout both` は `<名前>.png` と `<名前>.comparison.png`（元画像と
 並べた 2 倍幅）を両方出す。**`tests/image_oracle/` は `converted`（既定）のまま

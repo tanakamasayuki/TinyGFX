@@ -9,6 +9,8 @@ Everything is judged as a difference from base, so that things the core brings
 in by itself - `_malloc_r` and friends - are not blamed on TinyGFX.
 """
 
+from pathlib import Path
+
 import pytest
 
 import tinygfx_build as tb
@@ -112,3 +114,61 @@ def test_unused_font_formats_are_not_linked(syms, construct):
         if key not in used and present:
             problems.append(f"{key} is not used yet is linked")
     assert not problems, f"construct {construct}: " + "; ".join(problems)
+
+
+# --- a converter bundle -----------------------------------------------------
+#
+# GfxImageToolJs puts every image of a project into one header, alongside index
+# arrays (`images_file_refs`, `images_file_names`, ...). **A sketch includes the
+# bundle and draws one picture**, so what the other ten cost is the question.
+
+SKETCHES = Path(__file__).parent / "sketches"
+BUNDLE = Path(__file__).parent.parent / "image_oracle"
+
+# Data symbols belonging to images the sketch never draws
+UNDRAWN = ["photoData", "gradData", "bandsData", "quantData", "odd_rleData"]
+
+
+@pytest.fixture(scope="module")
+def bundle():
+    out = {}
+    for name in ("img_one", "img_index"):
+        build = tb.compile_sketch(SKETCHES / name, tb.CH32V003,
+                                  extra_include=tb.FONTS + [BUNDLE])
+        out[name] = (tb.symbols(build), build["flash"])
+    return out
+
+
+def test_undrawn_images_in_a_bundle_are_not_linked(bundle):
+    """**Including a bundle must cost only the pictures you draw.**
+
+    The converter emits every image of a project into one header and says so in
+    its README. This is the measurement behind that claim: `img_one` draws one
+    of eleven images and touches no index array.
+    """
+    names, _ = bundle["img_one"]
+    assert tb.contains(names, "iconData"), (
+        "the image the sketch does draw is missing; the check is wrong")
+    leaked = [s for s in UNDRAWN if tb.contains(names, s)]
+    assert not leaked, (
+        f"a bundle of 11 images keeps {leaked} that nothing draws. "
+        "Either --gc-sections is off or an index array is holding them alive")
+
+
+def test_a_runtime_index_keeps_the_whole_bundle(bundle):
+    """**The other half of the same fact**, so the test above is not vacuous.
+
+    Index the bundle with a value the compiler cannot fold and every image has
+    to stay. Measured at +6,420 B on this board, 39% of its 16,384
+    (docs/IMAGE_FORMAT.ja.md). Not a defect - it is what indexing means - but it
+    is the difference between free and a third of the flash.
+    """
+    names, idx_flash = bundle["img_index"]
+    _, one_flash = bundle["img_one"]
+    missing = [s for s in UNDRAWN if not tb.contains(names, s)]
+    assert not missing, (
+        f"a runtime index dropped {missing}, which cannot be right: "
+        "any of them could be the one selected")
+    print(f"\nbundle index: {one_flash} -> {idx_flash} "
+          f"({idx_flash - one_flash:+} B for all 11 images)")
+    assert idx_flash > one_flash

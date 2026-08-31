@@ -19,11 +19,11 @@ be. **These two are why the tool has to emit the expected image at all.**
 
 ## How to use it
 
-Drop a `.png` in `sources/`, name it in `sources/.imagesconfig`, run
-`regen.py`. **No code needed** - `gen_sketch.py` assembles the sketch at
-collection time from whatever `generated/images.h` holds.
+Drop a `.png` in `images/`, name it in `images/.imagesconfig`, run `regen.py`.
+**No code needed** - `gen_sketch.py` assembles the sketch at collection time
+from whatever `images.h` holds.
 
-`generated/` and `expected/` are committed, so the comparison runs without the
+`images.h` and `expected/` are committed, so the comparison runs without the
 converter installed. `regen.py --check` is what notices they have gone stale.
 """
 
@@ -76,15 +76,15 @@ def to565(im):
                   for y in range(h) for x in range(w)]
 
 
-@pytest.mark.skipif(not CASES, reason="generated/images.h is empty; run regen.py")
+@pytest.mark.skipif(not CASES, reason="images.h is empty; run regen.py")
 def test_every_decoder_is_covered():
     """**Not a property of TinyGFX - a property of this test folder.**
 
     The converter chooses a format per image, and it chooses globally: a
     decoder is paid for once, so one image needing rle565 can pull every other
     image onto rle565 too. That is correct behaviour and it would quietly leave
-    three of the five decoders undrawn. `.imagesconfig` pins each format; this
-    is what notices if a pin stops working.
+    three of the five decoders undrawn. `images/.imagesconfig` pins each format;
+    this is what notices if a pin stops working.
     """
     got = {ops for _, _, _, ops, _ in CASES}
     assert DECODERS <= got, f"no case draws {sorted(DECODERS - got)}"
@@ -93,7 +93,7 @@ def test_every_decoder_is_covered():
 def test_committed_output_is_current():
     """**The comparison is only as good as the files it compares.**
 
-    `generated/` and `expected/` are committed so the suite runs without the
+    `images.h` and `expected/` are committed so the suite runs without the
     converter installed - and so a change in what the converter emits would
     otherwise go unnoticed, the test still passing against yesterday's answer.
     Skipped where the converter is not present, which is most machines.
@@ -106,7 +106,7 @@ def test_committed_output_is_current():
     assert r.returncode == 0, r.stdout + r.stderr
 
 
-@pytest.mark.skipif(not CASES, reason="generated/images.h is empty; run regen.py")
+@pytest.mark.skipif(not CASES, reason="images.h is empty; run regen.py")
 def test_image_oracle(dut):
     dut.expect("TEST start image_oracle", timeout=20)
     dut.expect("TEST done", timeout=90)

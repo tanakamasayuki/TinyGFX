@@ -543,3 +543,105 @@ static const CellImage quant TINYGFX_IMAGE_PROGMEM = {
 };
 
 static const TinyGFXImageRef quantRef = {&quant, &tinygfxImageRlepal4Ops};
+
+// ---- project image index ----
+
+static const uint16_t images_file_count = 11;
+
+static const char* const images_file_names[images_file_count] = {
+  "alpha.png",
+  "bands.png",
+  "grad.png",
+  "icon.png",
+  "mono_h.png",
+  "mono_v.png",
+  "odd_h.png",
+  "odd_rle.png",
+  "odd_v.png",
+  "photo.png",
+  "quant.png"
+};
+
+static const uint8_t* const images_file_data[images_file_count] = {
+  alphaData,
+  bandsData,
+  gradData,
+  iconData,
+  mono_hData,
+  mono_vData,
+  odd_hData,
+  odd_rleData,
+  odd_vData,
+  photoData,
+  quantData
+};
+
+static const uint32_t images_file_sizes[images_file_count] = {
+  57,
+  96,
+  512,
+  152,
+  128,
+  128,
+  68,
+  483,
+  26,
+  3072,
+  335
+};
+
+static const uint16_t images_file_widths[images_file_count] = {
+  24,
+  64,
+  64,
+  32,
+  64,
+  64,
+  31,
+  23,
+  13,
+  48,
+  48
+};
+
+static const uint16_t images_file_heights[images_file_count] = {
+  24,
+  32,
+  64,
+  32,
+  16,
+  16,
+  17,
+  7,
+  13,
+  32,
+  48
+};
+
+static const char* const images_file_formats[images_file_count] = {
+  "tinygfx-rlepal4",
+  "tinygfx-rle565",
+  "bitmap1-msb",
+  "tinygfx-rlepal4",
+  "bitmap1-msb",
+  "bitmap1-vertical",
+  "bitmap1-msb",
+  "tinygfx-rle565",
+  "bitmap1-vertical",
+  "tinygfx-raw565",
+  "tinygfx-rlepal4"
+};
+
+static const TinyGFXImageRef* const images_file_refs[images_file_count] = {
+  &alphaRef,
+  &bandsRef,
+  &gradRef,
+  &iconRef,
+  &mono_hRef,
+  &mono_vRef,
+  &odd_hRef,
+  &odd_rleRef,
+  &odd_vRef,
+  &photoRef,
+  &quantRef
+};
