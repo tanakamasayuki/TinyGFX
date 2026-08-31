@@ -21,7 +21,7 @@
 | [E12](#e12) | GfxImageToolJs | ~~相対 `--out` の基準がずれる~~ **解決。`[preview] output_dir` も入った** | — | しない |
 | [E13](#e13) | GfxImageToolJs | ~~元画像を消しても出力が残る~~ **解決。マニフェストで追跡し、`build` が消す** | — | しない |
 | [E14](#e14) | GfxImageToolJs | ~~数字で始まる名前が `_2nd` になる~~ **解決（`img_2nd`）** | — | しない |
-| [E15](#e15) | GfxImageToolJs | マニフェストが無いとき、全行 `upToDate` なのに `--check` が落ちる | 低 | しない |
+| [E15](#e15) | GfxImageToolJs | ~~マニフェストが無いとき全行 `upToDate` なのに落ちる~~ **解決** | — | しない |
 
 ---
 
@@ -800,6 +800,15 @@ gfx-image-tool: C symbol collision: my_icon (my icon.png and my_icon.png)
 
 ## E15. GfxImageToolJs — マニフェストが無いとき、全行 `upToDate` なのに落ちる {#e15}
 
+> **2026-08-31: 解決。** `--check` が
+> `../generated/.gfx-image-tool-headers.json  missing manifest` と**名前で出す**
+> ようになり、まとめの 1 行も
+> `generated output or manifest is stale, different, or missing` に変わって
+> 上の行と矛盾しなくなった。`build` は作り直したうえで
+> `warning: header manifest was missing; stale headers could not be detected on this build.`
+> と出す —— **安全側の挙動はそのままで、黙っていないだけ**という頼んだとおりの形。
+
+
 **2026-08-31 確認。** [E13](#e13) で入ったマニフェストが無い状態で `--check` すると、
 **12 行すべてが `upToDate` と出たあとで失敗する。**
 
@@ -837,3 +846,23 @@ commit しているので、この 2 つも一緒に commit する必要があ�
 マニフェストが無いときに `build` が**知らないファイルを消さない**のは正しい
 （何を作ったか分からないので）。**そこは変えなくていい** —— 「マニフェストが
 無いので古いファイルは検出できない」と一言出るだけで十分。
+
+---
+
+## GfxImageToolJs — 依頼はすべて解決（2026-08-31 時点）
+
+E9〜E15 の 7 件は全部閉じた。**TinyGFX 側に回避は 1 つも残っていない。**
+
+`--preview-layout both`（利用者からの依頼で追加）も確認した。`<名前>.png` と
+`<名前>.comparison.png`（元画像と並べた 2 倍幅）の両方が出て、**マニフェストが
+2 つとも追跡する。**
+
+- `both` → `converted` に戻すと `.comparison.png` が `removed` になる
+- 委託済みの層と違う `--preview-layout` で `--check` すると `missingOutput` と
+  `mismatch manifest` を出して 2 で終了する
+- `icon.comparison.png` という名前の元画像を `icon.png` と並べて置くと
+  `preview output collision: ... (icon.comparison.png and icon.png)` で止まる
+
+**`tests/image_oracle/` は `converted`（既定）のまま。** 比較画像はテストが
+読まないうえ、`sources/` と `expected/` が並んで commit されているので、
+**目で見るぶんには 2 つのファイルを開けば足りる。** 生成物を倍にする理由が無い。

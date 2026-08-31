@@ -171,9 +171,16 @@ gfx-image-tool build sources --out generated --preview expected
 （[E11](EXTERNAL_REQUESTS.ja.md#e11)〜[E14](EXTERNAL_REQUESTS.ja.md#e14) 解決済み）。
 
 **マニフェストは commit すること。** `.gfx-image-tool-headers.json` /
-`.gfx-image-tool-previews.json` はドットファイルなので漏らしやすく、
-無いと `--check` が「全部 upToDate」と出したあとで落ちる
-（[E15](EXTERNAL_REQUESTS.ja.md#e15)）。
+`.gfx-image-tool-previews.json` はドットファイルなので漏らしやすい。無くても
+`build` が作り直して警告を出し、`--check` は `missing manifest` と名前で出すが、
+**そのビルドでは古いファイルの検出だけができない。**
+
+`--preview-layout both` は `<名前>.png` と `<名前>.comparison.png`（元画像と
+並べた 2 倍幅）を両方出す。**`tests/image_oracle/` は `converted`（既定）のまま
+にしてある** —— 比較画像はテストが読まないし、`sources/` と `expected/` が並んで
+commit されているので、目で見るには 2 つ開けば足りる。
+
+**依頼（E9〜E15）は全部解決した。TinyGFX 側に回避は 1 つも残っていない。**
 
 ## いまあるもの
 
