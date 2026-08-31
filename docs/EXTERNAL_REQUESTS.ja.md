@@ -19,8 +19,9 @@
 | [E10](#e10) | GfxImageToolJs | ~~「変換後の画素」を出す口が無い~~ **解決（`--preview`）。ディザと減色を検証できるようになった** | — | しない |
 | [E11](#e11) | GfxImageToolJs | ~~フォルダ変換だと透過が黙って落ちる~~ **解決。既定で保たれるようになった** | — | しない |
 | [E12](#e12) | GfxImageToolJs | ~~相対 `--out` の基準がずれる~~ **解決。`[preview] output_dir` も入った** | — | しない |
-| [E13](#e13) | GfxImageToolJs | **元画像を消しても出力が残り、`--check` が「最新」と言う** | 中 | しない |
-| [E14](#e14) | GfxImageToolJs | 数字で始まる名前が `_2nd` になる（C++ の予約識別子） | 低 | しない |
+| [E13](#e13) | GfxImageToolJs | ~~元画像を消しても出力が残る~~ **解決。マニフェストで追跡し、`build` が消す** | — | しない |
+| [E14](#e14) | GfxImageToolJs | ~~数字で始まる名前が `_2nd` になる~~ **解決（`img_2nd`）** | — | しない |
+| [E15](#e15) | GfxImageToolJs | マニフェストが無いとき、全行 `upToDate` なのに `--check` が落ちる | 低 | しない |
 
 ---
 
@@ -732,6 +733,16 @@ gfx-image-tool build sources --out outdir --preview prevdir
 
 ## E13. GfxImageToolJs — 元画像を消しても出力が残り、`--check` が「最新」と言う {#e13}
 
+> **2026-08-31: 解決。** 出力先にマニフェスト
+> （`.gfx-image-tool-headers.json` / `.gfx-image-tool-previews.json`）を置いて
+> 自分が作ったものを覚えるようになった。`--check` は `stale` と出して 2 で終了し、
+> `build` は `removed` と出して消す。
+>
+> **消すのは自分が作ったものだけ。** 出力先に置いた `README.md`・手書きの `.h`・
+> サブディレクトリはそのまま残ることを確認した。**マニフェストの中身は相対名だけ**
+> （絶対パスも日時も無い）なので、commit しても機械依存にならない。
+
+
 **2026-08-31 確認。** 変換済みのフォルダから元画像を 1 枚消して、もう一度
 `build` しても、**その画像の出力が消えない。**
 
@@ -767,6 +778,9 @@ gfx-image-tool build sources --out generated --check
 
 ## E14. GfxImageToolJs — 数字で始まる名前が `_2nd` になる {#e14}
 
+> **2026-08-31: 解決。** `2nd.png` → `img_2ndRef`。
+
+
 **2026-08-31 確認。** `2nd.png` から `_2ndRef` という記号が出る。
 
 C++ では、**アンダースコアで始まる識別子はグローバル名前空間では処理系の予約**
@@ -781,3 +795,45 @@ gfx-image-tool: C symbol collision: my_icon (my icon.png and my_icon.png)
 
 **両方のファイル名が出るので、どちらを直せばいいかすぐ分かる。**
 `sub/icon.png` は `sub_icon` になり、階層も潰れずに済んでいる。
+
+---
+
+## E15. GfxImageToolJs — マニフェストが無いとき、全行 `upToDate` なのに落ちる {#e15}
+
+**2026-08-31 確認。** [E13](#e13) で入ったマニフェストが無い状態で `--check` すると、
+**12 行すべてが `upToDate` と出たあとで失敗する。**
+
+```
+../generated/images.h  upToDate
+../expected/alpha.png  upToDate  preview
+   ... （全部 upToDate）...
+gfx-image-tool: --check: generated output differs or does not exist
+exit 2
+```
+
+**何も differ していないし、何も存在しない訳でもない。** 足りないのはマニフェスト
+だけなのに、それを指す行が 1 つも出ないので、**この状態から原因にたどり着けない。**
+
+### 踏みやすい
+
+マニフェストは**ドットファイル**なので、`cp dir/* other/` では付いてこないし、
+`.gitignore` に `.*` があると commit から漏れる。**生成物を commit する運用では
+必ず一度は踏む**（TinyGFX 側は `tests/image_oracle/generated/` と `expected/` を
+commit しているので、この 2 つも一緒に commit する必要がある）。
+
+### 頼みたいこと
+
+**足りないものを名前で出してほしい。**
+
+```
+../generated/.gfx-image-tool-headers.json  missing manifest
+```
+
+`build` のほうは**黙って作り直す**ので、そちらは実害が無い。**`--check` の
+まとめの 1 行が、その上の全行と矛盾しているのが問題。**
+
+### 安全側の挙動は正しかった
+
+マニフェストが無いときに `build` が**知らないファイルを消さない**のは正しい
+（何を作ったか分からないので）。**そこは変えなくていい** —— 「マニフェストが
+無いので古いファイルは検出できない」と一言出るだけで十分。

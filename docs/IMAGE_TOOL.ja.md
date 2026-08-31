@@ -164,13 +164,16 @@ gfx-image-tool build sources --out generated --preview expected
 | 記号の衝突検査 | **両方のファイル名を出す**（`my icon.png and my_icon.png`）。`sub/icon.png` は `sub_icon` |
 | 8 の倍数でない寸法 | 31x17・13x13・23x7 が全形式で通る（`tests/image_oracle/`） |
 
-**回避は 1 つも要らなくなった。** 透過も出力先も `--check` も、ツールの既定と
-設定ファイルだけで済んでいる（[E11](EXTERNAL_REQUESTS.ja.md#e11)・
-[E12](EXTERNAL_REQUESTS.ja.md#e12) は解決済み）。
+| **古い出力の掃除** | 出力先のマニフェストで自分の作ったものを追跡する。元画像を消すと `build` が消し、`--check` は `stale` で 2 で終了。**置いてある `README.md` や手書きの `.h` には触らない** |
 
-**残っているのは [E13](EXTERNAL_REQUESTS.ja.md#e13)**（元画像を消しても出力が
-残り、`--check` が最新と言う）**と [E14](EXTERNAL_REQUESTS.ja.md#e14)**（数字で
-始まる名前が `_2nd` になる）。どちらもブロックしない。
+**回避は 1 つも要らなくなった。** 透過も出力先も `--check` も古い出力の掃除も、
+ツールの既定と設定ファイルだけで済んでいる
+（[E11](EXTERNAL_REQUESTS.ja.md#e11)〜[E14](EXTERNAL_REQUESTS.ja.md#e14) 解決済み）。
+
+**マニフェストは commit すること。** `.gfx-image-tool-headers.json` /
+`.gfx-image-tool-previews.json` はドットファイルなので漏らしやすく、
+無いと `--check` が「全部 upToDate」と出したあとで落ちる
+（[E15](EXTERNAL_REQUESTS.ja.md#e15)）。
 
 ## いまあるもの
 
