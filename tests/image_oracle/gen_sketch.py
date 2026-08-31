@@ -56,20 +56,28 @@ void setup() {
 void loop() {}
 '''
 
-# The tool's preview flattens transparency onto black, so the canvas starts
-# black. **That transparency is honoured at all is not what is measured here** -
-# tests/image_fmt/ draws the same image over a background and checks that only
-# the transparent pixels let it through.
+# **An image with transparency is drawn over a colour it does not contain.**
+# On black it would pass either way: a decoder that painted the transparent
+# pixels black instead of leaving them alone gives the same picture. Magenta
+# does not survive that mistake.
+BG_OPAQUE = 0x0000
+BG_TRANSPARENT = 0xF81F
+
 CASE = '''
   // ---- %(name)s (%(ops)s) ----
-  panel.fillBuffer(0x0000);
+  panel.fillBuffer(%(bg)#06x);
   lcd.drawImage(&%(name)sRef, 0, 0);
   tgfxShot("%(name)s", gram, W, H);
 '''
 
 
 def cases():
-    """[(name, width, height, ops), ...] from the header and the pictures."""
+    """[(name, width, height, ops, background), ...].
+
+    **The converter's own picture decides the background.** Where it wrote a
+    fully transparent pixel, the image is drawn over a colour instead of black
+    so that leaving a pixel alone and painting it black are different results.
+    """
     if not GENERATED.exists():
         return []
     from PIL import Image
@@ -83,12 +91,14 @@ def cases():
                 "Run regen.py")
         with Image.open(png) as im:
             w, h = im.size
-        out.append((name, w, h, ops))
+            clear = im.mode == "RGBA" and im.getchannel("A").getextrema()[0] == 0
+        out.append((name, w, h, ops,
+                    BG_TRANSPARENT if clear else BG_OPAQUE))
     return sorted(out)
 
 
 def build():
-    """Collect the cases and write the sketch. Returns [(name, w, h, ops), ...]."""
+    """Collect the cases and write the sketch. Returns what cases() returned."""
     found = cases()
     if not found:
         # Still has to build with nothing to draw; pytest decides to skip
@@ -99,7 +109,8 @@ def build():
     # **The canvas is sized to the largest image.** Smaller ones go top left
     w = max(c[1] for c in found)
     h = max(c[2] for c in found)
-    body = "".join(CASE % {"name": n, "ops": o} for n, _, _, o in found)
+    body = "".join(CASE % {"name": n, "ops": o, "bg": bg}
+                   for n, _, _, o, bg in found)
     (HERE / "image_oracle.ino").write_text(
         HEAD + '#include "generated/images.h"\n'
         + BODY % {"w": w, "h": h, "cases": body})

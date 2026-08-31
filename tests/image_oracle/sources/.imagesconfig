@@ -35,8 +35,14 @@ format = rlepal4
 
 # 2 colours plus transparency. **The colour key travels in the header**, so
 # this is where a wrong transparent index would show.
+#
+# `alpha_mode` is not optional: **a folder conversion drops transparency
+# unless it is asked for**, and the same file converted on its own keeps it.
+# Without this line the header comes out with hasTransparent = 0 and the case
+# proves nothing.
 [image "alpha.png"]
 format = rlepal4
+alpha_mode = color-key
 
 # The same 64x16 image twice, packed both ways. Two decoders, one picture:
 # **if the bit order were wrong, only one of the two would fail.**

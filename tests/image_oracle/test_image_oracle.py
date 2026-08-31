@@ -31,6 +31,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 SKETCH = Path(__file__).parent
 sys.path.insert(0, str(SKETCH))
@@ -46,6 +47,22 @@ import tgfx_check as tc  # noqa: E402
 # less than it looks like it is.** They are not interchangeable: rlepal4 reads a
 # palette, bitmap1v walks the rows eight at a time, raw565 does neither.
 DECODERS = {"Raw565", "Rle565", "Rlepal4", "Bitmap1h", "Bitmap1v"}
+
+
+def over(im, bg565):
+    """Composite the converter's picture onto the colour the sketch drew over.
+
+    **Only where it is fully transparent.** The preview stores an alpha
+    channel, so what should show through is not a guess: TinyGFX either left
+    those pixels alone or it did not.
+    """
+    rgb = ((bg565 >> 8) & 0xF8, (bg565 >> 3) & 0xFC, (bg565 << 3) & 0xF8)
+    if im.mode != "RGBA":
+        return im.convert("RGB")
+    flat = Image.new("RGB", im.size, rgb)
+    flat.paste(im.convert("RGB"), (0, 0), im.split()[3].point(
+        lambda a: 255 if a else 0))
+    return flat
 
 
 def to565(im):
@@ -69,7 +86,7 @@ def test_every_decoder_is_covered():
     three of the five decoders undrawn. `.imagesconfig` pins each format; this
     is what notices if a pin stops working.
     """
-    got = {ops for _, _, _, ops in CASES}
+    got = {ops for _, _, _, ops, _ in CASES}
     assert DECODERS <= got, f"no case draws {sorted(DECODERS - got)}"
 
 
@@ -94,12 +111,10 @@ def test_image_oracle(dut):
     dut.expect("TEST start image_oracle", timeout=20)
     dut.expect("TEST done", timeout=90)
 
-    from PIL import Image
-
     problems = []
-    for name, w, h, ops in CASES:
-        want_w, want_h, want = to565(
-            Image.open(SKETCH / "expected" / f"{name}.png").convert("RGB"))
+    for name, w, h, ops, bg in CASES:
+        want_w, want_h, want = to565(over(
+            Image.open(SKETCH / "expected" / f"{name}.png"), bg))
         # The canvas is sized to the largest image, so crop the top left
         got = tc.image(SKETCH, name).crop((0, 0, want_w, want_h))
         _, _, cut = to565(got)
