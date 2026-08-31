@@ -1,0 +1,64 @@
+# The oracle's inputs, read by GfxImageToolJs. **regen.py runs the tool over
+# this folder in one go**, which is also what makes it a test of the batch
+# optimiser: the decoder is paid for once per format, so what an image is
+# encoded as depends on what else is in the folder.
+#
+# Every entry pins its format, because the point here is **coverage of the five
+# decoders**, not what the optimiser would pick. Take the pins out and the whole
+# folder collapses onto rle565 + raw565 - correct, and it would leave three
+# decoders untested.
+
+[general]
+output_dir = ../generated
+output_mode = bundle
+output_file = images.h
+target = tinygfx
+
+[input]
+patterns = *.png
+
+# --- one image per decoder -------------------------------------------------
+
+# 48x32 photograph, 1535 colours. Nothing compresses, so this is the raw case.
+[image "photo.png"]
+format = raw565
+
+# 32 horizontal bands of full-width colour. Too many colours for a palette,
+# long enough runs for the run-length coder.
+[image "bands.png"]
+format = rle565
+
+# 3 colours. The palette coder, and the format the optimiser picks on its own
+# when the folder holds nothing that needs rle565.
+[image "icon.png"]
+format = rlepal4
+
+# 2 colours plus transparency. **The colour key travels in the header**, so
+# this is where a wrong transparent index would show.
+[image "alpha.png"]
+format = rlepal4
+
+# The same 64x16 image twice, packed both ways. Two decoders, one picture:
+# **if the bit order were wrong, only one of the two would fail.**
+[image "mono_h.png"]
+format = bitmap1h
+
+[image "mono_v.png"]
+format = bitmap1v
+
+# --- the two the tool alone can answer -------------------------------------
+
+# 127 shades down to 2, by error diffusion. **There is no way to recompute this
+# from the source without reimplementing the ditherer**, which is the whole
+# reason the tool has to emit the expected image.
+[image "grad.png"]
+format = bitmap1h
+mode = monochrome
+dither = floyd-steinberg
+
+# 2304 colours down to 16. **Which 16 is the tool's choice**, and nothing on
+# this side can predict it.
+[image "quant.png"]
+format = rlepal4
+mode = indexed
+colors = 16
