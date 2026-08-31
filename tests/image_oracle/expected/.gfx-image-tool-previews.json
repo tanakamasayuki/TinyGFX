@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "kind": "previews",
+  "files": [
+    "alpha.png",
+    "bands.png",
+    "grad.png",
+    "icon.png",
+    "mono_h.png",
+    "mono_v.png",
+    "odd_h.png",
+    "odd_rle.png",
+    "odd_v.png",
+    "photo.png",
+    "quant.png"
+  ]
+}

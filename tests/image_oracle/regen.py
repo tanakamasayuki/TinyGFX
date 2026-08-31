@@ -11,6 +11,11 @@ compiles, and the picture it is measured against.
     sources/*.png  ->  generated/images.h    the code under test
                    ->  expected/*.png        the pixels after conversion
 
+Both folders also get a `.gfx-image-tool-*.json` manifest, which is how the
+tool knows which files are its own and deletes the ones a removed source used
+to produce. **They are dotfiles and they are part of the committed output** -
+without them `--check` fails while reporting every file as up to date.
+
 Where they go is in `sources/.imagesconfig`, not here, so **the same conversion
 happens whether it is this script or a person running the tool by hand.**
 
