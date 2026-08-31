@@ -23,6 +23,19 @@
 #include "Gfx.h"
 
 /// 生成ヘッダはこれを見て、描画器が先に include されているか確かめる。
+///
+/// **互換番号ではない。値は誰も比べない**（D35）。比べる必要が無いのは、
+/// 生成ヘッダが型と記号を名前で書いているので、**食い違いは C++ 側が先に
+/// 落とすから**（実測、CH32V003）:
+///
+///   | 生成ヘッダ側の変化      | コンパイラが言うこと                          |
+///   | 知らない形式を使う      | 'tinygfxImageRlepal9Ops' was not declared     |
+///   | CellImage に項目が増えた | too many initializers for 'const CellImage'   |
+///   | この include を忘れた   | 'CellImage' does not name a type              |
+///
+/// **番号は「上げ忘れる」が、名前は忘れようがない。** 唯一 C++ に見えないのは
+/// 同じ型の項目を入れ替えた場合なので、**そのときは型を改名する**
+/// （`CellImage` → `CellImage2`）。上の 3 行目と同じ形の失敗になる。
 #define TINYGFX_IMAGE_SPEC_VERSION 1
 #define TINYGFX_IMAGE_PROGMEM TINYGFX_FONT_PROGMEM
 
