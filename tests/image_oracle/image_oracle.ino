@@ -15,7 +15,7 @@
 #include <TinyGFX/MemoryTarget.h>
 #include <TinyGFX/Image.h>
 #include <tgfx_test.h>
-#include "generated/images.h"
+#include "images.h"
 
 static const int W = 64, H = 64;
 static uint16_t gram[W * H];

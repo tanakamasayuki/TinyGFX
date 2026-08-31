@@ -8,8 +8,10 @@
 # folder collapses onto rle565 + raw565 - correct, and it would leave three
 # decoders untested.
 
+# Paths are relative to this images/ directory. **The default layout**: the
+# bundle lands beside images/, which is where a sketch includes it from.
 [general]
-output_dir = ../generated
+output_dir = ..
 output_mode = bundle
 output_file = images.h
 target = tinygfx
@@ -17,8 +19,11 @@ target = tinygfx
 [input]
 patterns = *.png
 
+# The previews are the oracle's other half, so they are committed rather than
+# left in the disposable cache the default points at.
 [preview]
 output_dir = ../expected
+layout = converted
 
 # --- one image per decoder -------------------------------------------------
 

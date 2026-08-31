@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Runs GfxImageToolJs over `sources/` and writes what the oracle compares.
+"""Runs GfxImageToolJs over this folder and writes what the oracle compares.
 
     python3 regen.py                # rewrite generated/ and expected/
     python3 regen.py --check        # fail if either is out of date
@@ -8,15 +8,14 @@
 **One invocation produces both halves of the oracle**: the header TinyGFX
 compiles, and the picture it is measured against.
 
-    sources/*.png  ->  generated/images.h    the code under test
-                   ->  expected/*.png        the pixels after conversion
+    images/*.png  ->  images.h         the code under test
+                  ->  expected/*.png   the pixels after conversion
 
-Both folders also get a `.gfx-image-tool-*.json` manifest, which is how the
-tool knows which files are its own and deletes the ones a removed source used
-to produce. **They are dotfiles and they are part of the committed output** -
-without them `--check` fails while reporting every file as up to date.
+**The layout is the tool's own project layout**: sources in `images/`, the
+bundle beside it, which is where a sketch includes it from. `images/.gfx-image-tool/`
+is the tool's disposable cache and is git-ignored; deleting it changes no output.
 
-Where they go is in `sources/.imagesconfig`, not here, so **the same conversion
+Where they go is in `images/.imagesconfig`, not here, so **the same conversion
 happens whether it is this script or a person running the tool by hand.**
 
 The expected image is **the tool's own `--preview` output**, not something
@@ -38,7 +37,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).parent
-SOURCES = HERE / "sources"
+PROJECT = HERE
 
 DEFAULT_TOOL = Path.home() / "dev" / "GfxImageToolJs" / "bin" / "gfx-image-tool.js"
 
@@ -56,7 +55,7 @@ def main():
                          "Pass --tool <path>, or skip: the committed output "
                          "is what the test compares against.")
 
-    cmd = ["node", args.tool, "build", str(SOURCES)]
+    cmd = ["node", args.tool, "build", str(PROJECT)]
     if args.check:
         cmd.append("--check")
     r = subprocess.run(cmd, capture_output=True, text=True)
