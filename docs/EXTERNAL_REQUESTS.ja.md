@@ -22,7 +22,7 @@
 | [E13](#e13) | GfxImageToolJs | ~~元画像を消しても出力が残る~~ **解決。マニフェストで追跡し、`build` が消す** | — | しない |
 | [E14](#e14) | GfxImageToolJs | ~~数字で始まる名前が `_2nd` になる~~ **解決（`img_2nd`）** | — | しない |
 | [E15](#e15) | GfxImageToolJs | ~~マニフェストが無いとき全行 `upToDate` なのに落ちる~~ **解決** | — | しない |
-| [E16](#e16) | GfxImageToolJs | preview のマニフェストだけ出力先にドットファイルで残る（header は cache に移った） | 中 | しない |
+| [E16](#e16) | GfxImageToolJs | ~~preview のマニフェストだけ出力先に残る~~ **解決。cache に揃った** | — | しない |
 
 ---
 
@@ -871,6 +871,14 @@ commit しているので、この 2 つも一緒に commit する必要があ�
 ---
 
 ## E16. GfxImageToolJs — preview のマニフェストだけ出力先に残る {#e16}
+
+> **2026-09-01: 解決。** `images/.gfx-image-tool/previews.json` に揃った。
+> **出力先にツールのファイルは 1 つも残らない。**
+>
+> 旧い置き場のドットファイル（`expected/.gfx-image-tool-previews.json`）は
+> 新しいツールが読みも書きもしないので残る。TinyGFX 側は消した。**ツール側に
+> 移行処理は入れない** —— リリース前で、旧いバージョンの利用者がいないため。
+
 
 **2026-08-31、フォルダ構成の変更後に確認。** [E13](#e13) で入ったマニフェストの
 置き場が、**header と preview で分かれている。**
