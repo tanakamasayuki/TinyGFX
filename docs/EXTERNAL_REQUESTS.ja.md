@@ -23,6 +23,7 @@
 | [E14](#e14) | GfxImageToolJs | ~~数字で始まる名前が `_2nd` になる~~ **解決（`img_2nd`）** | — | しない |
 | [E15](#e15) | GfxImageToolJs | ~~マニフェストが無いとき全行 `upToDate` なのに落ちる~~ **解決** | — | しない |
 | [E16](#e16) | GfxImageToolJs | ~~preview のマニフェストだけ出力先に残る~~ **解決。cache に揃った** | — | しない |
+| [E17](#e17) | GfxImageToolJs | **生成物のどこにもツールのバージョンが無い。** `--check` の失敗が原因不明になる | 中 | しない |
 
 ---
 
@@ -916,3 +917,61 @@ layout = converted
 `--preview-layout requires --preview or [preview] output_dir.` で止まる。
 **コメントされた行が既定値に見える**が、実際はプレビューそのものが無効。
 エラーメッセージが正確なので実害は小さい。
+
+---
+
+## E17. GfxImageToolJs — 生成物のどこにもツールのバージョンが無い {#e17}
+
+**2026-09-01 確認。** 生成ヘッダにも `--json` にもマニフェストにも、
+**どのバージョンが出したものかが残らない。**
+
+### 症状
+
+`--check` を CI で回す運用（TinyGFX がやっている形）で、こうなる:
+
+1. A が 0.1.0 で生成して commit する
+2. ツールが上がって、符号化が 1 バイト変わる
+3. B の手元で `--check` が `../images.h  mismatch` で落ちる
+
+**元画像を変えたときと、区別が付かない。** B は「誰かが画像を差し替えたのか」と
+`images/` を疑いに行くが、変わっているのはツールのほうしかない。
+
+### 頼みたいこと（軽いほうだけで足りる）
+
+**`--json` にツール名とバージョンを入れてほしい。**
+
+```json
+{ "tool": { "name": "gfx-image-tool", "version": "0.1.0" }, ... }
+```
+
+生成バイトに影響しないので、**差分が増えない。** プロジェクト側はこれを記録
+できるし、CI で固定したバージョンと突き合わせられる。
+
+ヘッダにコメントで焼き込む案もあるが、**バージョンを上げるたび全ヘッダの差分が
+動く**ので、そちらは勧めない。判断はお任せする。
+
+### `TINYGFX_IMAGE_SPEC_VERSION` はいまのままでいい
+
+生成ヘッダの `#if !defined(TINYGFX_IMAGE_SPEC_VERSION)` について、
+**値を比べる形に変えてほしい、とは頼まない。** TinyGFX 側で検討して
+**やめた**（[DECISIONS.ja.md](DECISIONS.ja.md) D35）。
+
+理由は、**食い違いが全部いま既にコンパイルエラーになる**ため。生成ヘッダが型と
+記号を名前で書いているので、C++ が先に落とす:
+
+| | |
+| --- | --- |
+| 知らない形式 | `'tinygfxImageRlepal9Ops' was not declared in this scope` |
+| `CellImage` に項目が増えた | `too many initializers for 'const CellImage'` |
+| include 忘れ | `'CellImage' does not name a type` |
+
+**番号が足せるものが無い。** 唯一 C++ に見えない「同じ型の項目の入れ替え」は
+TinyGFX 側で型を改名して対処する。**いまの 3 行はそのままにしてほしい** ——
+include 忘れのエラーを読めるものにする役目があるので。
+
+### 併せて — npm への公開
+
+`npm install --global gfx-image-tool` は現時点で 404。リリース前なので当然だが、
+**バージョンを固定する手段がこれ待ち**になっている。TinyGFX 側は Arduino
+ライブラリで `package.json` を持たないので、固定は CI のワークフローに書く形に
+なる（そこにバージョンを直接書けるようになるのが公開後）。
