@@ -183,9 +183,8 @@ MySketch/
     <元画像>
 ```
 
-**header のマニフェストは cache に移った**ので commit の対象から外れた。
-preview のマニフェストだけは出力先にドットファイルで残る
-（[E16](EXTERNAL_REQUESTS.ja.md#e16)）。
+**マニフェストは header も preview も cache に移った**ので、commit の対象から
+外れた。**出力先にツールのファイルは 1 つも残らない。**
 
 `--preview-layout both` は `<名前>.png` と `<名前>.comparison.png`（元画像と
 並べた 2 倍幅）を両方出す。**`tests/image_oracle/` は `converted`（既定）のまま
