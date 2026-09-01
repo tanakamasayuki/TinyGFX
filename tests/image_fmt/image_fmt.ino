@@ -60,6 +60,45 @@ void setup() {
   tgfxReport("rlepal4_diff", diff());
   tgfxShot("rlepal4", gram, W, H);
 
+  // --- dataLen is only the RLE terminator -----------------------------------
+  //
+  // **Which formats read CellImage::dataLen decides how big an image can be.**
+  // It is uint16_t, so 65,535 bytes; a 240x240 raw565 is 115,200. The
+  // converter used to refuse every format at that size, which put a full
+  // screen of the reference panel out of reach
+  // (docs/EXTERNAL_REQUESTS.ja.md E18).
+  //
+  // It only had to refuse two. Here the same picture is drawn from the same
+  // bytes with dataLen zeroed: **raw565 and the 1bpp packings walk by
+  // dimensions and do not look at it**, so nothing changes. The RLE decoders
+  // terminate on it, so it must change - which is what keeps them limited.
+  {
+    static const CellImage rawNoLen TINYGFX_IMAGE_PROGMEM = {
+        same_raw565Data, NULL, 32, 32, /*dataLen*/ 0, 0x0000, 0, 0};
+    static const TinyGFXImageRef rawNoLenRef = {&rawNoLen, &tinygfxImageRaw565Ops};
+    static const CellImage monoNoLen TINYGFX_IMAGE_PROGMEM = {
+        mono_hData, mono_hPalette, 32, 32, /*dataLen*/ 0, 0x0000, 2, 0};
+    static const TinyGFXImageRef monoNoLenRef = {&monoNoLen, &tinygfxImageBitmap1hOps};
+    static const CellImage rleNoLen TINYGFX_IMAGE_PROGMEM = {
+        same_rle565Data, NULL, 32, 32, /*dataLen*/ 0, 0x0000, 0, 0};
+    static const TinyGFXImageRef rleNoLenRef = {&rleNoLen, &tinygfxImageRle565Ops};
+
+    reset(); lcd.drawImage(&same_raw565Ref, 0, 0);
+    snap();
+    reset(); lcd.drawImage(&rawNoLenRef, 0, 0);
+    tgfxReport("raw565_nolen_diff", diff());
+
+    reset(); lcd.drawImage(&mono_hRef, 0, 0);
+    snap();
+    reset(); lcd.drawImage(&monoNoLenRef, 0, 0);
+    tgfxReport("bitmap1h_nolen_diff", diff());
+
+    reset(); lcd.drawImage(&same_rle565Ref, 0, 0);
+    snap();
+    reset(); lcd.drawImage(&rleNoLenRef, 0, 0);
+    tgfxReport("rle565_nolen_diff", diff());
+  }
+
   // --- 1bpp packed horizontally and vertically ------------------------------
   reset(); lcd.drawImage(&mono_hRef, 0, 0);
   snap();

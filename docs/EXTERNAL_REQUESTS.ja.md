@@ -23,7 +23,11 @@
 | [E14](#e14) | GfxImageToolJs | ~~数字で始まる名前が `_2nd` になる~~ **解決（`img_2nd`）** | — | しない |
 | [E15](#e15) | GfxImageToolJs | ~~マニフェストが無いとき全行 `upToDate` なのに落ちる~~ **解決** | — | しない |
 | [E16](#e16) | GfxImageToolJs | ~~preview のマニフェストだけ出力先に残る~~ **解決。cache に揃った** | — | しない |
-| [E17](#e17) | GfxImageToolJs | **生成物のどこにもツールのバージョンが無い。** `--check` の失敗が原因不明になる | 中 | しない |
+| [E17](#e17) | GfxImageToolJs | ~~生成物にツールのバージョンが無い~~ **解決。`--json` に `tool`** | — | しない |
+| [E18](#e18) | GfxImageToolJs | ~~データ長の制限が全形式に掛かる~~ **解決。RLE 2 形式だけになった** | — | しない |
+| [E19](#e19) | GfxImageToolJs | ~~設定の綴り間違いが黙って無視される~~ **解決。4 種類とも警告する** | — | しない |
+| [E20](#e20) | GfxImageToolJs | ~~GUIDE の例が落ちる／設定の違いを言わない~~ **解決。両方** | — | しない |
+| [E21](#e21) | GfxImageToolJs | ~~最初の一歩と、最後の 1 枚~~ **解決。両方** | — | しない |
 
 ---
 
@@ -851,9 +855,9 @@ commit しているので、この 2 つも一緒に commit する必要があ�
 
 ---
 
-## GfxImageToolJs — E9〜E15 は解決（2026-08-31 時点）
+## GfxImageToolJs — 依頼はすべて解決（2026-09-01 時点）
 
-7 件とも閉じた。**TinyGFX 側に回避は 1 つも残っていない。**
+**E9〜E21 の 13 件、全部閉じた。TinyGFX 側に回避は 1 つも残っていない。**
 
 `--preview-layout both`（利用者からの依頼で追加）も確認した。`<名前>.png` と
 `<名前>.comparison.png`（元画像と並べた 2 倍幅）の両方が出て、**マニフェストが
@@ -922,6 +926,11 @@ layout = converted
 
 ## E17. GfxImageToolJs — 生成物のどこにもツールのバージョンが無い {#e17}
 
+> **2026-09-01: 解決。** `--json` に `"tool": {"name", "version"}` が入った。
+> `build`（単体・プロジェクト）・`--check`・`inspect` の全部で出る。
+> **生成バイトは変わっていない**（commit 済みヘッダを再生成して 1 バイト一致）。
+
+
 **2026-09-01 確認。** 生成ヘッダにも `--json` にもマニフェストにも、
 **どのバージョンが出したものかが残らない。**
 
@@ -975,3 +984,197 @@ include 忘れのエラーを読めるものにする役目があるので。
 **バージョンを固定する手段がこれ待ち**になっている。TinyGFX 側は Arduino
 ライブラリで `package.json` を持たないので、固定は CI のワークフローに書く形に
 なる（そこにバージョンを直接書けるようになるのが公開後）。
+
+---
+
+## E18. GfxImageToolJs — データ長 65,535 の制限が全形式に掛かる {#e18}
+
+> **2026-09-01: 解決。** データ長の制限は **rle565 と rlepal4 だけ**になった。
+> 240x240（115,200 B）も 320x240（153,600 B）も raw565 で通る。
+> **`dataLen` には 0 が入る** —— raw565 は読まないので、切り捨てた値より正しい。
+>
+> RLE を明示したときの断り方も良くなった。**ファイル名・形式・実際の値・上限・
+> 逃げ道が 1 行に出る**:
+>
+> ```
+> splash240.png: TinyGFX RLE data length must fit uint16_t (65535 bytes),
+> but rle565 is 172125 bytes. Select format auto or raw565, or reduce the
+> image dimensions.
+> ```
+>
+> **TinyGFX 側でも実測して固定した**（`tests/image_fmt/`）。同じバイト列を
+> `dataLen` 0 で描くと、raw565 と bitmap1h は **0 画素差**、rle565 は
+> **616 画素差**。読む形式と読まない形式の切り分けが正しいことの裏取り。
+
+
+**2026-09-01、リリース前点検で確認。** これがいちばん効く。
+
+```sh
+gfx-image-tool build splash240.png --target tinygfx --format raw565 --out x.h
+#   gfx-image-tool: TinyGFX width, height, and data length must fit uint16_t.
+```
+
+**240x240 が変換できない。** これは TinyGFX が preset を同梱している
+ST7789 の代表的な寸法で（`panels/ST7789_240x240.h`）、**自社の看板パネルの
+全画面絵が作れない**状態。ESP32（フラッシュ数 MB）では普通にやりたいこと。
+
+180x180 は通る（raw565 で 64,800 B）。境界は 65,535 B。
+
+### TinyGFX 側の制限ではない
+
+`CellImage.dataLen` は `uint16_t` だが、**読んでいるのは 5 つのうち 2 つだけ。**
+
+| デコーダ | `dataLen` を読むか |
+| --- | --- |
+| `drawRle565` | **読む**（RLE の終端判定） |
+| `drawRlePal4` | **読む**（同上） |
+| `drawRaw565` | 読まない |
+| `drawBitmap1H` | 読まない |
+| `drawBitmap1V` | 読まない |
+
+`src/TinyGFX/Image.h` の `d.len` 参照は 184 行目と 201 行目の 2 箇所だけで、
+どちらも RLE のループ。**raw565 と 1bpp は寸法だけで走査する**ので、
+115,200 B の raw565 を渡しても正しく描く。
+
+ツール側は `src/target/csource.js:54` で、幅・高さ・データ長を**一括で**
+弾いている（`EncodeConstraintError('TINYGFX_FIELD_OVERFLOW', ...)`）。
+
+### 頼みたいこと
+
+**データ長の制限を形式ごとにしてほしい** —— rle565 と rlepal4 だけに掛ける。
+幅・高さの uint16 は全形式でそのままでいい。
+
+しかも**形式選択の仕組みに載せられる。** 「rlepal4 は色数が足りないので不可」を
+既に扱っているのと同じ扱いで、「この形式ではデータ長が入らないので不可」に
+すればいい。全部の形式が不可なら、いまと同じく
+`No allowed TinyGFX format can encode every image.` になる。
+
+**メッセージが画像名を言わないのも直してほしい。** フォルダに 2 枚入れて
+片方だけ大きいときも、どちらのことか出ない。
+
+## E19. GfxImageToolJs — 設定の綴り間違いが全部黙って無視される {#e19}
+
+> **2026-09-01: 解決。** 4 種類とも警告が出るようになった。
+>
+> ```
+> warning: .imagesconfig: unknown key "fromat" in [image "icon.png"]; it was ignored.
+> warning: .imagesconfig: [image "iocn.png"] did not match any input image; check the path after renaming files.
+> warning: .imagesconfig: unknown key "nosuchkey" in [general]; it was ignored.
+> warning: .imagesconfig: unknown section [nosuchsection]; its settings were ignored.
+> ```
+>
+> **改名で無効になる場合をわざわざ書いてある**のが効く。
+
+
+**2026-09-01 確認。** `.imagesconfig` の書き間違いが、**どれも警告なしで通る。**
+
+| 書いたもの | 結果 |
+| --- | --- |
+| `[image "icon.png"]` + `format = rle565` | rle565（正しく効く） |
+| `[image "icon.png"]` + **`fromat`** = rle565 | **rlepal4。無言** |
+| **`[image "iocn.png"]`**（ファイル名の打ち間違い） | **rlepal4。無言** |
+| `[general]` に `nosuchkey = 3` | **無言** |
+| `[nosuchsection]` | **無言** |
+
+全部 exit 0。
+
+### なぜ効くか
+
+**設定ファイルが再現の要**である以上、効かない設定に気づけないのは痛い。
+とくに `[image "..."]` は**ファイル名を書く**ので、画像を改名した瞬間に
+黙って無効になる。TinyGFX 側は `tests/image_oracle/` で 11 枚の形式を
+`[image]` で固定しているので、**改名 1 回で検査の網が静かに緩む。**
+
+キー名も当てにくい —— 画像ごとの透過設定は `alpha_mode` だが、`[alpha]`
+セクションでは `mode`。**`config.js` を読んで初めて分かった。**
+
+### 頼みたいこと
+
+**知らないキー・知らないセクション・どの画像にも当たらない `[image]` グロブを
+警告してほしい。** `warnings[]` も `warning:` 行も既にあるので、そこに乗せる
+だけで足りる。落とす必要はない。
+
+## E20. GfxImageToolJs — GUIDE の例をそのまま実行すると落ちる {#e20}
+
+> **2026-09-01: 解決。両方。** GUIDE（en/ja）の `--check` に `--target tinygfx`
+> が付いて、書いてある順に実行して通るようになった。そして本体のほうも:
+>
+> ```
+> warning: generation setting changed: target: tinygfx -> generic-c
+> warning: generation setting changed: color: {...} -> {...}
+> ```
+>
+> **食い違ったときに、何の設定が違うかが出る。**
+
+
+**2026-09-01 確認。** `docs/GUIDE.md` 184〜187（`GUIDE.ja.md` も同じ）を、
+**書いてある順にそのまま実行すると失敗する。**
+
+```sh
+gfx-image-tool init ./MySketch
+# Put images under ./MySketch/images/
+gfx-image-tool build ./MySketch --target tinygfx     # exit 0
+gfx-image-tool build ./MySketch --check              # exit 2
+#   ../images.h  mismatch
+#   gfx-image-tool: --check: generated output is stale, different, or missing
+```
+
+原因は、**`--target tinygfx` が build にだけ付いていて check に無い**こと。
+`init` が置く設定の `target` は `generic-c` なので、`--check` は generic-c で
+作り直して食い違う。README の同じ流れ（57〜60 行）は `--target` がどちらにも
+無いので通る。
+
+**入門ガイドの、しかも「再現できる」と説明している節**なので、最初に踏む。
+
+### 直しかたは 2 つあって、両方やってほしい
+
+1. **例を直す。** `.imagesconfig` に `target = tinygfx` を書く形にする
+   （この節の主旨が再現性なので、設定に置くほうが教え方としても合っている）
+2. **`--check` が設定の違いを言う。** いまは「stale, different, or missing」
+   だけで、**ツールは両方の target を知っているのに黙っている。**
+   `settings differ from the ones that produced this output (target: tinygfx -> generic-c)`
+   のように出れば、5 秒で分かる
+
+2 のほうが本体。**バイトは比べているのに、設定は比べていない。**
+
+## E21. GfxImageToolJs — 最初の一歩と、最後の 1 枚 {#e21}
+
+> **2026-09-01: 解決。両方。**
+>
+> ```
+> Run gfx-image-tool init /tmp/bare, then move or copy the source images into
+> /tmp/bare/images; images beside images/ are not scanned.
+> ```
+>
+> 最後の 1 枚を消したときも `../images.h  removed` と掃除される。
+
+
+**2026-09-01 確認。** 小さい話 2 つ。
+
+### 画像だけ入ったフォルダを渡したとき
+
+```sh
+gfx-image-tool build ./bare --target tinygfx
+#   gfx-image-tool: Image project directory not found: /tmp/bare/images.
+#   Run gfx-image-tool init /tmp/bare first.
+```
+
+**「まず持っている画像フォルダを変換してみる」が最初の一歩**として自然だが、
+言われたとおり `init` しても `bare/images/` が空でできるだけで、**画像は
+外に残ったまま。** もう一度同じエラーになる。
+
+`images/` に置く規約自体は文書化されているので変えなくていい。
+**「画像を `images/` へ移してください」まで言ってほしい**（1 枚だけなら
+`build bare/icon.png` で足りることも）。
+
+### 最後の 1 枚を消したとき
+
+```sh
+rm images/icon.png          # 最後の 1 枚
+gfx-image-tool build .      # exit 1: no matching images
+ls                          # images.h が残っている
+```
+
+[E13](#e13) で入った掃除が、**N→0 のときだけ走らない**（1→0 of N は正しく
+`removed` になる）。exit 1 なので見えはするが、**マニフェストは `images.h` を
+自分の作ったものとして知っている**ので、消せるはず。
