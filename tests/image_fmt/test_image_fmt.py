@@ -81,6 +81,25 @@ def test_image_fmt(dut):
     assert r["photo_extreme_cmds"] == 0, (
         f"entirely off screen, yet {r['photo_extreme_cmds'] / 3:.0f} windows were opened")
 
+    # --- dataLen is only the RLE terminator -----------------------------------
+    #
+    # **How big an image may be depends on which decoders read
+    # CellImage::dataLen.** It is uint16_t (65,535 bytes) and a 240x240 raw565
+    # is 115,200, so the answer decides whether a full screen of the reference
+    # panel can be an image at all (docs/EXTERNAL_REQUESTS.ja.md E18).
+    #
+    # Same bytes, same picture, dataLen zeroed. raw565 and the 1bpp packings
+    # walk by dimensions; only the RLE decoders terminate on it.
+    assert r["raw565_nolen_diff"] == 0, (
+        f"raw565 changed by {r['raw565_nolen_diff']} pixels when dataLen was "
+        "zeroed, so it does read it and the uint16 limit applies to it too")
+    assert r["bitmap1h_nolen_diff"] == 0, (
+        f"bitmap1h changed by {r['bitmap1h_nolen_diff']} pixels when dataLen "
+        "was zeroed")
+    assert r["rle565_nolen_diff"] > 0, (
+        "rle565 drew the same picture with dataLen zeroed, so the two checks "
+        "above prove nothing - dataLen is not being read by anything")
+
     # --- transparency -------------------------------------------------------
     #
     # The same image drawn with and without transparency. **Only the pixels of
