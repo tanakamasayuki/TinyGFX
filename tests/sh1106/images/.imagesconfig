@@ -1,0 +1,15 @@
+# The splash the SH1106 test pushes with pushVBitmap: **1bpp packed vertically**,
+# which is the page-addressed panel's own buffer layout.
+
+[general]
+output_dir = ..
+output_mode = bundle
+output_file = images.h
+target = tinygfx
+
+[input]
+patterns = *.png
+
+[image "splash_v.png"]
+format = bitmap1v
+mode = monochrome

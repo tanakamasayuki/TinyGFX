@@ -23,17 +23,26 @@ TinyGFX's API and design hold up. The point is not "everyone else does X" but
 
 | | TinyGFX | Adafruit_GFX | U8g2 | LovyanGFX | TFT_eSPI | Arduino_GFX |
 | --- | --- | --- | --- | --- | --- | --- |
-| Drawing calls | **47** | 64 | 126 | **175** | many | many |
+| Drawing calls | **59** | 64 | 126 | **175** | many | many |
 | Virtuals in the core | **0** | 18 | 0 (C function pointers) | 3 | few | few |
 | Colour depths | **RGB565 only** | 1 / 8 / 16 | 1bpp | **9** (1/2/4/8 palette, grey 8, 565/666/888/8888) | 1 / 8 / 16 | several |
-| Panels | **5** | separate libraries | many | **~45** | 18+ | **40+** |
-| Buses | 3 (soft SPI / SPI / I2C) | driver's business | SPI / I2C / parallel | **9** | SPI / 8-bit / 16-bit parallel | SPI / 8-bit / 16-bit / RGB |
+| Drivers (controller ICs) | **7** | separate libraries | many | **~45** | 18+ | **40+** |
+| Panels (product presets) | **24** | — | — | — | — | — |
+| Buses | **5** (soft SPI / SPI / soft I2C / I2C / capture) | driver's business | SPI / I2C / parallel | **9** | SPI / 8-bit / 16-bit parallel | SPI / 8-bit / 16-bit / RGB |
 | Platforms | **`architectures=*`** | wide | wide | **17** | 5 families | ~20 |
 | Header-only | **yes** | no | no | no | no | no |
+
+> The drawing-call count is a recount of the public methods on `Gfx.h` and
+> `Print.h`, duplicates removed (2026-09-01). The other figures are from the
+> 2026-08-28 survey and were not necessarily counted the same way. **They are
+> here for the order of magnitude.**
 
 **TinyGFX is the smallest on every axis.** That is the point; the survey is not
 looking for gaps to fill but checking that **each gap has a reason that can be
 stated out loud**.
+
+**Only the panel row has no column for anyone else.** That is where the shape
+differs, so it gets its own section (1.5).
 
 ## The axes
 
@@ -47,7 +56,7 @@ This is where the libraries differ most.
 | **U8g2** | `ll_hvline` (a horizontal or vertical run into the buffer) | — |
 | **embedded-graphics** | `draw_iter` (take a sequence of pixels) - **that is all** | `fill_contiguous` / `fill_solid` / `clear` |
 | **LovyanGFX** | the whole `Panel_Device` surface | many |
-| **TinyGFX** | `setWindow` + `writeColor` + `writePixels` | **`fillRect`** |
+| **TinyGFX** | `TinyGFXTarget`: `setWindow` + `writeColor` + `writePixels` | **`fillRect`** |
 
 **"One required method plus optional specialisations" is exactly what
 embedded-graphics does.** TinyGFX's `fillRect` seam is not a novel idea; the
@@ -62,6 +71,39 @@ up overriding it anyway.
 page-addressed 1bpp buffer that is the natural fit
 ([OPTIMIZE.ja.md](OPTIMIZE.ja.md) H).
 
+### 1.5 Splitting the panel from the driver (nobody else has this)
+
+**A layer added after this survey, with no counterpart to compare against.**
+
+Everyone else counts supported panels as one number. There is an `ILI9341`
+class, and the size and offsets arrive as constructor arguments or a subclass.
+TinyGFX **cuts it in two** (DECISIONS.ja.md D34, [GLOSSARY.md](GLOSSARY.md)).
+
+| Layer | What it stands for | Count |
+| --- | --- | --- |
+| **Driver** | The controller IC. Owns the command sequences | 7 |
+| **Panel** | The product, the tab variant. **Dimensions and a few values** | 24 |
+
+```cpp
+#include <TinyGFX/panels/SSD1306_128x64_SeqCom.h>   // this is what a user picks
+```
+
+A panel header is a few `#define`s and an include of its driver, so **no branch
+and no carried data appear at runtime**. Baking the values in with macros is
+**148 bytes smaller** than passing them (measured).
+
+### Why nobody else does it, probably
+
+**The scale at which it starts to matter is different.** For a library that
+assumes an ESP32, passing size and offsets at runtime costs a few hundred bytes
+- noise. On a CH32V003 with 16 KB, **making 24 variants of one IC selectable at
+runtime spends the budget outright**.
+
+What it costs instead is a rule: **one panel per driver per sketch**, enforced
+with `#error`. Everyone else can drive two panels of the same IC.
+
+**Neither is right; the reference board is different.**
+
 ### 2. Colour
 
 **TinyGFX has no colour-depth abstraction in the core**
@@ -73,7 +115,8 @@ LovyanGFX switches between nine depths at runtime. Adafruit splits them into
 
 **Both carry two of everything, and neither would fit the reference board.**
 But **this decision will need revisiting to add a greyscale or palette panel**.
-An SSD1327 (4bpp) added today would have the panel reduce 565 to 4bpp, by which
+An SSD1327 (4bpp) added today - it is out of scope, see the last section -
+would have the panel reduce 565 to 4bpp, by which
 point the shades are already gone.
 
 ### 3. Buffering
@@ -291,6 +334,11 @@ other libraries have it, so compatibility argues for it too.
    **Off by default**, and off costs nothing. On costs **+164 B** (measured).
    The price is that wrapping has to know how wide a character is *before*
    drawing it, which links a second entry point into the font decoder
-4. **The colour decision is right for now, not forever.** Adding an SSD1327
-   (4bpp) or a greyscale e-paper breaks the "let the panel reduce 565" model.
-   **That is when D4 needs revisiting**
+4. **The colour decision is right for now, not forever.** Adding a greyscale
+   panel breaks the "let the panel reduce 565" model. **That is when D4 needs
+   revisiting.**
+
+   **The SSD1327 (4bpp) is out of scope** (2026-09-01). The only ones in
+   circulation cost **more than a colour panel of the same size**, so there is
+   no reason to add a third protocol for it. If greyscale ever arrives, it will
+   arrive from e-paper

@@ -310,7 +310,6 @@ void writeData(const uint8_t* d, size_t n) { while (n--) _spi->transfer(*d++); }
 | スイッチ | 状況 |
 | --- | --- |
 | `TINYGFX_STATIC_BUS` / `TINYGFX_STATIC_PANEL` | **未実装。** 構成 E が予算内に収まったので、いまは不要と判断（[DECISIONS.ja.md](DECISIONS.ja.md) D2）。必要になったら測ってから入れる |
-| `TINYGFX_NO_CLIP` | **未実装。** 同上。クリップ判定の削減効果を測ってから決める |
 | `TINYGFX_FILL_CHUNK` | 実装済み（`TinyGFXBusSPI` のみ）。**効果は未測定** |
 | `TINYGFX_TEXT_WRAP` | 実装済み。**既定 0。** 1 で **+164 B**（AVR +190 / RAM +1、ESP32 +116）。0 のままなら入れる前と 1 バイトも違わない（実測。D33） |
 | `TINYGFX_FONT_BG` / `TINYGFX_FONT_SCALE` / `TINYGFX_FONT_CHAIN` | 実装済み。0 で **−104 / −100 / −8 B**（構成 T、2026-08-30 実測） |
