@@ -855,9 +855,14 @@ commit しているので、この 2 つも一緒に commit する必要があ�
 
 ---
 
-## GfxImageToolJs — 依頼はすべて解決（2026-09-01 時点）
+## GfxImageToolJs — 依頼はすべて解決。1.0.0 として公開（2026-09-01）
 
 **E9〜E21 の 13 件、全部閉じた。TinyGFX 側に回避は 1 つも残っていない。**
+
+TinyGFX は**リリース版を使っている** —— `npx --yes gfx-image-tool@1.0.0`。
+**install はしない**し、ローカルの checkout も見ていない
+（`regen.py --tool <path>` で切り替えは効く）。
+**公開版が commit 済み生成物を 1 バイト違わず再現することを確認済み。**
 
 `--preview-layout both`（利用者からの依頼で追加）も確認した。`<名前>.png` と
 `<名前>.comparison.png`（元画像と並べた 2 倍幅）の両方が出て、**マニフェストが
@@ -980,10 +985,12 @@ include 忘れのエラーを読めるものにする役目があるので。
 
 ### 併せて — npm への公開
 
-`npm install --global gfx-image-tool` は現時点で 404。リリース前なので当然だが、
-**バージョンを固定する手段がこれ待ち**になっている。TinyGFX 側は Arduino
-ライブラリで `package.json` を持たないので、固定は CI のワークフローに書く形に
-なる（そこにバージョンを直接書けるようになるのが公開後）。
+> **2026-09-01: 公開された。** `gfx-image-tool@1.0.0`。
+> TinyGFX は `npx --yes gfx-image-tool@1.0.0` で呼ぶ形にした（install しない）。
+> **バージョンが spec の中にあるのでずれようがない。** `--tool` で checkout を
+> 指したときだけ `--json` の `tool.version` を読み戻し、**バージョン違いは
+> 「バージョンが違う」と出す** —— `images.h mismatch` だけを見せられて元画像を
+> 疑いに行く、という E17 の症状がこれで塞がった。
 
 ---
 
