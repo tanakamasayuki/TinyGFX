@@ -11,6 +11,13 @@
 #include <TinyGFX.h>
 #include <TinyGFX/BusI2C.h>
 #include <TinyGFX/panels/SSD1306_128x64_SeqCom.h>
+
+// **One panel, so the shorthand is here.** Including a panel also names it, so
+// that the class name is never written twice. The two-panel case in
+// tests/panels/ asserts the other half: there the name is taken away.
+#ifndef TINYGFX_PANEL
+#error "TINYGFX_PANEL is missing from a sketch with exactly one panel."
+#endif
 #include <tgfx_test.h>
 
 static const uint8_t ADDR = 0x3C;

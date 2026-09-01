@@ -322,9 +322,17 @@ COM 配線が入った状態で使えます。
 ```cpp
 #include <TinyGFX/panels/SSD1306_128x64.h>     // ← ここだけ差し替える
 
-static uint8_t fb[TinyGFXPanelSSD1306_128x64::kBufferBytes];
-TinyGFXPanelSSD1306_128x64 panel(bus, fb);
+static uint8_t fb[TINYGFX_PANEL::kBufferBytes];
+TINYGFX_PANEL panel(bus, fb);
 ```
+
+**include するとパネルに名前が付く**ので、クラス名を書くのは 1 回だけです。
+`TinyGFXPanelSSD1306_128x64` と書いても同じですが、そのときは差し替えが 3 行に
+なります。
+
+**パネルを 2 枚使うとき（TFT と OLED など）は `TINYGFX_PANEL` が消えます。**
+「どちらのことか」が決まらないので、2 枚目のヘッダが名前を取り下げます。
+そのときはクラス名を書いてください。
 
 <!-- BEGIN PANEL TABLE -->
 | ドライバ | 種類 | パネル（`TinyGFX/panels/<ドライバ>_<寸法>.h`） |

@@ -32,7 +32,7 @@
 | --- | --- |
 | **バスを `begin()` したか** | TinyGFX は `SPI.begin()` も `Wire.begin()` も呼びません（[DECISIONS.ja.md](DECISIONS.ja.md) D24）。**あなたが呼ぶ必要があります** |
 | **`begin()` が true を返したか** | `false` は「設定が使えない」の意味です。バッファが null、高さが 8 の倍数でない、寸法が 0 のどれか |
-| **バッファの大きさ** | `static uint8_t fb[TinyGFXPanelSSD1306_128x64::kBufferBytes];` と書けば間違えません。手で計算すると、足りなくても `begin()` は通り、書き潰します |
+| **バッファの大きさ** | `static uint8_t fb[TINYGFX_PANEL::kBufferBytes];` と書けば間違えません（`TINYGFX_PANEL` は include したパネルの名前）。手で計算すると、足りなくても `begin()` は通り、書き潰します |
 | **モノクロパネルで `display()` を呼んだか** | ページ方式のパネルは**呼ぶまで 1 バイトも送りません**。描いただけでは出ません |
 | **I2C アドレス** | 0x3C か 0x3D。モジュール裏の抵抗で決まっていることがあります |
 | **配線** | ソフト SPI ならピン番号、I2C ならプルアップ |

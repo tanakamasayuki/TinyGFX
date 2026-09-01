@@ -34,7 +34,7 @@ Before the table. **Usually this is not a settings problem.**
 | --- | --- |
 | **Did you begin the bus?** | TinyGFX calls neither `SPI.begin()` nor `Wire.begin()` ([DECISIONS.ja.md](DECISIONS.ja.md) D24). **That one is yours** |
 | **Did `begin()` return true?** | `false` means "this configuration is unusable": a null buffer, a height that is not a multiple of 8, or a zero dimension |
-| **The buffer size** | Write `static uint8_t fb[TinyGFXPanelSSD1306_128x64::kBufferBytes];` and it cannot be wrong. Work it out by hand and a buffer that is too small still passes `begin()`, then overruns |
+| **The buffer size** | Write `static uint8_t fb[TINYGFX_PANEL::kBufferBytes];` and it cannot be wrong (`TINYGFX_PANEL` is the panel you included). Work it out by hand and a buffer that is too small still passes `begin()`, then overruns |
 | **Did you call `display()`?** | A page-addressed panel **sends nothing until you do**. Drawing alone puts nothing on the glass |
 | **The I2C address** | 0x3C or 0x3D, often selected by a resistor on the back of the module |
 | **The wiring** | Pin numbers for software SPI; pull-ups for I2C |

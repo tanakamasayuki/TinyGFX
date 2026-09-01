@@ -258,6 +258,51 @@ void setup() {
     tgfxReport("com64", (long)comArg);
   }
 
+  // --- every geometry on the bring-up list ----------------------------------
+  //
+  // **Panels on order, checked before they arrive.** What the driver has to get
+  // right for an unfamiliar size is the page walk: 88 rows is 11 pages, 128 is
+  // 16, and a full transfer has to be exactly w * h / 8 bytes with the
+  // multiplex ratio following the height.
+  //
+  // The controllers differ (SSD1315, CH1115, SSD1312 are all SSD1306-family),
+  // but the geometry does not care which one is on the other end - so this is
+  // the half that can be settled on the host. **The COM pin layout and the
+  // column offset cannot**, and wait for the glass.
+  {
+    static uint8_t geomBuf[128 * 128 / 8];   // the largest of them
+    static const int16_t G[][2] = {
+        { 96, 64},   // SSD1306 96x64  - a size the catalogue does not have yet
+        { 48, 88},   // CH1115 48x88   - 11 pages, and taller than it is wide
+        { 64, 128},  // SSD1312 64x128 - 16 pages
+        { 72, 40},   // SSD1315 72x40  - same geometry as the SSD1306 preset
+        { 64, 32},   // SSD1315 64x32
+        {128, 64},   // SSD1315 128x64
+    };
+    long begins = 0;
+    long muxWrong = 0;
+    long bytesWrong = 0;
+    long tried = 0;
+    for (uint8_t i = 0; i < sizeof(G) / sizeof(G[0]); ++i) {
+      const int16_t w = G[i][0];
+      const int16_t h = G[i][1];
+      TinyGFXDriverSSD1306 p(bus, geomBuf, w, h);
+      TinyGFX g(p);
+      muxArg = 0xFF;
+      ++tried;
+      if (!g.begin()) { ++begins; continue; }
+      if (muxArg != (uint8_t)(h - 1)) ++muxWrong;
+      p.clearBuffer(true);
+      dataBytes = 0;
+      p.display();
+      if (dataBytes != (uint32_t)w * h / 8) ++bytesWrong;
+    }
+    tgfxReport("geom_count", tried);
+    tgfxReport("geom_begin_failures", begins);
+    tgfxReport("geom_mux_wrong", muxWrong);
+    tgfxReport("geom_bytes_wrong", bytesWrong);
+  }
+
   // --- an unusable configuration must make begin() return false -------------
   //
   // None of these are visible to the compiler: the buffer is a pointer the user

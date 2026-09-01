@@ -19,3 +19,16 @@ class TinyGFXPanelST7796_320x480 : public TinyGFXDriverST7796 {
   explicit TinyGFXPanelST7796_320x480(TinyGFXBus& bus, int8_t rst = -1)
       : TinyGFXDriverST7796(bus, kWidth, kHeight, rst) {}
 };
+
+// The name of the panel this sketch drives, so that it is written once:
+//
+//   TINYGFX_PANEL panel(bus);
+//
+// **Two panels and this disappears** - the second header to arrive removes it,
+// because there is then no such thing as "the" panel. Name them explicitly.
+#ifdef TINYGFX_PANEL_CLAIMED
+#undef TINYGFX_PANEL
+#else
+#define TINYGFX_PANEL_CLAIMED 1
+#define TINYGFX_PANEL TinyGFXPanelST7796_320x480
+#endif

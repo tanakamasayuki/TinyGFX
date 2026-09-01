@@ -934,6 +934,24 @@ TinyGFXPanelSSD1306_128x64 panel(bus, fb);
 
 導出をやめ、データシートのリセット値を既定にしてパネルが上書きする形にした。
 
+#### パネル名は 1 回だけ書く（`TINYGFX_PANEL`、2026-09-01 追加）
+
+クラス名を include と宣言で 2 回書かせていたので、**パネルヘッダが自分の名前を
+`TINYGFX_PANEL` として置く**ようにした。
+
+```cpp
+#include <TinyGFX/panels/SSD1306_128x64.h>
+static uint8_t fb[TINYGFX_PANEL::kBufferBytes];
+TINYGFX_PANEL panel(bus, fb);
+```
+
+**2 枚目が来たら消す。** 「1 枚目が勝つ」だと include の順で意味が変わるので、
+2 枚目のヘッダが `#undef` する。使うとコンパイルが通らなくなり、
+**2 枚あるなら明示的に名前を書け**、という形になる。
+
+`tests/panels_seqcom/`（1 枚）が「在ること」を、`tests/panels/`（TFT + OLED の
+2 枚）が「消えること」を、どちらも `#error` で検査している。実費 0 バイト。
+
 #### 同じドライバのパネルは 1 スケッチに 1 枚
 
 2 枚 include すると **`#error` で止まる。** 止めないと `#pragma once` で 2 枚目が
