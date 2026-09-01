@@ -21,3 +21,16 @@ class TinyGFXPanelST7789_172x320 : public TinyGFXDriverST7789 {
     setOffset(34, 0);
   }
 };
+
+// The name of the panel this sketch drives, so that it is written once:
+//
+//   TINYGFX_PANEL panel(bus);
+//
+// **Two panels and this disappears** - the second header to arrive removes it,
+// because there is then no such thing as "the" panel. Name them explicitly.
+#ifdef TINYGFX_PANEL_CLAIMED
+#undef TINYGFX_PANEL
+#else
+#define TINYGFX_PANEL_CLAIMED 1
+#define TINYGFX_PANEL TinyGFXPanelST7789_172x320
+#endif

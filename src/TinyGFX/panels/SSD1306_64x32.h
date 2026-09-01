@@ -24,3 +24,16 @@ class TinyGFXPanelSSD1306_64x32 : public TinyGFXDriverSSD1306 {
   TinyGFXPanelSSD1306_64x32(TinyGFXBus& bus, uint8_t* buffer, int16_t bufferPages = 0)
       : TinyGFXDriverSSD1306(bus, buffer, kWidth, kHeight, bufferPages) {}
 };
+
+// The name of the panel this sketch drives, so that it is written once:
+//
+//   TINYGFX_PANEL panel(bus);
+//
+// **Two panels and this disappears** - the second header to arrive removes it,
+// because there is then no such thing as "the" panel. Name them explicitly.
+#ifdef TINYGFX_PANEL_CLAIMED
+#undef TINYGFX_PANEL
+#else
+#define TINYGFX_PANEL_CLAIMED 1
+#define TINYGFX_PANEL TinyGFXPanelSSD1306_64x32
+#endif

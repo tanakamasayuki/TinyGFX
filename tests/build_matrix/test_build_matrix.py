@@ -6,6 +6,10 @@ neither of which can run on the host. The examples serve as the material.
 The examples carry profiles in sketch.yaml, so they build with `--profile`.
 """
 
+import shutil
+import tempfile
+from pathlib import Path
+
 import pytest
 
 import tinygfx_build as tb
@@ -62,6 +66,51 @@ def test_manual_sketch_builds():
     build = tb.compile_profile(tb.REPO / "tests" / "manual" / "m5stack", "m5stack")
     assert build["flash"] is not None
     print(f"  manual     m5stack      flash={build['flash']:>7} ram={build['ram']}")
+
+
+def test_bringup_sketch_builds_both_branches():
+    """The panel bring-up sketch (`tests/manual/bringup/`) has not rotted.
+
+    **It has two halves that cannot both be exercised by one build**: a
+    page-addressed panel owns a framebuffer and calls `display()`, a
+    direct-window one does neither. The sketch is meant to be edited by hand, so
+    rather than putting macros in the reader's way, this copies it and swaps the
+    two lines a person would swap.
+
+    Never run automatically - it only means anything on real hardware.
+    docs/MANUAL_TEST.ja.md.
+    """
+    if not tb.have_core(PROFILE_CORE["m5stack"]):
+        pytest.skip("the esp32 core is not installed")
+    src = tb.REPO / "tests" / "manual" / "bringup"
+    variants = [
+        ("ST7789 over SPI", {}),
+        ("SSD1306 over I2C", {
+            "#include <TinyGFX/panels/ST7789_240x240.h>":
+                "#include <TinyGFX/panels/SSD1306_128x64.h>",
+            "#define USE_SPI": "// #define USE_SPI",
+            "// #define USE_I2C": "#define USE_I2C",
+        }),
+    ]
+    for label, edits in variants:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "bringup"
+            shutil.copytree(src, out)
+            ino = out / "bringup.ino"
+            text = ino.read_text()
+            for a, b in edits.items():
+                assert a in text, f"{label}: {a!r} is no longer in the sketch"
+                text = text.replace(a, b, 1)
+            ino.write_text(text)
+            # The profile's library path is relative to the sketch, and the
+            # copy is not where the original was.
+            yaml = out / "sketch.yaml"
+            yaml.write_text(yaml.read_text().replace("dir: ../../../",
+                                                     f"dir: {tb.REPO}"))
+            build = tb.compile_profile(out, "esp32")
+            assert build["flash"] is not None
+            print(f"  bringup    {label:<17} flash={build['flash']:>7} "
+                  f"ram={build['ram']}")
 
 
 def test_hardware_spi_still_fails_on_ch32():

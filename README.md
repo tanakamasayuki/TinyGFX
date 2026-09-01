@@ -322,9 +322,17 @@ and COM wiring come with it.
 ```cpp
 #include <TinyGFX/panels/SSD1306_128x64.h>     // <- the only line that changes
 
-static uint8_t fb[TinyGFXPanelSSD1306_128x64::kBufferBytes];
-TinyGFXPanelSSD1306_128x64 panel(bus, fb);
+static uint8_t fb[TINYGFX_PANEL::kBufferBytes];
+TINYGFX_PANEL panel(bus, fb);
 ```
+
+**Including a panel also names it**, so the class name is written once.
+`TinyGFXPanelSSD1306_128x64` works just as well, at the cost of making the swap
+three lines instead of one.
+
+**With two panels (a TFT and an OLED, say) `TINYGFX_PANEL` disappears.** There
+is no longer one panel it could mean, so the second header to arrive takes the
+name away. Write the class names in that case.
 
 <!-- BEGIN PANEL TABLE -->
 | Driver | Kind | Panels (`TinyGFX/panels/<driver>_<size>.h`) |

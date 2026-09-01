@@ -91,6 +91,30 @@ def test_i2c(dut):
     assert r["com32"] == 0x12, (
         f"a bare driver sent COM pins {r['com32']:#04x}; it must not guess from the height")
 
+    # --- every geometry on the bring-up list ---------------------------------
+    #
+    # **Panels on order, checked before they arrive** (docs/MANUAL_TEST.ja.md).
+    # 88 rows is 11 pages and 128 is 16, so an unfamiliar height is where a page
+    # walk goes wrong. The controllers are all SSD1306-family (SSD1315, CH1115,
+    # SSD1312); which one is on the other end does not change the geometry.
+    #
+    # The COM pin layout and the column offset are the half that cannot be
+    # settled here - they are facts about the glass and wait for it.
+    # Three zeroes below would also be what an empty loop reports.
+    assert r["geom_count"] == 6, (
+        f"only {r['geom_count']} geometries ran; the three checks below would "
+        "pass on an empty loop")
+    assert r["geom_begin_failures"] == 0, (
+        f"{r['geom_begin_failures']} of the ordered geometries were rejected "
+        "by begin()")
+    assert r["geom_mux_wrong"] == 0, (
+        f"{r['geom_mux_wrong']} geometries sent a multiplex ratio that is not "
+        "height - 1")
+    assert r["geom_bytes_wrong"] == 0, (
+        f"{r['geom_bytes_wrong']} geometries transferred something other than "
+        "w * h / 8 bytes, so the page walk is wrong for that size")
+
+
     # --- the begin() contract -----------------------------------------------
     #
     # **The return value means "is this configuration usable"**, not "is there

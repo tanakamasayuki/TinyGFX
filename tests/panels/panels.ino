@@ -15,6 +15,17 @@
 #include <TinyGFX/BusI2C.h>
 #include <TinyGFX/panels/SSD1306_128x32.h>
 #include <TinyGFX/panels/ST7789_240x240.h>   // a different driver: must coexist
+
+// **Two panels, so the shorthand has to be gone.** A single-panel sketch gets
+// `TINYGFX_PANEL` as the name of the one it drives, which is what keeps the
+// class name from being written twice. Here there is no such thing as "the"
+// panel, and the second header to arrive takes the name away rather than
+// quietly meaning one of the two.
+//
+// This is the assertion for that, and it costs nothing to make.
+#ifdef TINYGFX_PANEL
+#error "TINYGFX_PANEL survived two panel headers. It would then silently name whichever was included first."
+#endif
 #include <TinyGFX/BusCapture.h>
 #include <tgfx_test.h>
 

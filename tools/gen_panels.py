@@ -154,6 +154,31 @@ HEAD = '''// {cls}
 // If the picture is wrong, docs/PANEL_TUNING.ja.md says which line to change.
 '''
 
+# **The shorthand, and why it can vanish.**
+#
+# Naming the class twice - once to include it, once to declare the object - is
+# the kind of repetition that goes wrong silently, so every panel header offers
+# `TINYGFX_PANEL` as the name of the panel this sketch drives.
+#
+# **A sketch with two panels has no such thing**, so the second panel header to
+# be included takes the shorthand away rather than quietly meaning one of them.
+# Using it then fails to compile, which is the point: with two panels you have
+# to say which one you mean.
+SHORTHAND = '''
+// The name of the panel this sketch drives, so that it is written once:
+//
+//   TINYGFX_PANEL panel(bus);
+//
+// **Two panels and this disappears** - the second header to arrive removes it,
+// because there is then no such thing as "the" panel. Name them explicitly.
+#ifdef TINYGFX_PANEL_CLAIMED
+#undef TINYGFX_PANEL
+#else
+#define TINYGFX_PANEL_CLAIMED 1
+#define TINYGFX_PANEL {cls}
+#endif
+'''
+
 PAGED_BODY = '''#include "../Driver{driver}.h"
 
 class {cls} : public TinyGFXDriver{driver} {{
@@ -216,7 +241,8 @@ def render(e, paged):
     return (HEAD.format(cls=cls, note=note)
             + GUARD.format(driver=e["driver"])
             + defines
-            + tmpl.format(driver=e["driver"], cls=cls, w=e["w"], h=e["h"], body=body))
+            + tmpl.format(driver=e["driver"], cls=cls, w=e["w"], h=e["h"], body=body)
+            + SHORTHAND.format(cls=cls))
 
 
 # --- the catalogue table in the READMEs ------------------------------------
