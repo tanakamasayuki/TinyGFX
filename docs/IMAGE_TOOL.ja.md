@@ -124,20 +124,42 @@ asset 側は `embed-asset-tool`（`EmbedAssetToolJs`）で揃う。
 **7〜10 は他のライブラリでは意味を持たない。** ツールの中で「TinyGFX
 ターゲット」として分けるのが素直だと思う。
 
-## 状況（2026-08-31）
+## 状況（2026-09-01）
 
 | | |
 | --- | --- |
 | asset ツール | **分離してライブラリ + CLI 化。** VSCode 拡張はそれを読み込む構成に |
-| 画像ツール | **GfxImageToolJs（リリース前）。上の 1〜10 が動くことを確認済み** |
+| 画像ツール | **`gfx-image-tool` 1.0.0 として npm に公開済み。** 上の 1〜10 が動くことを確認済み |
 | TinyGFX 側 | `src/TinyGFX/Image.h` は**実装済み・テスト済み。** ツールの完成を待たずに使える |
+
+### TinyGFX での使いかた —— 入れない
+
+```sh
+npx --yes gfx-image-tool@1.0.0 build <プロジェクト>
+```
+
+**グローバルに install しない。** npx が取ってきて cache するので、
+**バージョンがコマンドの中に書いてある**状態になる。`tests/image_oracle/regen.py`
+はこの形で呼ぶ（`TOOL_SPEC`）。
+
+固定する理由は、生成物を commit しているから。**別のバージョンで符号化が変わると
+`--check` が `images.h mismatch` で落ち、元画像を誰かが差し替えたのと見分けが
+付かない。** 既定の経路は spec で固定されるのでずれようがなく、`--tool` で
+checkout を指したときだけ、**失敗時にバージョンを読み戻して先に報告する。**
+
+上げるのは意図的な操作 —— `TOOL_SPEC` を書き換え、`regen.py` を走らせ、
+動いたものを commit する。
+
+npx が無い環境（あるいは cache が空でネットも無い環境）では `regen.py` が
+**終了コード 3** を返し、テストは skip する。**突き合わせ自体は commit 済みの
+中身だけで動く**ので、そちらは走る。
 
 ### 本番 CLI で確認したこと
 
 **フォルダを 1 回渡すだけで、5 デコーダ全部の出力が得られる。**
 
 ```sh
-gfx-image-tool build sources --out generated --preview expected
+gfx-image-tool build <プロジェクト>        # images/ の隣に images.h
 ```
 
 | 項目 | 結果 |

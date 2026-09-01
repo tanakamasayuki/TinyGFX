@@ -96,13 +96,15 @@ def test_committed_output_is_current():
     `images.h` and `expected/` are committed so the suite runs without the
     converter installed - and so a change in what the converter emits would
     otherwise go unnoticed, the test still passing against yesterday's answer.
-    Skipped where the converter is not present, which is most machines.
+    **Nothing is installed to run it**: `regen.py` fetches the pinned release
+    through npx (`gfx-image-tool@1.0.0`), so the version cannot drift and a
+    machine with no npx or no network simply skips.
     """
     import subprocess
-    if not regen.DEFAULT_TOOL.exists():
-        pytest.skip(f"gfx-image-tool.js not at {regen.DEFAULT_TOOL}")
     r = subprocess.run([sys.executable, str(SKETCH / "regen.py"), "--check"],
                        capture_output=True, text=True)
+    if r.returncode == regen.UNAVAILABLE:
+        pytest.skip(r.stderr.strip().splitlines()[0])
     assert r.returncode == 0, r.stdout + r.stderr
 
 
