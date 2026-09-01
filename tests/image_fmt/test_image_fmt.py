@@ -1,9 +1,12 @@
 """**However a picture is encoded, not one pixel may differ.**
 
-The converter (`tools/img2h.py`) brute-forces the smallest encoding for each
-picture: raw RGB565, RLE, RLE with a palette, 1bpp packed horizontally, 1bpp
-packed vertically. **Which one it picked must not be visible from the sketch**,
-and that is what this test pins down.
+The converter picks an encoding per picture: raw RGB565, RLE, RLE with a
+palette, 1bpp packed horizontally, 1bpp packed vertically. **Which one it picked
+must not be visible from the sketch**, and that is what this test pins down.
+
+`images.h` holds one copy of the picture per encoding, each pinned in
+`images/.imagesconfig` so every decoder actually runs. Regenerate with
+`tests/regen_images.py`.
 
 The same idea as pinning "three encodings draw the same pixels" for CellFont
 (`tests/text/`). Encoding is the tool's business, not the user's.
@@ -120,3 +123,27 @@ def test_image_fmt(dut):
     assert r["trans_differ"] == r["trans_bg_left"], (
         f"something other than the transparent colour differs: {r['trans_differ']} "
         f"changed against {r['trans_bg_left']} left as background")
+
+
+def test_committed_images_are_current():
+    """**The comparison is only as good as the files it compares.**
+
+    `images.h` is committed so the suite runs without the converter installed -
+    and so a change in what the converter emits would otherwise go unnoticed,
+    the test still passing against yesterday's answer.
+
+    **Nothing is installed to run it**: `regen_images.py` fetches the pinned
+    release through npx, so the version cannot drift and a machine with no npx
+    or no network simply skips.
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+    tests = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(tests))
+    import regen_images
+    r = subprocess.run([sys.executable, str(tests / "regen_images.py"),
+                        "image_fmt", "--check"], capture_output=True, text=True)
+    if r.returncode == regen_images.UNAVAILABLE:
+        pytest.skip(r.stderr.strip().splitlines()[0])
+    assert r.returncode == 0, r.stdout + r.stderr

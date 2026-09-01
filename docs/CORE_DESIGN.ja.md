@@ -498,7 +498,6 @@ lcd.println(3.14f);           // ここまで来ると浮動小数点書式化�
 | `TINYGFX_TEXT_WRAP` | **0** | 1 で `TinyGFXPrint::setTextWrap()`（右端での自動折り返し）が現れる | **+164 B**（D33） |
 | `TINYGFX_FONT_UTF8` | 1 | 0 で文字列をバイト単位（Latin-1）として読む | **−148 B**（`TinyGFXPrint` も使っていれば −292 B。D26） |
 | `TINYGFX_STATIC_BUS` / `TINYGFX_STATIC_PANEL` | — | Bus / Panel を単一実装に固定して virtual を消す | **未実装。** 構成 E が予算内に収まったので保留（D2） |
-| `TINYGFX_NO_CLIP` | — | クリップ判定を省く | **未実装。** 効果を測ってから決める |
 
 **スイッチは増やしすぎない。** 追加するときは「これで何バイト減るか」を
 [FOOTPRINT.ja.md](FOOTPRINT.ja.md) に測った数字とともに書く。測っていないスイッチは入れない。

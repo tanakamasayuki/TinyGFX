@@ -1,9 +1,12 @@
 // **However a picture is encoded, not one pixel may differ.**
 //
-// The converter (tools/img2h.py) brute-forces the smallest format for each
-// picture. **Which one it picked must not be visible from the sketch**, and
-// that is what this pins down - the same idea as "three encodings draw the same
-// pixels" for CellFont (tests/text/).
+// **Which format a picture ended up in must not be visible from the sketch**,
+// and that is what this pins down - the same idea as "three encodings draw the
+// same pixels" for CellFont (tests/text/).
+//
+// images.h comes from the released converter over images/; one copy of the
+// picture per encoding, each pinned in images/.imagesconfig. Regenerate with
+// regen.py.
 //
 // Vertical and horizontal packing likewise: the data is laid out completely
 // differently, and the picture must be the same.
@@ -12,13 +15,7 @@
 #include <TinyGFX/DriverST7789.h>
 #include <TinyGFX/Image.h>
 #include <tgfx_test.h>
-#include "same_raw565.h"
-#include "same_rle565.h"
-#include "same_rlepal4.h"
-#include "mono_h.h"
-#include "mono_v.h"
-#include "trans_icon.h"
-#include "photo64.h"
+#include "images.h"
 
 static const int W = 32, H = 32;
 static uint16_t gram[W * H];

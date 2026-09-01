@@ -1,0 +1,46 @@
+# **The same picture, one file per encoding.** A bundle names each image after
+# its file, so getting five encodings of one picture means five copies of it -
+# which is also what the sketch asserts: whichever of these it draws, not one
+# pixel may differ.
+#
+# Every format is pinned. **The optimiser is not what is being tested here**
+# (tests/image_oracle/ does that); these exist to make the decoder run.
+
+[general]
+output_dir = ..
+output_mode = bundle
+output_file = images.h
+target = tinygfx
+
+[input]
+patterns = *.png
+
+# --- one picture, three colour encodings -----------------------------------
+[image "same_raw565.png"]
+format = raw565
+
+[image "same_rle565.png"]
+format = rle565
+
+[image "same_rlepal4.png"]
+format = rlepal4
+
+# The same picture again, with its black turned into the transparent colour.
+# **Opaque source, colour key** - which is why it is `source_key` and not an
+# alpha channel.
+[image "trans_icon.png"]
+format = rlepal4
+source_key = 000000
+
+# --- one picture, both 1bpp packings ---------------------------------------
+[image "mono_h.png"]
+format = bitmap1h
+mode = monochrome
+
+[image "mono_v.png"]
+format = bitmap1v
+mode = monochrome
+
+# --- a photograph, for the raw path ----------------------------------------
+[image "img_photo64.png"]
+format = raw565

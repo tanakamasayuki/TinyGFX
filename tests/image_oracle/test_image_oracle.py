@@ -19,12 +19,13 @@ be. **These two are why the tool has to emit the expected image at all.**
 
 ## How to use it
 
-Drop a `.png` in `images/`, name it in `images/.imagesconfig`, run `regen.py`.
+Drop a `.png` in `images/`, name it in `images/.imagesconfig`, run `regen_images.py`.
 **No code needed** - `gen_sketch.py` assembles the sketch at collection time
 from whatever `images.h` holds.
 
 `images.h` and `expected/` are committed, so the comparison runs without the
-converter installed. `regen.py --check` is what notices they have gone stale.
+converter installed. `regen_images.py --check` is what notices they have
+gone stale.
 """
 
 import sys
@@ -36,7 +37,6 @@ from PIL import Image
 SKETCH = Path(__file__).parent
 sys.path.insert(0, str(SKETCH))
 import gen_sketch  # noqa: E402
-import regen  # noqa: E402
 
 # **Assemble the sketch at collection time**, before the dut compiles it
 CASES = gen_sketch.build()
@@ -76,7 +76,7 @@ def to565(im):
                   for y in range(h) for x in range(w)]
 
 
-@pytest.mark.skipif(not CASES, reason="images.h is empty; run regen.py")
+@pytest.mark.skipif(not CASES, reason="images.h is empty; run regen_images.py")
 def test_every_decoder_is_covered():
     """**Not a property of TinyGFX - a property of this test folder.**
 
@@ -90,25 +90,31 @@ def test_every_decoder_is_covered():
     assert DECODERS <= got, f"no case draws {sorted(DECODERS - got)}"
 
 
-def test_committed_output_is_current():
+def test_committed_images_are_current():
     """**The comparison is only as good as the files it compares.**
 
-    `images.h` and `expected/` are committed so the suite runs without the
-    converter installed - and so a change in what the converter emits would
-    otherwise go unnoticed, the test still passing against yesterday's answer.
-    **Nothing is installed to run it**: `regen.py` fetches the pinned release
-    through npx (`gfx-image-tool@1.0.0`), so the version cannot drift and a
-    machine with no npx or no network simply skips.
+    `images.h` is committed so the suite runs without the converter installed -
+    and so a change in what the converter emits would otherwise go unnoticed,
+    the test still passing against yesterday's answer.
+
+    **Nothing is installed to run it**: `regen_images.py` fetches the pinned
+    release through npx, so the version cannot drift and a machine with no npx
+    or no network simply skips.
     """
     import subprocess
-    r = subprocess.run([sys.executable, str(SKETCH / "regen.py"), "--check"],
-                       capture_output=True, text=True)
-    if r.returncode == regen.UNAVAILABLE:
+    import sys
+    from pathlib import Path
+    tests = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(tests))
+    import regen_images
+    r = subprocess.run([sys.executable, str(tests / "regen_images.py"),
+                        "image_oracle", "--check"], capture_output=True, text=True)
+    if r.returncode == regen_images.UNAVAILABLE:
         pytest.skip(r.stderr.strip().splitlines()[0])
     assert r.returncode == 0, r.stdout + r.stderr
 
 
-@pytest.mark.skipif(not CASES, reason="images.h is empty; run regen.py")
+@pytest.mark.skipif(not CASES, reason="images.h is empty; run regen_images.py")
 def test_image_oracle(dut):
     dut.expect("TEST start image_oracle", timeout=20)
     dut.expect("TEST done", timeout=90)

@@ -19,7 +19,7 @@
 #include <TinyGFX/DriverSH1106.h>
 #include <TinyGFX/DriverSSD1306.h>
 #include <TinyGFX/Image.h>
-#include "splash_v.h"
+#include "images.h"
 #include <tgfx_test.h>
 #include <TinyGFX/FontCell.h>
 #include <tgfx_digits.h>

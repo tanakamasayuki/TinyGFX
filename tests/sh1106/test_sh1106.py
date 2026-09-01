@@ -75,3 +75,27 @@ def test_sh1106(dut):
     assert r["vblit_unaligned"] == 0, "accepted a bitmap that is not page aligned"
     assert r["vblit_offpanel"] == 0, "accepted a bitmap hanging off the panel"
     assert r["vblit_rotated"] == 0, "accepted a bitmap while rotated"
+
+
+def test_committed_images_are_current():
+    """**The comparison is only as good as the files it compares.**
+
+    `images.h` is committed so the suite runs without the converter installed -
+    and so a change in what the converter emits would otherwise go unnoticed,
+    the test still passing against yesterday's answer.
+
+    **Nothing is installed to run it**: `regen_images.py` fetches the pinned
+    release through npx, so the version cannot drift and a machine with no npx
+    or no network simply skips.
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+    tests = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(tests))
+    import regen_images
+    r = subprocess.run([sys.executable, str(tests / "regen_images.py"),
+                        "sh1106", "--check"], capture_output=True, text=True)
+    if r.returncode == regen_images.UNAVAILABLE:
+        pytest.skip(r.stderr.strip().splitlines()[0])
+    assert r.returncode == 0, r.stdout + r.stderr
