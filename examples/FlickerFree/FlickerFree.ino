@@ -35,7 +35,10 @@ static uint16_t band[WIDTH * BAND_ROWS];
 TinyGFXTileCanvas canvas(panel, band, sizeof(band) / sizeof(band[0]));
 
 struct Ball {
-  int16_t x, y, dx, dy;
+  int16_t x;
+  int16_t y;
+  int16_t dx;
+  int16_t dy;
 };
 static Ball ball = {40, 40, 3, 2};
 

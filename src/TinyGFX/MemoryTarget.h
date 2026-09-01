@@ -75,8 +75,14 @@ class TinyGFXMemoryTarget : public TinyGFXTarget {
   }
 
   uint16_t* _buf;
-  int16_t _natW, _natH;
-  int16_t _bufY0, _bufRows;
-  uint16_t _xs = 0, _ys = 0, _xe = 0, _ye = 0;
-  uint16_t _cx = 0, _cy = 0;
+  int16_t _natW;
+  int16_t _natH;
+  int16_t _bufY0;
+  int16_t _bufRows;
+  uint16_t _xs = 0;
+  uint16_t _ys = 0;
+  uint16_t _xe = 0;
+  uint16_t _ye = 0;
+  uint16_t _cx = 0;
+  uint16_t _cy = 0;
 };

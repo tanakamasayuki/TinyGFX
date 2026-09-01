@@ -47,7 +47,8 @@
 struct CellImage {
   const void* data;         ///< 画素データ
   const uint16_t* palette;  ///< NULL なら直接色
-  uint16_t width, height;
+  uint16_t width;
+  uint16_t height;
   uint16_t dataLen;         ///< data のバイト数。RLE の終端判定に要る
   /// 透過。直接色なら色、パレットなら索引。`hasTransparent` が 0 なら無視。
   ///
@@ -86,8 +87,10 @@ namespace tinygfx_image {
 struct Head {
   const uint8_t* data;
   const uint16_t* palette;
-  int16_t w, h;
-  uint16_t len, transparent;
+  int16_t w;
+  int16_t h;
+  uint16_t len;
+  uint16_t transparent;
   bool hasTransparent;
 };
 
@@ -110,7 +113,8 @@ inline Head head(const CellImage* im) {
 /// 除算がソフトウェアルーチンになる。行をまたぐたびに 1 つ足すだけで
 /// 済むので、除算は要らない。
 struct Cursor {
-  int16_t row, col;
+  int16_t row;
+  int16_t col;
 };
 
 /// 行をまたがない範囲で塗り、カーソルを進める。RLE 系が共有する。
@@ -252,7 +256,8 @@ inline void drawRaw565(TinyGFX& g, const CellImage* im, int16_t x, int16_t y) {
   // Taking coordinates from outside the screen and clipping them is part of
   // the contract (see TinyGFX::fillRect). Both are back inside int16_t by the
   // time they are used, because the clip rectangle is.
-  int32_t c0 = 0, c1 = (int32_t)d.w - 1;
+  int32_t c0 = 0;
+  int32_t c1 = (int32_t)d.w - 1;
   if ((int32_t)x + c0 < g.clipX0()) c0 = (int32_t)g.clipX0() - x;
   if ((int32_t)x + c1 > g.clipX1()) c1 = (int32_t)g.clipX1() - x;
   if (c0 > c1 || c1 < 0 || c0 >= (int32_t)d.w) return;

@@ -121,7 +121,8 @@ class TinyGFXBusSoftI2C : public TinyGFXBus {
     drive(_scl);
   }
 
-  int8_t _sda, _scl;
+  int8_t _sda;
+  int8_t _scl;
   uint8_t _addr;
   uint8_t _cmdCtrl = 0x00;
   uint8_t _dataCtrl = 0x40;

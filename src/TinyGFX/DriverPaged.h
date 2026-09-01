@@ -106,7 +106,10 @@ class TinyGFXDriverPaged : public TinyGFXTarget {
   /// in the run shares it.
   void fillRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color) override {
     const bool on = (color != 0);
-    int16_t ax, ay, bx, by;
+    int16_t ax;
+    int16_t ay;
+    int16_t bx;
+    int16_t by;
     toBuffer((int16_t)x, (int16_t)y, &ax, &ay);
     toBuffer((int16_t)(x + w - 1), (int16_t)(y + h - 1), &bx, &by);
     if (ax > bx) { const int16_t t = ax; ax = bx; bx = t; }
@@ -301,13 +304,15 @@ class TinyGFXDriverPaged : public TinyGFXTarget {
 
   /// Logical coordinates to a bit in the buffer. Out-of-range writes are dropped.
   void put(bool on) {
-    const uint16_t x = _cx, y = _cy;
+    const uint16_t x = _cx;
+    const uint16_t y = _cy;
     // Advance to the next pixel up front, so an early return cannot desync it
     if (_cx >= _xe) { _cx = _xs; ++_cy; } else { ++_cx; }
     // Unsigned, so "below zero" and "past the edge" are the same comparison.
     if (x >= (uint16_t)_width || y >= (uint16_t)_height) return;
 
-    int16_t fx, fy;
+    int16_t fx;
+    int16_t fy;
     toBuffer((int16_t)x, (int16_t)y, &fx, &fy);
     int16_t page = (int16_t)(fy >> 3);
     if (_bandPages != 0) {
@@ -327,11 +332,18 @@ class TinyGFXDriverPaged : public TinyGFXTarget {
   TinyGFXBus* _bus;
   uint8_t _col0 = 0;
   uint8_t* _buf;
-  int16_t _natW, _natH, _pages;
+  int16_t _natW;
+  int16_t _natH;
+  int16_t _pages;
   int16_t _pageFirst = 0;
   int16_t _bandPages = 0;  // 0 means the buffer covers the whole screen
-  uint16_t _xs = 0, _ys = 0, _xe = 0, _ye = 0;
-  uint16_t _cx = 0, _cy = 0;
-  int16_t _dirtyLo = 32767, _dirtyHi = -1;
+  uint16_t _xs = 0;
+  uint16_t _ys = 0;
+  uint16_t _xe = 0;
+  uint16_t _ye = 0;
+  uint16_t _cx = 0;
+  uint16_t _cy = 0;
+  int16_t _dirtyLo = 32767;
+  int16_t _dirtyHi = -1;
   uint8_t _rotation = 0;
 };

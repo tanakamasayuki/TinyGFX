@@ -94,9 +94,14 @@ class TinyGFXBusCapture : public TinyGFXBus {
   }
 
   uint16_t* _gram;
-  uint16_t _w, _h;
-  uint16_t _xs = 0, _ys = 0, _xe = 0, _ye = 0;
-  uint16_t _cx = 0, _cy = 0;
+  uint16_t _w;
+  uint16_t _h;
+  uint16_t _xs = 0;
+  uint16_t _ys = 0;
+  uint16_t _xe = 0;
+  uint16_t _ye = 0;
+  uint16_t _cx = 0;
+  uint16_t _cy = 0;
   uint8_t _args[4] = {0, 0, 0, 0};
   uint8_t _argLen = 0;
   uint8_t _hi = 0;
@@ -104,6 +109,9 @@ class TinyGFXBusCapture : public TinyGFXBus {
   uint8_t _lastArg0 = 0;
   uint8_t _txnDepth = 0;
   bool _inRamwr = false;
-  uint32_t _cmdCount = 0, _pixelCount = 0, _beginCalls = 0, _endCalls = 0;
+  uint32_t _cmdCount = 0;
+  uint32_t _pixelCount = 0;
+  uint32_t _beginCalls = 0;
+  uint32_t _endCalls = 0;
   uint32_t _initCalls = 0;
 };
