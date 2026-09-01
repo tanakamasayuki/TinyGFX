@@ -59,12 +59,19 @@ what you hand over stays yours, and what you do not hand over TinyGFX drives.
 
 **The product you bought** - "a 0.96 inch 128x64 I2C OLED".
 
-Named after its controller and its size, `TinyGFXDriverSSD1306_128x64`. Pick one
+Named after its controller and its size, `TinyGFXPanelSSD1306_128x64`. Pick one
 from the catalogue and include it.
 
 ```cpp
 #include <TinyGFX/panels/SSD1306_128x64.h>
+static uint8_t fb[TINYGFX_PANEL::kBufferBytes];
+TINYGFX_PANEL panel(bus, fb);
 ```
+
+**Including a panel also names it**, so the class name is written once.
+**Two panels and `TINYGFX_PANEL` disappears** - there is no longer one panel it
+could mean, so the second header to arrive takes the name away. Write the class
+names then.
 
 A panel is a preset (§3), not a driver (§2). **The same driver behind different
 glass is a different panel**, with a different multiplex ratio, column offset and

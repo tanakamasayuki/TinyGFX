@@ -191,7 +191,9 @@ class TinyGFX {
 
   void drawCircle(int16_t cx, int16_t cy, int16_t r, uint16_t color) {
     if (r < 0) return;
-    int16_t x = 0, y = r, d = (int16_t)(1 - r);
+    int16_t x = 0;
+    int16_t y = r;
+    int16_t d = (int16_t)(1 - r);
     startWrite();
     while (x <= y) {
       drawPixel((int16_t)(cx + x), (int16_t)(cy + y), color);
@@ -215,7 +217,9 @@ class TinyGFX {
 
   void fillCircle(int16_t cx, int16_t cy, int16_t r, uint16_t color) {
     if (r < 0) return;
-    int16_t x = 0, y = r, d = (int16_t)(1 - r);
+    int16_t x = 0;
+    int16_t y = r;
+    int16_t d = (int16_t)(1 - r);
     startWrite();
     while (x <= y) {
       drawFastHLine((int16_t)(cx - x), (int16_t)(cy + y), (int16_t)((x << 1) + 1), color);
@@ -238,13 +242,16 @@ class TinyGFX {
     const int16_t rmax = (int16_t)(((w < h ? w : h) - 1) >> 1);
     if (r > rmax) r = rmax;
     if (r <= 0) { drawRect(x, y, w, h, color); return; }
-    const int16_t x1 = (int16_t)(x + w - 1), y1 = (int16_t)(y + h - 1);
+    const int16_t x1 = (int16_t)(x + w - 1);
+    const int16_t y1 = (int16_t)(y + h - 1);
     startWrite();
     drawFastHLine((int16_t)(x + r), y, (int16_t)(w - (r << 1)), color);
     drawFastHLine((int16_t)(x + r), y1, (int16_t)(w - (r << 1)), color);
     drawFastVLine(x, (int16_t)(y + r), (int16_t)(h - (r << 1)), color);
     drawFastVLine(x1, (int16_t)(y + r), (int16_t)(h - (r << 1)), color);
-    int16_t cx = 0, cy = r, d = (int16_t)(1 - r);
+    int16_t cx = 0;
+    int16_t cy = r;
+    int16_t d = (int16_t)(1 - r);
     while (cx <= cy) {
       drawPixel((int16_t)(x1 - r + cx), (int16_t)(y1 - r + cy), color);
       drawPixel((int16_t)(x + r - cx), (int16_t)(y1 - r + cy), color);
@@ -269,7 +276,9 @@ class TinyGFX {
     const int16_t x1 = (int16_t)(x + w - 1);
     startWrite();
     fillRect((int16_t)(x + r), y, (int16_t)(w - (r << 1)), h, color);
-    int16_t cx = 0, cy = r, d = (int16_t)(1 - r);
+    int16_t cx = 0;
+    int16_t cy = r;
+    int16_t d = (int16_t)(1 - r);
     while (cx <= cy) {
       drawFastVLine((int16_t)(x + r - cy), (int16_t)(y + r - cx), (int16_t)(h - ((r - cx) << 1)), color);
       drawFastVLine((int16_t)(x1 - r + cy), (int16_t)(y + r - cx), (int16_t)(h - ((r - cx) << 1)), color);
@@ -300,7 +309,8 @@ class TinyGFX {
     if (y1 > y2) { swap16(x1, x2); swap16(y1, y2); }
     if (y0 > y1) { swap16(x0, x1); swap16(y0, y1); }
     if (y0 == y2) {  // degenerate: a horizontal line
-      int16_t lo = x0, hi = x0;
+      int16_t lo = x0;
+      int16_t hi = x0;
       if (x1 < lo) lo = x1; else if (x1 > hi) hi = x1;
       if (x2 < lo) lo = x2; else if (x2 > hi) hi = x2;
       drawFastHLine(lo, y0, (int16_t)(hi - lo + 1), color);
@@ -312,7 +322,8 @@ class TinyGFX {
     startWrite();
     for (int16_t y = y0; y <= y2; ++y) {
       if (y == y1) shortEdge.init(x1, y1, x2, y2);
-      int16_t a = longEdge.x, b = shortEdge.x;
+      int16_t a = longEdge.x;
+      int16_t b = shortEdge.x;
       if (a > b) { const int16_t t = a; a = b; b = t; }
       drawFastHLine(a, y, (int16_t)(b - a + 1), color);
       longEdge.step();
@@ -385,9 +396,11 @@ class TinyGFX {
   // ---- images ----------------------------------------------------------
   void pushImage(int16_t x, int16_t y, int16_t w, int16_t h, const uint16_t* data) {
     if (w <= 0 || h <= 0 || data == nullptr) return;
-    int16_t sx = 0, sy = 0;
+    int16_t sx = 0;
+    int16_t sy = 0;
     // 32 bits for the far edge - see fillRect for why.
-    int32_t x1 = (int32_t)x + w - 1, y1 = (int32_t)y + h - 1;
+    int32_t x1 = (int32_t)x + w - 1;
+    int32_t y1 = (int32_t)y + h - 1;
     // sx and sy stay in 16 bits, and that is safe rather than lucky.
     // _clipX0 - x only exceeds int16_t when it exceeds 32767, and getting past
     // the x > x1 test below then needs w - 1 >= _clipX0 - x > 32767, i.e. a
@@ -604,7 +617,11 @@ class TinyGFX {
 
   /// An edge that steps x once per scanline, without dividing.
   struct Edge {
-    int16_t x = 0, dx = 0, dy = 1, sx = 1, err = 0;
+    int16_t x = 0;
+    int16_t dx = 0;
+    int16_t dy = 1;
+    int16_t sx = 1;
+    int16_t err = 0;
     void init(int16_t x0, int16_t y0, int16_t x1, int16_t y1) {
       x = x0;
       dx = (int16_t)(x1 > x0 ? x1 - x0 : x0 - x1);
@@ -621,9 +638,16 @@ class TinyGFX {
 
   TinyGFXTarget* _panel;
   const TinyGFXFontRef* _font = nullptr;
-  int16_t _clipX0 = 0, _clipY0 = 0, _clipX1 = 0, _clipY1 = 0;
-  int16_t _cursorX = 0, _cursorY = 0;
-  uint16_t _textFg = 0xFFFF, _textBg = 0x0000;
-  uint8_t _rotation = 0, _txn = 0, _textSize = 1;
+  int16_t _clipX0 = 0;
+  int16_t _clipY0 = 0;
+  int16_t _clipX1 = 0;
+  int16_t _clipY1 = 0;
+  int16_t _cursorX = 0;
+  int16_t _cursorY = 0;
+  uint16_t _textFg = 0xFFFF;
+  uint16_t _textBg = 0x0000;
+  uint8_t _rotation = 0;
+  uint8_t _txn = 0;
+  uint8_t _textSize = 1;
   bool _textHasBg = false;
 };

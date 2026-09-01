@@ -143,7 +143,8 @@ class TinyGFXBusSPI : public TinyGFXBus {
   }
 
   void writeColor(uint16_t color, uint32_t count) override {
-    const uint8_t hi = (uint8_t)(color >> 8), lo = (uint8_t)color;
+    const uint8_t hi = (uint8_t)(color >> 8);
+    const uint8_t lo = (uint8_t)color;
 #if TINYGFX_FILL_CHUNK > 0
     if (count >= TINYGFX_FILL_CHUNK) {
       uint8_t buf[TINYGFX_FILL_CHUNK * 2];  // on the stack; no static RAM added

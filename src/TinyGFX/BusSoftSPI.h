@@ -67,7 +67,8 @@ class TinyGFXBusSoftSPI : public TinyGFXBus {
   }
 
   void writeColor(uint16_t color, uint32_t count) override {
-    const uint8_t hi = (uint8_t)(color >> 8), lo = (uint8_t)color;
+    const uint8_t hi = (uint8_t)(color >> 8);
+    const uint8_t lo = (uint8_t)color;
     while (count--) { shiftOutByte(hi); shiftOutByte(lo); }
   }
 
@@ -89,5 +90,8 @@ class TinyGFXBusSoftSPI : public TinyGFXBus {
     }
   }
 
-  int8_t _sck, _mosi, _dc, _cs;
+  int8_t _sck;
+  int8_t _mosi;
+  int8_t _dc;
+  int8_t _cs;
 };

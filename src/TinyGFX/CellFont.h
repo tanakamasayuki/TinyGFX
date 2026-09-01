@@ -62,9 +62,12 @@ typedef struct CellFont {
   const struct CellFont* next;  ///< NULL ends the chain
   uint16_t first;               ///< first code of the contiguous index, or of the head block
   uint16_t count;               ///< number of glyphs
-  uint8_t width, height;        ///< width is for fixed pitch; height is shared by every glyph
-  uint8_t xAdvance, yAdvance;   ///< xAdvance is for fixed pitch; yAdvance is the line advance
-  int8_t xOffset, yOffset;      ///< shared by every glyph; yOffset is usually negative
+  uint8_t width;                ///< for fixed pitch
+  uint8_t height;               ///< shared by every glyph
+  uint8_t xAdvance;             ///< for fixed pitch
+  uint8_t yAdvance;             ///< the line advance
+  int8_t xOffset;               ///< shared by every glyph
+  int8_t yOffset;               ///< shared by every glyph, and usually negative
   uint8_t bytesPerGlyph;        ///< fixed pitch only, so nothing divides at run time
   uint8_t headCount;            ///< head block length of a sparse index (>= 1); 0 when contiguous
 } CellFont;

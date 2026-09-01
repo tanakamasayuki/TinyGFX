@@ -59,12 +59,18 @@ API.ja.md と同じく日英を用意する。
 
 **買った製品そのもの。** 「0.96 インチ 128x64 の I2C OLED」に相当するもの。
 
-`TinyGFXDriverSSD1306_128x64` のように、**コントローラ名と寸法で名前が付く。**
+`TinyGFXPanelSSD1306_128x64` のように、**コントローラ名と寸法で名前が付く。**
 カタログから 1 枚選んで include する。
 
 ```cpp
 #include <TinyGFX/panels/SSD1306_128x64.h>
+static uint8_t fb[TINYGFX_PANEL::kBufferBytes];
+TINYGFX_PANEL panel(bus, fb);
 ```
+
+**include するとパネルに名前が付く**ので、クラス名を書くのは 1 回だけ。
+**2 枚使うと `TINYGFX_PANEL` は消える** —— 「どちらのことか」が決まらないので、
+2 枚目のヘッダが取り下げる。そのときはクラス名で書く。
 
 パネルはプリセット（§3）であって、ドライバ（§2）ではない。**同じドライバでも
 ガラスが違えば別のパネル**であり、多重比・列オフセット・COM 配線が変わる。

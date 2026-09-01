@@ -150,7 +150,8 @@ inline int16_t draw(TinyGFX& g, const void* font, uint16_t ch, int16_t x, int16_
   const uint8_t b1 = f.bitsPer1();
   const uint16_t fg = g.getTextColor();
 
-  uint8_t cx = 0, cy = 0;
+  uint8_t cx = 0;
+  uint8_t cy = 0;
   g.startWrite();
   do {
     const uint8_t zeros = bits.get(b0);

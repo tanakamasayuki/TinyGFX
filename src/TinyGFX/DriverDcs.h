@@ -149,10 +149,17 @@ class TinyGFXDriverDcs : public TinyGFXTarget {
   }
 
   TinyGFXBus* _bus;
-  int16_t _natW, _natH;
-  int16_t _offX0 = 0, _offY0 = 0;  // offset at rotation 0
-  int16_t _gramW = 0, _gramH = 0;  // 0 means "same as the panel"
-  int16_t _offX = 0, _offY = 0;    // offset at the current rotation
+  int16_t _natW;
+  int16_t _natH;
+  // The offset at rotation 0
+  int16_t _offX0 = 0;
+  int16_t _offY0 = 0;
+  // The controller's memory. 0 means "same as the panel"
+  int16_t _gramW = 0;
+  int16_t _gramH = 0;
+  // The offset at the current rotation
+  int16_t _offX = 0;
+  int16_t _offY = 0;
   void deriveOffsets();
 
   int8_t _rst;

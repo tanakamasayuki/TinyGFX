@@ -84,7 +84,8 @@ struct CellBits {
 
   const uint8_t* src;
 #if defined(__AVR__)
-  uint8_t acc = 0, left = 0;
+  uint8_t acc = 0;
+  uint8_t left = 0;
   bool next() {
     if (left == 0) { acc = CELLFONT_READ_U8(src++); left = 8; }
     const bool b = (acc & 0x80) != 0;
@@ -124,7 +125,8 @@ inline bool indexIn(const CellFont* f, uint16_t ch, uint16_t* outIndex) {
     }
     // The tail. Codes smaller than `first` can appear here, so an early
     // `ch < first` bail-out would be wrong.
-    uint16_t lo = 0, hi = (uint16_t)(count - head);
+    uint16_t lo = 0;
+    uint16_t hi = (uint16_t)(count - head);
     while (lo < hi) {
       const uint16_t mid = (uint16_t)(lo + ((hi - lo) >> 1));
       const uint16_t v = CELLFONT_READ_U16(&codes[mid]);
@@ -195,7 +197,8 @@ inline int16_t draw(TinyGFX& g, const void* font, uint16_t ch, int16_t x, int16_
   const uint8_t sz = 1;
 #endif
   uint32_t bmOffset;
-  uint8_t gw, adv;
+  uint8_t gw;
+  uint8_t adv;
 #if TINYGFX_FONT_RECORDS
   const CellGlyph* gp = (const CellGlyph*)CELLFONT_READ_PTR(&f->glyphs);
   if (gp != nullptr) {  // variable pitch: look it up in the glyph table
