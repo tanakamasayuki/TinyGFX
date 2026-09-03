@@ -37,7 +37,7 @@ void setup() {
 ## 2. 登録（attach / detach）
 
 ```c
-bool emu_attach_i2c (EmuCtx*, uint8_t bus, uint8_t addr,  const EmuI2cDeviceOps*, void* dev);
+bool emu_attach_i2c (EmuCtx*, uint8_t bus, uint16_t addr, const EmuI2cDeviceOps*, void* dev);
 bool emu_attach_spi (EmuCtx*, uint8_t bus, EmuLine cs, const EmuSpiRoles*, const EmuSpiDeviceOps*, void* dev);
 bool emu_attach_uart(EmuCtx*, uint8_t port,               const EmuUartDeviceOps*, void* dev);
 bool emu_attach_pins(EmuCtx*, const EmuLine*, uint8_t n,  const EmuPinDeviceOps*, void* dev);
@@ -45,10 +45,19 @@ bool emu_detach     (EmuCtx*, void* dev);
 ```
 
 - **統一 API。** 適合するどの環境でも同じ行が動く
-- バスは宣言不要（番号は鍵）。上限は登録数で、表の容量は ctx 初期化時に渡す
+- バスは宣言不要（番号は鍵）。**上限は 2 段**（CONCEPTS §5-11）: IF 上の上限は
+  型幅（バス番号 uint8_t = 255 まで、アドレスは 10 ビット I2C が入る幅）。
+  **実際の上限は環境と ctx が規定**する —— 表の容量は ctx 初期化時に渡し、
+  超過した attach は失敗が返る
 - 番号の写像はフレームワーク中間層の規約（Arduino: `Wire`=0、`Wire1`=1）
 - **I2C の attach にピンは出ない。** 線が出るのは SPI の CS だけ（バス内の宛先が
   線しか無いため）
+- **attach は束縛表でもある。** デバイスの役割番号（0 始まり・全環境共通）と
+  世界の線（この環境の番号）の対応はここで渡す —— `attach_pins` の線配列は
+  **添字 = デバイスの役割番号**、SPI の `EmuSpiRoles` は DC などの役割 → 線。
+  「デバイスの PWM1 はこの GPIO」もこの形
+- 線番号を直接使う台本（`emu_at_line`）は**この環境・この板に束縛される**
+  （実物のピン番号と同じ）。可搬にしたい台本は物理チャネル（`emu_at_phys`）を使う
 - 同じバスに複数デバイス可。一意なのは宛先。**占有済みへの attach は失敗が返る**
   （黙って置き換えない）。同じ実体を複数宛先に付けるのは可
 - テスト間の掃除は `emu_detach`

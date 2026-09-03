@@ -15,6 +15,10 @@
 **部分実装は正当。** E1 だけなら「解析専用環境」（実機タップがそれ）。
 実装した範囲を `emu_bind()` の能力宣言で申告し、テスト側の skip 判断に使わせる。
 
+**実際の上限も環境が規定してよい**（観測できる線の数・バス数・リスナー数。
+CONCEPTS §5-11）。義務は 2 つ —— 能力宣言に含めて見えるようにすること、
+超過は黙らず失敗を返すこと。
+
 ## 2. 層の役割 —— ①は薄く、②に意味論を集める
 
 環境は 2 枚で作る（[CONCEPTS.ja.md](CONCEPTS.ja.md) §4.9）。
@@ -23,6 +27,10 @@
 | --- | --- | --- |
 | ① フレームワーク実装 | **タップの場所**と機構（ピンを変える・ISR を走らせる・受信バッファに積む） | 意味論の判断 |
 | ② フレームワーク中間層 | **フレームワークの意味論**（Arduino なら: mode 値の解釈、Wire の作法、CS がただの GPIO であること、`Wire`=バス 0 の写像） | 契約より下の知識 |
+
+**EmuLine の番号の意味は環境（中間層）が宣言する。** 型（幅）は契約が固定して
+いるので型は必ず通る。Arduino 中間層はピン番号、ESP-IDF 中間層は gpio_num を
+そのまま写すのが自然。宣言は `emu_bind` の情報に含める。
 
 ②は**両面を持つ翻訳器**で、同じフレームワークの別実装から使い回せる共有
 ライブラリにする。上面はフレームワークの言葉のまま
@@ -42,7 +50,7 @@ void    emu_gpio_output(EmuCtx*, EmuLine, uint8_t level);   // CS 追跡もこ�
 uint8_t emu_gpio_input (EmuCtx*, EmuLine);                  // 結果込みで記録
 
 // 解釈層（ハードウェア周辺のタップ。線イベントは捏造しない）
-uint8_t emu_i2c_txn   (EmuCtx*, uint8_t bus, uint8_t addr,
+uint8_t emu_i2c_txn   (EmuCtx*, uint8_t bus, uint16_t addr,
                        const uint8_t* w, size_t wn,
                        uint8_t* r, size_t rn, bool stop);   // 状態コードを返す
 void    emu_spi_config(EmuCtx*, uint8_t bus, uint32_t hz, uint8_t mode);
