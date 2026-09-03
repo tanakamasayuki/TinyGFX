@@ -50,7 +50,8 @@ uint8_t emu_spi_xfer  (EmuCtx*, uint8_t bus, uint8_t out);  // CS は線の状�
 void    emu_uart_tx   (EmuCtx*, uint8_t port, const uint8_t*, size_t);
 size_t  emu_uart_rx   (EmuCtx*, uint8_t port, uint8_t*, size_t);
 void    emu_pwm       (EmuCtx*, EmuLine, uint32_t hz, uint32_t duty, uint8_t bits);
-uint16_t emu_adc      (EmuCtx*, EmuLine);                   // 物理面から解決
+void    emu_dac       (EmuCtx*, EmuLine, uint16_t value);   // アナログ出力（電圧値）
+uint16_t emu_adc      (EmuCtx*, EmuLine);                   // アナログ入力。物理面から解決
 
 // 時間と割り込み（安全点の運転）
 void emu_wait       (EmuCtx*, uint64_t dur_us);   // DES: 予定を発火しつつ進める
