@@ -12,16 +12,20 @@
 3. **自分の状態**（呼び出し側が確保して渡したメモリ）
 
 ```c
+// EmuBinding は attach が作る束縛（役割 → 世界の線、UART ならポート）。
+// デバイスは中身を見ない —— 自分の役割番号と物理チャネルだけで喋る。
 typedef struct {
-  void     (*drive_line)(EmuCtx*, EmuLine, uint8_t level);   // INT を引く 等
-  void     (*uart_send) (EmuCtx*, uint8_t port, const uint8_t*, size_t);
-  uint64_t (*now_us)    (EmuCtx*);                           // busy の表現用
-  EmuCtx*  ctx;
+  void     (*drive)(EmuBinding*, uint8_t role, uint8_t level);  // INT を引く 等
+  void     (*uart_send)(EmuBinding*, const uint8_t*, size_t);   // 自分のポートへ
+  uint64_t (*now_us)(EmuBinding*);                              // busy の表現用
+  EmuBinding* self;
 } EmuDeviceEnv;
 ```
 
-`drive_line` は**線のレベルを変えるだけ**。割り込みが起きるかは関知しない
-（[CONCEPTS.ja.md](CONCEPTS.ja.md) §4.7 —— 割り込みは経路ではなく帰結）。
+**デバイスは世界の線番号（EmuLine）もポート番号も知らない。** `drive` の
+`role` は**自分の 0 始まりの役割番号**で、線への写しは attach 時の束縛表が持つ
+（[CONCEPTS.ja.md](CONCEPTS.ja.md) §4.5「名前は 3 種」）。割り込みが起きるかは
+関知しない（§4.7 —— 割り込みは経路ではなく帰結）。
 
 ## 2. 実装する ops（4 形のうち自分のもの）
 
@@ -46,9 +50,9 @@ typedef struct {
   void (*tx)(void* dev, const uint8_t*, size_t);
 } EmuUartDeviceOps;
 
-// レベル型: 線の変化を受ける
+// レベル型: 線の変化を役割番号で受ける（attach の線配列の添字 = 役割番号）
 typedef struct {
-  void (*line)(void* dev, EmuLine, uint8_t level);
+  void (*line)(void* dev, uint8_t role, uint8_t level);
 } EmuPinDeviceOps;
 ```
 
@@ -106,4 +110,6 @@ RAM に 128 列の窓、のようにオフセットのずれが絵で見える�
 - `<Arduino.h>` もどのフレームワークのヘッダも含めない。動的確保・例外・RTTI・
   I/O をしない（MCU に載る前提 —— U16）
 - `EmuDeviceEnv` 以外の道で世界に触れない
+- **EmuLine を受け取らない・保存しない**（役割番号だけで喋る。線を知った時点で
+  その環境に縛られる）
 - デバイス種の列挙に自分を足す必要があったら、それは契約側の設計ミス（報告する）
