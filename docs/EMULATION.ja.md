@@ -254,6 +254,26 @@ TinyGFX がバスとパネルを Protocol で切り離しているのと同じ�
 デバイスは**解釈層に接続する**のが基本形（線層しか無い経路は持ち上げ器を
 挟む）。レベル型だけは線層に直接付く。
 
+#### attach の細目
+
+- **attach は Protocol が規定する統一 API。** 環境ごとの登録口は作らない。
+  同じデバイス + 同じ attach 行が、適合するどの環境でも動く
+- **バスは宣言不要で、番号は鍵にすぎない。** 参照された時点で存在する。
+  上限は「バスの数」ではなく**登録数**で決まり、エンドポイント表の容量は
+  呼び出し側が用意する（動的確保なしの帰結。既定の静的容量 + 差し替え可）
+- **番号 ↔ 実体の写像はフレームワーク中間層の規約。** Arduino 中間層は
+  `Wire` = バス 0、`Wire1` = バス 1（host-arduino-core の `busNum()` と同じ）。
+  ESP-IDF 中間層は `i2c_port_t` を写す。契約は番号しか知らない
+- **I2C の attach に線（ピン）は出ない。** 宛先はアドレスで足りる。線が出るのは
+  **SPI の CS だけ** —— SPI にはバス内の宛先が線しか無いため（これは Arduino の
+  漏れではなくハードウェアの事実）。UART はポート番号、レベル型は線集合
+- **同じバスに複数デバイスは当然可**（U19。それが表の存在理由）。一意なのは
+  宛先 (bus, addr) / (bus, cs)。**占有済みの宛先への attach は音を立てて失敗**
+  させる —— 黙って置き換えない（TinyGFX の「1 スケッチ 1 パネル」と同じ思想）
+- 逆に**同じデバイス実体を複数の宛先に attach するのは可**（バンク切り替えで
+  複数アドレスに応える EEPROM など）
+- **detach も対で置く**（テスト間の掃除）
+
 ### 4.4 デバイス = 枠組み + 解釈器 + 状態
 
 | 層 | 何をするか | 変わる軸 |
@@ -487,6 +507,134 @@ callback を渡しておき、解釈器が呼ぶと**世界の注入点（E3）*
 
 何を公開するかは**デバイスの作者が決める**。核が強制するのは命名と置き場所
 （読み出し層）だけ。B 系統（ログ解析）はこれらに触れない（§6-10）。
+
+### 4.12 契約の関数一覧（v0 案）—— これが揃って Protocol になる
+
+**接頭辞 `emu_` は仮**（ライブラリ名が未決のため）。すべて C から呼べる形で、
+第 1 引数は必ず世界 `EmuCtx*`（グローバルを持たない —— 並列テストと複数世界の
+ため。表の記憶域は ctx の初期化時に呼び出し側が渡す）。段階 1 でこの一覧を
+凍結するのが受け入れ条件になる。
+
+#### (a) 利用者が呼ぶ —— テストの支度と観察
+
+```c
+// 登録（4 形。占有済みは失敗を返す。detach が対）
+bool emu_attach_i2c (EmuCtx*, uint8_t bus, uint8_t addr,
+                     const EmuI2cDeviceOps*, void* dev);
+bool emu_attach_spi (EmuCtx*, uint8_t bus, EmuLine cs,
+                     const EmuSpiRoles*,      // DC など役割→線の割り当て（任意）
+                     const EmuSpiDeviceOps*, void* dev);
+bool emu_attach_uart(EmuCtx*, uint8_t port,
+                     const EmuUartDeviceOps*, void* dev);
+bool emu_attach_pins(EmuCtx*, const EmuLine*, uint8_t n,
+                     const EmuPinDeviceOps*, void* dev);
+bool emu_detach     (EmuCtx*, void* dev);    // その実体の全宛先を外す
+
+// 観測（B 系統。何個でも。読み取り専用）
+EmuListenerId emu_listen  (EmuCtx*, uint32_t domainMask,
+                           void (*fn)(const EmuEvent*, void* user), void* user);
+void          emu_unlisten(EmuCtx*, EmuListenerId);
+
+// 刺激（台本。時刻順に発火し、イベントに写る）
+void emu_at_line(EmuCtx*, uint64_t t_us, EmuLine, uint8_t level);
+void emu_at_rx  (EmuCtx*, uint64_t t_us, uint8_t port, const uint8_t*, size_t);
+void emu_at_phys(EmuCtx*, uint64_t t_us, void* dev, uint8_t channel, int32_t value);
+
+// 時計と能力
+uint64_t emu_now_us(EmuCtx*);
+uint32_t emu_caps  (EmuCtx*);                // 環境が宣言した能力（§4.7）
+
+// イベントの直列化（トレース = キャプチャ = golden の 1 形式）
+size_t emu_event_write(const EmuEvent*, char* out, size_t cap);
+bool   emu_event_read (const char* line, EmuEvent* out);
+```
+
+デバイスの検分・仕込みは**ここに無い** —— 手元のハンドルの型付き口で直接
+（§4.11。契約は中継しない）。
+
+#### (b) デバイス作者が実装する —— ops（4 形）と、渡される道具
+
+```c
+// I2C: トランザクション単位（Wire の意味論と同じ粒度）。0 = ACK、2 = 不在
+typedef struct {
+  uint8_t (*write)(void* dev, const uint8_t*, size_t, bool stop);
+  size_t  (*read) (void* dev, uint8_t*, size_t, bool stop);
+  void    (*reset)(void* dev);               // RESET 線・電源投入相当（任意）
+} EmuI2cDeviceOps;
+
+// SPI: バイト単位・全二重。役割線（DC 等）はレベルで通知される
+typedef struct {
+  void    (*select)(void* dev, bool asserted);         // CS の縁
+  uint8_t (*transfer)(void* dev, uint8_t out);         // MISO を返す（無応答 0xFF）
+  void    (*role)(void* dev, uint8_t roleId, uint8_t level);  // DC など（任意）
+  void    (*reset)(void* dev);
+} EmuSpiDeviceOps;
+
+// UART: アプリの送信を受ける。デバイスからの送信は env 経由（下）
+typedef struct {
+  void (*tx)(void* dev, const uint8_t*, size_t);
+} EmuUartDeviceOps;
+
+// レベル型: 線の変化を受ける
+typedef struct {
+  void (*line)(void* dev, EmuLine, uint8_t level);
+} EmuPinDeviceOps;
+
+// attach 時にデバイスへ渡される道具（デバイス → 世界への唯一の出口）
+typedef struct {
+  void     (*drive_line)(EmuCtx*, EmuLine, uint8_t level);   // INT を引く 等
+  void     (*uart_send) (EmuCtx*, uint8_t port, const uint8_t*, size_t);
+  uint64_t (*now_us)    (EmuCtx*);                           // busy の表現用
+  EmuCtx*  ctx;
+} EmuDeviceEnv;
+
+// 物理面: 名前つきチャネルの宣言（emu_at_phys の宛先になる）
+uint8_t emu_phys_channel(EmuCtx*, void* dev, const char* name,
+                         void (*set)(void* dev, int32_t value));
+```
+
+#### (c) 環境が呼ぶ —— タップと解決（B1/B2/B3/B4 の実体）
+
+環境（フレームワーク中間層）は API 実装の中からこれを呼ぶ。**記録・振り分け・
+応答・刺激の発火はぜんぶこの中**で起きるので、環境側に判断は残らない。
+
+```c
+// GPIO（線層）
+void    emu_gpio_mode  (EmuCtx*, EmuLine, uint8_t dir, uint8_t pull);
+void    emu_gpio_output(EmuCtx*, EmuLine, uint8_t level);   // CS 追跡もここ
+uint8_t emu_gpio_input (EmuCtx*, EmuLine);                  // 結果込みで記録
+
+// 解釈層（ハードウェア周辺のタップ。線イベントは捏造しない）
+uint8_t emu_i2c_txn   (EmuCtx*, uint8_t bus, uint8_t addr,
+                       const uint8_t* w, size_t wn,
+                       uint8_t* r, size_t rn, bool stop);   // 状態コードを返す
+void    emu_spi_config(EmuCtx*, uint8_t bus, uint32_t hz, uint8_t mode);
+uint8_t emu_spi_xfer  (EmuCtx*, uint8_t bus, uint8_t out);  // CS は線の状態から
+void    emu_uart_tx   (EmuCtx*, uint8_t port, const uint8_t*, size_t);
+size_t  emu_uart_rx   (EmuCtx*, uint8_t port, uint8_t*, size_t);  // 受信を引き取る
+void    emu_pwm       (EmuCtx*, EmuLine, uint32_t hz, uint32_t duty, uint8_t bits);
+uint16_t emu_adc      (EmuCtx*, EmuLine);                   // 物理面から解決
+
+// 時間と割り込み（安全点の運転）
+void emu_wait       (EmuCtx*, uint64_t dur_us);   // DES: 予定を発火しつつ進める
+void emu_int_attach (EmuCtx*, EmuLine, uint8_t edge, uint32_t token);
+void emu_int_detach (EmuCtx*, EmuLine);
+bool emu_int_pending(EmuCtx*, uint32_t* token);   // 安全点で環境が引き、ISR を走らせる
+
+// 環境の自己申告
+void emu_bind(EmuCtx*, const EmuEnvInfo*);        // 能力・時計モード・名前
+```
+
+#### 一覧の読み方
+
+| 観点 | どこに現れているか |
+| --- | --- |
+| 観測と応答の分離（§4.1） | (a) の listen には戻り値が無く、(b) の ops だけが応答を返す |
+| 線層と解釈層（§4.2b） | (c) が 2 群に分かれている。`emu_i2c_txn` は線イベントを作らない |
+| デバイスの出口は 1 つ（§4.10） | (b) の `EmuDeviceEnv` 経由のみ。デバイスは EmuCtx の他の口を知らない |
+| 割り込みは帰結（§4.10） | (c) に「ISR を呼ぶ」は無い。`emu_int_pending` を環境が安全点で引く |
+| 中継しない（§4.11） | (a) にデバイス内部へ触る関数が無い |
+| 追加のみ（§6-1） | ops は末尾追加、イベントはドメイン追加で伸びる |
 
 ## 5. いまの課題（2026-09-03 実測。= 既存が覆っていない証拠）
 
